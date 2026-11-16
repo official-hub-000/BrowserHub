@@ -1,0 +1,77 @@
+@import "tailwindcss";
+
+@layer base {
+  * {
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+  }
+}
+
+/* Sleek mobile scrollbars */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.25);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.45);
+}
+
+@keyframes pulseGlow {
+  0%, 100% {
+    opacity: 0.7;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.06);
+  }
+}
+
+.animate-pulse-glow {
+  animation: pulseGlow 2.4s ease-in-out infinite;
+}
+
+@keyframes fireSweep {
+  0% {
+    opacity: 0;
+    transform: translateY(35%) scale(0.95);
+  }
+  35% {
+    opacity: 1;
+    transform: translateY(0%) scale(1.02);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-30%) scale(1.08);
+  }
+}
+
+.animate-fire-sweep {
+  animation: fireSweep 1.15s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+/* Element Zapper interactive hover highlight */
+.zapper-active [data-zappable="true"]:hover {
+  outline: 2px dashed #f43f5e !important;
+  background-color: rgba(244, 63, 94, 0.14) !important;
+  cursor: crosshair !important;
+}

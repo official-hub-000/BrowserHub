@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">BrowserHub</string>
+    <string name="vpn_service_label">BrowserHub Zero-Log Privacy Tunnel</string>
+    <string name="vpn_disclosure_title">BrowserHub Built-In Privacy VPN Disclosure</string>
+    <string name="vpn_disclosure_message">BrowserHub uses Android VpnService exclusively when you enable the built-in VPN to create an encrypted WireGuard / DNS-over-HTTPS tunnel between your device and your chosen server node. Zero browsing history, DNS queries, or IP addresses are logged, stored, or shared with third parties.</string>
+</resources>

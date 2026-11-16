@@ -1,0 +1,86 @@
+name: Build Play Store AAB & Signed APK
+
+on:
+  push:
+    branches:
+      - main
+      - master
+      - "arena/**"
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build-android:
+    name: Build Play Store Bundle (.aab) & Universal APK (.apk)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Install Web Dependencies & Build BrowserHub Bundle
+        run: |
+          npm ci
+          npm run build
+          mkdir -p android/app/src/main/assets/public
+          cp -r dist/* android/app/src/main/assets/public/
+
+      - name: Setup JDK 17 (Temurin)
+        uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "17"
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Setup Gradle 8.10.2
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.10.2"
+
+      - name: Configure Upload Keystore
+        working-directory: android
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 --decode > upload-keystore.jks
+            printf "storeFile=upload-keystore.jks\nstorePassword=%s\nkeyAlias=%s\nkeyPassword=%s\n" \
+              "$KEYSTORE_PASSWORD" "$KEY_ALIAS" "$KEY_PASSWORD" > keystore.properties
+          else
+            keytool -genkeypair -v \
+              -keystore upload-keystore.jks \
+              -keyalg RSA -keysize 4096 -validity 9125 \
+              -alias browserhub-upload \
+              -storepass BrowserHubRelease2026! \
+              -keypass BrowserHubRelease2026! \
+              -dname "CN=BrowserHub Mobile, OU=Android Engineering, O=BrowserHub, L=San Francisco, ST=CA, C=US"
+            printf "storeFile=upload-keystore.jks\nstorePassword=BrowserHubRelease2026!\nkeyAlias=browserhub-upload\nkeyPassword=BrowserHubRelease2026!\n" > keystore.properties
+          fi
+
+      - name: Compile Signed Play Store AAB & Universal APK
+        working-directory: android
+        run: |
+          gradle bundlePlaystoreRelease assembleUniversalRelease --stacktrace
+
+      - name: Upload Google Play Store App Bundle (.aab)
+        uses: actions/upload-artifact@v4
+        with:
+          name: BrowserHub-PlayStore-Release-AAB
+          path: android/app/build/outputs/bundle/playstoreRelease/*.aab
+
+      - name: Upload Direct Sideload Universal Release APK (.apk)
+        uses: actions/upload-artifact@v4
+        with:
+          name: BrowserHub-Universal-Release-APK
+          path: android/app/build/outputs/apk/universal/release/*.apk

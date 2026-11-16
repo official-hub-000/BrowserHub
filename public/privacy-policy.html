@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>BrowserHub — Official Privacy Policy &amp; VpnService Disclosure</title>
+    <style>
+      body {
+        font-family: system-ui, -apple-system, sans-serif;
+        background: #060b16;
+        color: #e2e8f0;
+        line-height: 1.7;
+        margin: 0;
+        padding: 2rem 1.25rem;
+      }
+      main {
+        max-width: 780px;
+        margin: 0 auto;
+        background: #0f172a;
+        border: 1px solid #1e293b;
+        border-radius: 20px;
+        padding: 2rem;
+      }
+      h1, h2 { color: #38bdf8; }
+      .badge {
+        display: inline-block;
+        background: rgba(16, 185, 129, 0.15);
+        color: #34d399;
+        border: 1px solid rgba(52, 211, 153, 0.35);
+        border-radius: 999px;
+        padding: 0.25rem 0.75rem;
+        font-size: 0.8rem;
+        font-weight: 700;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <span class="badge">Zero Data Collected • Google Play Policy Compliant</span>
+      <h1>BrowserHub Privacy Policy</h1>
+      <p><strong>Effective Date:</strong> November 16, 2026</p>
+
+      <h2>1. Zero Data Collection &amp; Zero Telemetry</h2>
+      <p>
+        BrowserHub ("the App", package <code>com.browserhub.app</code>) does <strong>not</strong> collect,
+        log, store on external servers, sell, or share any personal information, browsing history, search queries,
+        IP addresses, device identifiers, or crash analytics. All tabs, bookmarks, passwords, and settings
+        reside strictly locally on your Android device.
+      </p>
+
+      <h2>2. Android VpnService Disclosure</h2>
+      <p>
+        BrowserHub integrates Android's <code>android.net.VpnService</code> API solely to provide an optional,
+        user-initiated encrypted privacy tunnel (WireGuard / DNS-over-HTTPS) that protects web traffic on public
+        and untrusted networks. Before activating the VPN for the first time, BrowserHub displays an explicit
+        in-app consent disclosure. No traffic payloads, DNS lookups, or source IP addresses are logged or monetized,
+        and BrowserHub never redirects or manipulates traffic from other apps for advertising purposes.
+      </p>
+
+      <h2>3. Local On-Device AI &amp; Translation</h2>
+      <p>
+        BrowserHub's summarization, Q&amp;A copilot, and multi-language page translation features process webpage
+        text locally without requiring third-party cloud API keys, user accounts, or external data storage.
+      </p>
+
+      <h2>4. Biometric Authentication</h2>
+      <p>
+        When Incognito Vault Biometric Lock is enabled, authentication is handled exclusively by Android's
+        system <code>BiometricPrompt</code> hardware keystore. BrowserHub never accesses or stores raw biometric data.
+      </p>
+
+      <h2>5. Instant User Data Deletion</h2>
+      <p>
+        Users can permanently erase all local browsing data, cookies, cache, and storage at any time in one tap
+        using the in-app <strong>Fire Wipe</strong> button or Android System Settings.
+      </p>
+
+      <h2>6. Contact</h2>
+      <p>For privacy inquiries or open-source security audits, please open an issue on the official BrowserHub repository.</p>
+    </main>
+  </body>
+</html>
