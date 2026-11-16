@@ -3,10 +3,6 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.USE_BIOMETRIC" />
 
     <application
@@ -51,19 +47,15 @@
             </intent-filter>
         </activity>
 
-        <!-- Google Play Policy Compliant Zero-Log WireGuard / DoH VpnService -->
+        <!-- Google Play Policy Compliant Zero-Log VpnService -->
         <service
             android:name=".vpn.HubVpnService"
             android:exported="false"
-            android:foregroundServiceType="specialUse"
             android:label="@string/vpn_service_label"
             android:permission="android.permission.BIND_VPN_SERVICE">
             <intent-filter>
                 <action android:name="android.net.VpnService" />
             </intent-filter>
-            <property
-                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="User-initiated zero-log encrypted privacy VPN and DNS-over-HTTPS tunnel for secure mobile web browsing." />
         </service>
     </application>
 </manifest>

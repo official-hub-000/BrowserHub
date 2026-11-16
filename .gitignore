@@ -17,6 +17,7 @@ android-native/app/build/
 *.jks
 *.keystore
 android/keystore.properties
+android/local.properties
 android/app/src/main/assets/public/
 
 # Logs & OS

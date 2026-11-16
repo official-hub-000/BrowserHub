@@ -112,3 +112,14 @@ export const AndroidHybridBridge = {
     };
   },
 };
+
+export function isPlayStoreCompliantFlavor(): boolean {
+  try {
+    if (typeof window !== 'undefined' && window.BrowserHubNative?.isPlayStoreFlavor) {
+      return Boolean(window.BrowserHubNative.isPlayStoreFlavor());
+    }
+  } catch {
+    // Ignore bridge lookup errors outside Android WebView
+  }
+  return false;
+}

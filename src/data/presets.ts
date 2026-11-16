@@ -3,6 +3,7 @@ import type {
   ThemePresetId,
   VpnNode,
 } from '../types/browser';
+import { isPlayStoreCompliantFlavor } from '../bridge/androidHybridBridge';
 
 export const GLOBAL_VPN_NODES: VpnNode[] = [
   {
@@ -97,7 +98,7 @@ export const GLOBAL_VPN_NODES: VpnNode[] = [
   },
 ];
 
-export const INITIAL_EXTENSIONS: BrowserExtension[] = [
+const RAW_INITIAL_EXTENSIONS: BrowserExtension[] = [
   {
     id: 'ublock-origin',
     name: 'uBlock Origin (Full MV2/MV3)',
@@ -252,6 +253,16 @@ export const INITIAL_EXTENSIONS: BrowserExtension[] = [
     usersCount: '3.7M+',
   },
 ];
+
+const PLAY_STORE_EXCLUDED_EXT_IDS = new Set([
+  'sponsorblock',
+  'return-yt-dislike',
+  'bg-video-play',
+]);
+
+export const INITIAL_EXTENSIONS: BrowserExtension[] = isPlayStoreCompliantFlavor()
+  ? RAW_INITIAL_EXTENSIONS.filter((ext) => !PLAY_STORE_EXCLUDED_EXT_IDS.has(ext.id))
+  : RAW_INITIAL_EXTENSIONS;
 
 export const DISCOVER_WORLD_EXTENSIONS: Omit<BrowserExtension, 'enabled' | 'allowIncognito'>[] = [
   {

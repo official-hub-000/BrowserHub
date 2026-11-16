@@ -14,12 +14,12 @@ val keystoreProps = Properties().apply {
 
 android {
     namespace = "com.browserhub.app"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.browserhub.app"
         minSdk = 26
-        targetSdk = 35
+        targetSdk = 36
         versionCode = 100
         versionName = "1.0.0"
     }
