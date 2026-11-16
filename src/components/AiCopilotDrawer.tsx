@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import type { AiChatMessage, BrowserTab } from '../types/browser';
 import { getPageContextForAi } from '../utils/pageTextExtractor';
+import { AiThinkingState } from './AiThinkingState';
 import { runSmartHybridAi } from '../utils/localAiEngine';
 
 interface AiCopilotDrawerProps {
@@ -137,6 +138,7 @@ export const AiCopilotDrawer: React.FC<AiCopilotDrawerProps> = ({
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [slowNetwork, setSlowNetwork] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const startedRef = useRef(false);
@@ -148,6 +150,8 @@ export const AiCopilotDrawer: React.FC<AiCopilotDrawerProps> = ({
   const execute = async (mode: string, customQuery?: string, userLabel?: string) => {
     if (loading) return;
     setLoading(true);
+    setSlowNetwork(false);
+    const slowTimer = window.setTimeout(() => setSlowNetwork(true), 2500);
 
     let nativeText = '';
     try {
@@ -194,6 +198,7 @@ export const AiCopilotDrawer: React.FC<AiCopilotDrawerProps> = ({
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       },
     ]);
+    window.clearTimeout(slowTimer);
     setLoading(false);
   };
 
@@ -392,15 +397,7 @@ export const AiCopilotDrawer: React.FC<AiCopilotDrawerProps> = ({
             </div>
           ))}
 
-          {loading && (
-            <div
-              className="rounded-2xl p-3.5 border border-slate-800 text-xs text-cyan-300 flex items-center gap-2"
-              style={{ backgroundColor: '#111827' }}
-            >
-              <Sparkles size={14} className="animate-spin shrink-0" />
-              <span>Thinking…</span>
-            </div>
-          )}
+          {loading && <AiThinkingState slow={slowNetwork} />}
         </div>
 
         {/* Composer */}

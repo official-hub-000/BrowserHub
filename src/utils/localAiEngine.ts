@@ -293,7 +293,7 @@ export function runLocalAiClient(input: LocalAiInput): LocalAiOutput {
  * Uses the Android shell's worker-thread AI client when available.
  * Returns null when the bridge is missing, the request fails, or it takes too long.
  */
-async function askViaNativeBridge(prompt: string): Promise<string | null> {
+async function askViaNativeBridge(prompt: string, timeoutMs: number): Promise<string | null> {
   const bridge = typeof window !== 'undefined' ? window.BrowserHubNative : undefined;
   if (!bridge?.startAiRequest || !bridge?.pollAiResult) return null;
 
@@ -304,7 +304,7 @@ async function askViaNativeBridge(prompt: string): Promise<string | null> {
     return null;
   }
 
-  const deadline = Date.now() + 22000;
+  const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     await new Promise((r) => setTimeout(r, 500));
     let raw: string | null = null;
@@ -325,6 +325,30 @@ async function askViaNativeBridge(prompt: string): Promise<string | null> {
     }
   }
   return null;
+}
+
+
+/**
+ * Runs a live-AI request with a hard timeout and swallows every failure mode
+ * (blocked network, CORS, malformed body) so callers can fall through cleanly.
+ */
+async function fetchLive(
+  request: (signal: AbortSignal) => Promise<string | null>,
+  timeoutMs: number
+): Promise<string | null> {
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const reply = await request(controller.signal);
+      const trimmed = typeof reply === 'string' ? reply.trim() : '';
+      return trimmed.length > 2 ? trimmed : null;
+    } finally {
+      clearTimeout(timer);
+    }
+  } catch {
+    return null;
+  }
 }
 
 const SYSTEM_PROMPT = `You are BrowserHub AI, the assistant built into the BrowserHub Android browser.
@@ -399,18 +423,17 @@ export async function runSmartHybridAi(input: LocalAiInput): Promise<LocalAiOutp
     bullets: hasPageText ? ['Answered using the clean text of this page'] : [],
   });
 
-  // Attempt 0 — native worker thread inside the APK (no CORS, never blocks the UI).
-  const nativeReply = await askViaNativeBridge(userPrompt);
+  // Live attempts run with a shared budget so the drawer never looks frozen.
+  // Native worker thread (APK, no CORS, off the JS thread) gets first refusal.
+  const nativeReply = await askViaNativeBridge(userPrompt, 15000);
   if (nativeReply) return liveReply(nativeReply);
 
-  // Attempt 1 — direct public endpoint (works where CORS allows).
-  try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 8000);
+  // Direct public endpoint (works wherever CORS allows).
+  const directReply = await fetchLive(async (signal) => {
     const res = await fetch('https://text.pollinations.ai/openai', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      signal: controller.signal,
+      signal,
       body: JSON.stringify({
         model: 'openai',
         messages: [
@@ -420,24 +443,18 @@ export async function runSmartHybridAi(input: LocalAiInput): Promise<LocalAiOutp
         ],
       }),
     });
-    clearTimeout(timer);
-    if (res.ok) {
-      const data: any = await res.json();
-      const reply: string | undefined = data?.choices?.[0]?.message?.content?.trim();
-      if (reply && reply.length > 2) return liveReply(reply);
-    }
-  } catch {
-    // network / CORS blocked — try the same-origin proxy next
-  }
+    if (!res.ok) return null;
+    const data: any = await res.json();
+    return data?.choices?.[0]?.message?.content ?? null;
+  }, 6000);
+  if (directReply) return liveReply(directReply);
 
-  // Attempt 2 — same-origin proxy (used by the Android shell build & web preview).
-  try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 12000);
+  // Same-origin proxy (Android shell asset build & web preview, and CORS fallback).
+  const proxyReply = await fetchLive(async (signal) => {
     const res = await fetch('./api/ai/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      signal: controller.signal,
+      signal,
       body: JSON.stringify({
         messages: priorMsgs,
         query: mode === 'chat' || mode === 'browse_for_me' ? query : '',
@@ -448,15 +465,11 @@ export async function runSmartHybridAi(input: LocalAiInput): Promise<LocalAiOutp
         pageText: hasPageText ? ctx.text : '',
       }),
     });
-    clearTimeout(timer);
-    if (res.ok) {
-      const data: any = await res.json();
-      const reply: string | undefined = data?.responseText?.trim();
-      if (data?.ok && reply && reply.length > 2) return liveReply(reply);
-    }
-  } catch {
-    // offline — fall through to the honest local engine
-  }
+    if (!res.ok) return null;
+    const data: any = await res.json();
+    return data?.ok ? data.responseText ?? null : null;
+  }, 9000);
+  if (proxyReply) return liveReply(proxyReply);
 
   return runLocalAiClient(input);
 }
