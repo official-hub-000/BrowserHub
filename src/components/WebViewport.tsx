@@ -14,7 +14,6 @@ import {
   Cpu,
   Puzzle,
   EyeOff,
-  Search,
   RefreshCw,
   ArrowRight,
 } from 'lucide-react';
@@ -34,6 +33,7 @@ import {
 import { SUPPORTED_LANGUAGES, translateTextLocal } from '../utils/translator';
 import { AndroidHybridBridge } from '../bridge/androidHybridBridge';
 import { sanitizeExtractedPageContent } from '../utils/localAiEngine';
+import { HomeSearchPanel } from './HomeSearchPanel';
 
 interface WebViewportProps {
   tab: BrowserTab;
@@ -98,7 +98,6 @@ export const WebViewport: React.FC<WebViewportProps> = ({
 }) => {
   const [liveResult, setLiveResult] = useState<LiveFetchResult | null>(null);
   const [loadingLive, setLoadingLive] = useState(false);
-  const [startSearchInput, setStartSearchInput] = useState('');
   const [speaking, setSpeaking] = useState(false);
   const [benchRunning, setBenchRunning] = useState(false);
 
@@ -337,71 +336,13 @@ export const WebViewport: React.FC<WebViewportProps> = ({
             </p>
           </div>
 
-          {/* SEARCH ENGINE SELECTOR + BIG SEARCH BAR */}
-          <div
-            className="rounded-2xl border border-slate-800 p-3 sm:p-4 space-y-3 shadow-xl"
-            style={{ backgroundColor: '#0e1526' }}
-          >
-            {/* 1-Tap Search Engine Picker Pills */}
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between px-1">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                  Choose Search Engine
-                </span>
-                <span className="text-[11px] font-semibold text-cyan-400">
-                  Active: {activeSearchEngine.name}
-                </span>
-              </div>
-
-              <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
-                {SEARCH_ENGINE_OPTIONS.map((eng) => {
-                  const selected = customization.searchEngine === eng.id;
-                  return (
-                    <button
-                      key={eng.id}
-                      type="button"
-                      onClick={() => onSelectSearchEngine?.(eng.id)}
-                      className={`px-3 py-1.5 rounded-xl border text-xs font-semibold flex items-center gap-1.5 shrink-0 cursor-pointer transition ${
-                        selected
-                          ? 'bg-cyan-500/20 border-cyan-400 text-white'
-                          : 'bg-slate-900 hover:bg-slate-800 border-slate-800 text-slate-300'
-                      }`}
-                    >
-                      <span>{eng.icon}</span>
-                      <span>{eng.shortLabel}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Prominent Search & Website URL Input */}
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                if (!startSearchInput.trim()) return;
-                onNavigate(startSearchInput.trim());
-                setStartSearchInput('');
-              }}
-              className="flex items-center gap-2 rounded-xl border border-slate-700 focus-within:border-cyan-400 px-3 py-2"
-              style={{ backgroundColor: '#070b14' }}
-            >
-              <span className="text-base shrink-0">{activeSearchEngine.icon}</span>
-              <input
-                value={startSearchInput}
-                onChange={(e) => setStartSearchInput(e.target.value)}
-                placeholder={activeSearchEngine.placeholder}
-                className="flex-1 min-w-0 bg-transparent text-sm text-white placeholder-slate-400 focus:outline-none py-1"
-              />
-              <button
-                type="submit"
-                className="px-3.5 py-2 rounded-xl bg-cyan-400 hover:bg-cyan-300 text-slate-950 font-bold text-xs inline-flex items-center gap-1.5 shrink-0 cursor-pointer"
-              >
-                <Search size={14} />
-                <span>Search</span>
-              </button>
-            </form>
-          </div>
+          {/* SEARCH ENGINE SWITCHER + WIDE SEARCH BAR (single source of truth) */}
+          <HomeSearchPanel
+            customization={customization}
+            isIncognito={tab.isIncognito}
+            onSelectSearchEngine={(id) => onSelectSearchEngine?.(id)}
+            onNavigate={(u) => onNavigate(u)}
+          />
 
           {/* QUICK ACCESS / SPEED DIAL (8 Real Sites) */}
           <div className="space-y-2.5">
