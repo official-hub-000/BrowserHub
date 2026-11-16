@@ -1,9 +1,98 @@
 import type {
   BrowserExtension,
+  SearchEngineId,
   ThemePresetId,
   VpnNode,
 } from '../types/browser';
 import { isPlayStoreCompliantFlavor } from '../bridge/androidHybridBridge';
+
+export interface SearchEngineOption {
+  id: SearchEngineId;
+  name: string;
+  shortLabel: string;
+  icon: string;
+  badgeColor: string;
+  placeholder: string;
+  homeUrl: string;
+  buildUrl: (query: string) => string;
+}
+
+export const SEARCH_ENGINE_OPTIONS: SearchEngineOption[] = [
+  {
+    id: 'google',
+    name: 'Google',
+    shortLabel: 'Google',
+    icon: '🔵',
+    badgeColor: '#3b82f6',
+    placeholder: 'Search Google or type any URL...',
+    homeUrl: 'https://www.google.com',
+    buildUrl: (q) => `https://www.google.com/search?q=${encodeURIComponent(q)}`,
+  },
+  {
+    id: 'duckduckgo',
+    name: 'DuckDuckGo',
+    shortLabel: 'DuckDuckGo',
+    icon: '🦆',
+    badgeColor: '#f97316',
+    placeholder: 'Search DuckDuckGo privately or type URL...',
+    homeUrl: 'https://duckduckgo.com',
+    buildUrl: (q) => `https://duckduckgo.com/?q=${encodeURIComponent(q)}`,
+  },
+  {
+    id: 'brave',
+    name: 'Brave Search',
+    shortLabel: 'Brave',
+    icon: '🦁',
+    badgeColor: '#fb923c',
+    placeholder: 'Search Brave Private Index or type URL...',
+    homeUrl: 'https://search.brave.com',
+    buildUrl: (q) => `https://search.brave.com/search?q=${encodeURIComponent(q)}`,
+  },
+  {
+    id: 'bing',
+    name: 'Microsoft Bing',
+    shortLabel: 'Bing',
+    icon: '🔷',
+    badgeColor: '#0ea5e9',
+    placeholder: 'Search Bing or type any URL...',
+    homeUrl: 'https://www.bing.com',
+    buildUrl: (q) => `https://www.bing.com/search?q=${encodeURIComponent(q)}`,
+  },
+  {
+    id: 'startpage',
+    name: 'Startpage (Anonymous Google)',
+    shortLabel: 'Startpage',
+    icon: '🔒',
+    badgeColor: '#6366f1',
+    placeholder: 'Search Google anonymously via Startpage...',
+    homeUrl: 'https://www.startpage.com',
+    buildUrl: (q) => `https://www.startpage.com/sp/search?query=${encodeURIComponent(q)}`,
+  },
+  {
+    id: 'wikipedia',
+    name: 'Wikipedia',
+    shortLabel: 'Wiki',
+    icon: '📚',
+    badgeColor: '#94a3b8',
+    placeholder: 'Search Wikipedia articles...',
+    homeUrl: 'https://en.wikipedia.org',
+    buildUrl: (q) => `https://en.wikipedia.org/w/index.php?search=${encodeURIComponent(q)}`,
+  },
+  {
+    id: 'github-live',
+    name: 'GitHub Repositories',
+    shortLabel: 'GitHub',
+    icon: '🐙',
+    badgeColor: '#10b981',
+    placeholder: 'Search GitHub repositories & code...',
+    homeUrl: 'https://github.com',
+    buildUrl: (q) => `https://github.com/search?q=${encodeURIComponent(q)}&type=repositories`,
+  },
+];
+
+export function getSearchEngineOption(id: SearchEngineId): SearchEngineOption {
+  return SEARCH_ENGINE_OPTIONS.find((opt) => opt.id === id) || SEARCH_ENGINE_OPTIONS[0];
+}
 
 export const GLOBAL_VPN_NODES: VpnNode[] = [
   {
@@ -421,59 +510,59 @@ export const THEME_PRESETS: Record<
 
 export const SPEED_DIAL_SITES = [
   {
-    title: 'TechPulse News',
-    subtitle: 'Test AdBlock, Reader & AI',
-    url: 'https://techpulse.news/ai-privacy-browsers-2026',
-    icon: '📰',
-    color: 'from-cyan-500/20 to-blue-600/20',
+    title: 'Google',
+    subtitle: 'Web Search',
+    url: 'https://www.google.com',
+    icon: '🔵',
+    color: 'from-blue-500/20 to-cyan-500/20',
   },
   {
-    title: 'StreamTube 4K',
-    subtitle: 'SponsorBlock + Dislikes + PiP',
-    url: 'https://www.youtube.com/watch?v=bh-100x',
+    title: 'DuckDuckGo',
+    subtitle: 'Private Search',
+    url: 'https://duckduckgo.com',
+    icon: '🦆',
+    color: 'from-orange-500/20 to-amber-500/20',
+  },
+  {
+    title: 'YouTube',
+    subtitle: 'Videos & Music',
+    url: 'https://m.youtube.com',
     icon: '▶️',
     color: 'from-rose-500/20 to-red-600/20',
   },
   {
-    title: 'GitHub Live',
-    subtitle: 'Real Live API Repo Browser',
+    title: 'Wikipedia',
+    subtitle: 'Encyclopedia',
+    url: 'https://en.wikipedia.org',
+    icon: '📚',
+    color: 'from-slate-500/20 to-indigo-500/20',
+  },
+  {
+    title: 'GitHub',
+    subtitle: 'Code & Repos',
     url: 'https://github.com/vitejs/vite',
     icon: '🐙',
-    color: 'from-slate-500/20 to-zinc-700/20',
-  },
-  {
-    title: '100/100 Benchmark',
-    subtitle: 'Speed, AdBlock & Privacy Suite',
-    url: 'browserhub://benchmark',
-    icon: '⚡',
-    color: 'from-amber-500/20 to-orange-600/20',
-  },
-  {
-    title: 'Hacker News',
-    subtitle: 'Desktop Reflow + Dark Reader',
-    url: 'https://news.ycombinator.com',
-    icon: '🟧',
-    color: 'from-orange-500/20 to-amber-600/20',
-  },
-  {
-    title: 'Wikipedia',
-    subtitle: '14-Lang Neural Translate + AI',
-    url: 'https://en.wikipedia.org/wiki/Web_browser',
-    icon: '🌐',
-    color: 'from-indigo-500/20 to-purple-600/20',
-  },
-  {
-    title: 'NPM Registry Live',
-    subtitle: 'Live Package Inspector',
-    url: 'https://www.npmjs.com/package/vite',
-    icon: '📦',
     color: 'from-emerald-500/20 to-teal-600/20',
   },
   {
-    title: 'Hybrid Android Core',
-    subtitle: 'Inspect Kotlin APK Architecture',
-    url: 'browserhub://architecture',
-    icon: '🤖',
-    color: 'from-lime-500/20 to-green-600/20',
+    title: 'Reddit',
+    subtitle: 'Communities',
+    url: 'https://www.reddit.com',
+    icon: '💬',
+    color: 'from-orange-600/20 to-rose-600/20',
+  },
+  {
+    title: 'Hacker News',
+    subtitle: 'Tech & Startups',
+    url: 'https://news.ycombinator.com',
+    icon: '🟧',
+    color: 'from-amber-500/20 to-yellow-600/20',
+  },
+  {
+    title: 'BBC News',
+    subtitle: 'World Headlines',
+    url: 'https://www.bbc.com/news',
+    icon: '🌍',
+    color: 'from-red-500/20 to-pink-600/20',
   },
 ];

@@ -79,7 +79,7 @@ export const VpnModal: React.FC<VpnModalProps> = ({ vpn, onUpdateVpn, onClose })
               </div>
             </div>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-xl hover:bg-slate-800 text-slate-400 cursor-pointer">
+          <button aria-label="Close" title="Close" onClick={onClose} className="p-1.5 rounded-xl hover:bg-slate-800 text-slate-400 cursor-pointer">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -114,6 +114,8 @@ export const VpnModal: React.FC<VpnModalProps> = ({ vpn, onUpdateVpn, onClose })
 
           <button
             onClick={handleToggleConnect}
+            aria-label={vpn.connected ? 'Disconnect VPN' : 'Connect VPN'}
+            title={vpn.connected ? 'Disconnect VPN' : 'Connect VPN'}
             className={`w-16 h-16 rounded-full flex items-center justify-center border-2 transition-all shrink-0 cursor-pointer ${
               vpn.connected
                 ? 'bg-emerald-500/20 border-emerald-400 text-emerald-300 shadow-lg shadow-emerald-500/25'

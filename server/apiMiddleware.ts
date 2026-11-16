@@ -278,173 +278,170 @@ export function createApiRouter() {
     }
   });
 
-  // 3. Zero-Key Custom Local AI Engine (100% Private, No API Keys, No Subscription)
-  router.post('/ai/local', (req: Request, res: Response) => {
-    const { mode = 'summarize', title = '', url = '', content = '', query = '' } = req.body || {};
-    const startNs = process.hrtime.bigint();
+  // 3. Zero-Key AI endpoint.
+  //    /ai/chat proxies a free, key-less public LLM so the installed APK gets real
+  //    conversational answers even where direct browser CORS calls are blocked.
+  //    Everything degrades to an honest, clearly-labelled local reply.
+  router.post('/ai/chat', async (req: Request, res: Response) => {
+    const {
+      messages = [],
+      query = '',
+      mode = 'chat',
+      title = '',
+      pageKind = 'article',
+      contextNote = '',
+      pageText = '',
+    } = req.body || {};
 
-    const cleanText = String(content || '')
-      .replace(/\s+/g, ' ')
-      .trim();
+    const cleanPage = String(pageText || '').replace(/\s+/g, ' ').trim().slice(0, 3500);
+    const userQuery = String(query || '').trim();
+
+    const systemPrompt =
+      'You are BrowserHub AI, the assistant built into the BrowserHub Android browser. ' +
+      'Answer in clean Markdown (short paragraphs, "### " headings, "- " bullets, **bold** key terms). ' +
+      'Be warm, direct and concise — answer the question first. Use provided webpage text only when the ' +
+      'question is about that page. Never quote search-result listings, menus or filter bars as article ' +
+      'content. Never invent page contents, statistics or citations; say plainly when you are unsure.';
+
+    const contextBlock =
+      pageKind === 'article' && cleanPage
+        ? `\n\n--- OPEN WEBPAGE ---\nTitle: ${title}\nContext: ${contextNote}\nVisible text:\n"""${cleanPage}"""\n--- END WEBPAGE ---`
+        : `\n\nContext: ${contextNote}`;
+
+    let prompt: string;
+    if (mode === 'summarize') {
+      prompt = `Summarize the webpage into 4-5 crisp bullet points using only the webpage text.${contextBlock}`;
+    } else if (mode === 'eli5') {
+      prompt = `Explain this webpage to a curious beginner in plain language.${contextBlock}`;
+    } else {
+      prompt = `${userQuery}${contextBlock}`;
+    }
+
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 12000);
+      const upstream = await fetch('https://text.pollinations.ai/openai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
+        body: JSON.stringify({
+          model: 'openai',
+          messages: [
+            { role: 'system', content: systemPrompt },
+            ...(Array.isArray(messages) ? messages.slice(-6) : []),
+            { role: 'user', content: prompt },
+          ],
+        }),
+      });
+      clearTimeout(timer);
+
+      if (upstream.ok) {
+        const data: any = await upstream.json();
+        const reply: string | undefined = data?.choices?.[0]?.message?.content?.trim();
+        if (reply && reply.length > 2) {
+          res.json({
+            ok: true,
+            engineLabel: 'Live AI (no key needed)',
+            responseText: reply,
+            bullets: [],
+          });
+          return;
+        }
+      }
+      res.status(502).json({ ok: false, error: 'Live model unavailable' });
+    } catch (err) {
+      res.status(502).json({
+        ok: false,
+        error: err instanceof Error ? err.message : 'Live model unavailable',
+      });
+    }
+  });
+
+  // 4. Local deterministic fallback (never invents page content)
+  router.post('/ai/local', (req: Request, res: Response) => {
+    const { mode = 'chat', title = '', url = '', content = '', query = '' } = req.body || {};
+    const startNs = process.hrtime.bigint();
+    const cleanText = String(content || '').replace(/\s+/g, ' ').trim();
 
     const sentences = cleanText
       .split(/(?<=[.!?])\s+/)
       .map((s) => s.trim())
-      .filter((s) => s.length > 28 && s.length < 360);
+      .filter((s) => s.length > 40 && s.length < 460);
 
-    // Compute real word frequency TF scores excluding stop words
     const stopWords = new Set([
       'the', 'and', 'for', 'that', 'with', 'this', 'from', 'are', 'was', 'were', 'have',
       'has', 'had', 'not', 'but', 'you', 'your', 'can', 'will', 'all', 'more', 'about',
       'into', 'than', 'its', 'also', 'their', 'they', 'them', 'been', 'which', 'when',
-      'what', 'where', 'who', 'how', 'our', 'out', 'use', 'used', 'using', 'one', 'two',
     ]);
 
-    const freq = new Map<string, number>();
     const words = cleanText.toLowerCase().match(/[a-z0-9]{3,}/g) || [];
-    for (const w of words) {
-      if (!stopWords.has(w)) {
-        freq.set(w, (freq.get(w) || 0) + 1);
-      }
-    }
-
+    const freq = new Map<string, number>();
+    for (const w of words) if (!stopWords.has(w)) freq.set(w, (freq.get(w) || 0) + 1);
     const topKeywords = [...freq.entries()]
       .sort((a, b) => b[1] - a[1])
-      .slice(0, 8)
+      .slice(0, 6)
       .map(([word]) => word);
 
-    // Rank sentences by centrality + position bonus + numeric/insight density
-    const scoredSentences = sentences.map((sentence, idx) => {
-      const sWords = sentence.toLowerCase().match(/[a-z0-9]{3,}/g) || [];
-      let score = 0;
-      for (const w of sWords) {
-        score += freq.get(w) || 0;
-      }
-      const normScore = sWords.length > 0 ? score / Math.sqrt(sWords.length) : 0;
-      const posBonus = idx === 0 ? 1.35 : idx < 4 ? 1.15 : 1.0;
-      const numBonus = /\d+%|\d+\s*(ms|mb|gb|fps|x|users|stars)/i.test(sentence) ? 1.22 : 1.0;
-      return { sentence, idx, finalScore: normScore * posBonus * numBonus };
-    });
-
-    const topRanked = [...scoredSentences]
-      .sort((a, b) => b.finalScore - a.finalScore)
+    const ranked = sentences
+      .map((sentence, idx) => {
+        const sWords = sentence.toLowerCase().match(/[a-z0-9]{3,}/g) || [];
+        let score = 0;
+        for (const w of sWords) score += freq.get(w) || 0;
+        const norm = sWords.length ? score / Math.sqrt(sWords.length) : 0;
+        const pos = idx === 0 ? 1.3 : idx < 4 ? 1.1 : 1;
+        return { sentence, idx, score: norm * pos };
+      })
+      .sort((a, b) => b.score - a.score)
       .slice(0, 5)
       .sort((a, b) => a.idx - b.idx)
-      .map((s) => s.sentence);
-
-    const wordCount = words.length;
-    const readingTimeMin = Math.max(1, Math.round(wordCount / 220));
+      .map((x) => x.sentence);
 
     let responseText = '';
     let bullets: string[] = [];
-    let metrics: Record<string, string | number> = {};
 
-    if (mode === 'summarize') {
-      const lead =
-        topRanked[0] ||
-        `This page ("${title || url}") presents core information centered on ${topKeywords.slice(0, 4).join(', ') || 'modern web topics'}.`;
-      responseText = `**Executive TL;DR:** ${lead}`;
-      bullets =
-        topRanked.length > 1
-          ? topRanked.slice(0, 5)
-          : [
-              `Primary focus: ${title || url}`,
-              `Core topics detected: ${topKeywords.slice(0, 5).join(', ') || 'general overview'}`,
-              `Estimated reading time saved: ~${readingTimeMin} min (${wordCount} words analyzed locally)`,
-            ];
-      metrics = {
-        wordsAnalyzed: wordCount,
-        readingTimeSaved: `${readingTimeMin} min`,
-        keyEntities: topKeywords.slice(0, 5).join(', '),
-        privacyGuarantee: '0 bytes sent to external AI clouds',
-      };
+    if (!sentences.length) {
+      responseText =
+        `I don't have readable page text for **${title || url || 'this tab'}** yet, so I won't guess at its contents.\n\n` +
+        `- **Search it** in the address bar, open a result, then summarize.\n` +
+        `- If this is a search results page, open one result first — listings are just menus and snippets.`;
+      bullets = ['No page text available'];
+    } else if (mode === 'summarize') {
+      responseText = `### Summary: ${title || url}\n\n${ranked.map((s) => `- ${s}`).join('\n')}`;
+      bullets = [`Read ${sentences.length} clean sentences locally`];
     } else if (mode === 'eli5') {
       responseText =
-        `**Simple Plain-Language Breakdown (ELI5):**\n\n` +
-        `Think of **${title || 'this page'}** simply: it focuses on **${topKeywords.slice(0, 3).join(', ') || 'key concepts'}**. ` +
-        (topRanked[0] ? `In essence, ${topRanked[0].charAt(0).toLowerCase() + topRanked[0].slice(1)} ` : '') +
-        `Instead of reading all ${wordCount} words of dense material, the core takeaway is how these pieces work together practically and why they matter to everyday users.`;
-      bullets = topKeywords.slice(0, 4).map(
-        (kw) => `Key term "${kw.toUpperCase()}": Frequently referenced anchor concept across this page.`
-      );
-    } else if (mode === 'audit') {
-      const hasTrackers = /analytics|doubleclick|pixel|telemetry|sponsor|cookie/i.test(cleanText);
-      responseText =
-        `**BrowserHub Local Neural Security & Privacy Audit**\n\n` +
-        `• **Overall Page Trust Grade:** ${url.startsWith('https') || url.startsWith('browserhub://') ? 'A+ (Verified Encrypted / Protected)' : 'B+'}\n` +
-        `• **Ad & Tracker Surface:** ${hasTrackers ? 'Moderate commercial signals detected — neutralized by Native Shields Ultra.' : 'Clean DOM structure — zero invasive script signatures active.'}\n` +
-        `• **Clickbait / Manipulation Index:** Low (12/100) — factual density aligns with headline "${title}".\n` +
-        `• **Fingerprint Isolation:** Canvas, AudioContext, WebGL & Battery APIs spoofed per-origin.`;
-      bullets = [
-        'Zero API keys or remote LLM servers touched during this audit',
-        'URL tracking parameters (utm_*, fbclid, gclid) automatically stripped',
-        `Top semantic signals: ${topKeywords.slice(0, 5).join(', ') || 'verified clean content'}`,
-      ];
-    } else if (mode === 'browse_for_me') {
-      const topic = String(query || title || 'Modern Technology').trim();
-      responseText =
-        `**Instant AI Synthesis Brief: "${topic}"**\n\n` +
-        `Synthesized locally by BrowserHub Neural Core without tracking or external API keys:\n\n` +
-        `1. **Core Overview:** "${topic}" encompasses high-impact workflows, architecture patterns, and user-facing tools actively discussed across developer and research ecosystems.\n` +
-        `2. **What Matters Most:** Prioritize speed, open standards, verifiable privacy, and low resource overhead when evaluating solutions related to *${topic}*.\n` +
-        `3. **Recommended Next Action:** Open comparison tabs in Split-Screen Mode or run a live GitHub open-source search (` +
-        `\`gh-search:${topic}\`) directly in the BrowserHub Omnibox to inspect real repositories.`;
-      bullets = [
-        `Instant multi-angle synthesis for "${topic}"`,
-        'Zero search history logged or monetized',
-        'Tip: Type gh-search:' + topic.split(' ')[0] + ' in the address bar for live GitHub repos!',
-      ];
+        `### Explained simply\n\n` +
+        ranked
+          .slice(0, 3)
+          .map((s, i) => `${i + 1}. ${s}`)
+          .join('\n');
+      bullets = ['Plain-language rewrite of the real page text'];
     } else {
-      // Contextual Chat / Q&A against the open page
-      const qWords =
-        String(query || '')
-          .toLowerCase()
-          .match(/[a-z0-9]{3,}/g)
-          ?.filter((w) => !stopWords.has(w)) || [];
-
+      const qWords = String(query || '').toLowerCase().match(/[a-z0-9]{3,}/g)?.filter((w) => !stopWords.has(w)) || [];
       const relevant = sentences
-        .map((s) => {
-          const lower = s.toLowerCase();
-          let hits = 0;
-          for (const qw of qWords) {
-            if (lower.includes(qw)) hits += 2;
-          }
-          return { s, hits };
-        })
-        .filter((item) => item.hits > 0)
+        .map((s) => ({ s, hits: qWords.reduce((acc, qw) => acc + (s.toLowerCase().includes(qw) ? 1 : 0), 0) }))
+        .filter((x) => x.hits > 0)
         .sort((a, b) => b.hits - a.hits)
         .slice(0, 3)
-        .map((item) => item.s);
+        .map((x) => x.s);
 
-      if (relevant.length > 0) {
-        responseText =
-          `Based directly on **${title || 'the current page'}**, here is what matches your question:\n\n` +
-          relevant.map((r) => `• "${r}"`).join('\n\n') +
-          `\n\n**Key Context:** This page primarily covers *${topKeywords.slice(0, 5).join(', ')}*.`;
-      } else if (/speed|privacy|vpn|extension|adblock|browserhub/i.test(query)) {
-        responseText =
-          `**BrowserHub Local Copilot:** BrowserHub runs a 100% zero-key local AI engine, Native Shields AdBlock (348,920+ rules), WireGuard/Tor/DoH built-in VPN, Desktop Mode, and Universal .CRX/.XPI/Userscript extensions — all without accounts or telemetry.`;
-      } else {
-        responseText =
-          `I analyzed all **${wordCount} words** on **"${title || 'this tab'}"** locally.\n\n` +
-          (topRanked[0]
-            ? `While your exact phrasing wasn't quoted verbatim, the closest core insight on the page is:\n• "${topRanked[0]}"\n\n`
-            : '') +
-          `Key concepts covered on this page include **${topKeywords.slice(0, 6).join(', ') || 'the displayed visual modules'}**. Ask about any specific section, number, or topic on the page!`;
-      }
-      bullets = topKeywords.slice(0, 4).map((k) => `Related page topic: ${k}`);
+      responseText = relevant.length
+        ? `From **${title || 'the current page'}**:\n\n${relevant.map((r) => `- ${r}`).join('\n')}`
+        : `The page **${title || 'this tab'}** doesn't appear to mention **${query}**.\n\n` +
+          `What it covers:\n${ranked.slice(0, 2).map((s) => `- ${s}`).join('\n')}`;
+      bullets = relevant.length ? [`${relevant.length} matching passage(s)`] : [];
     }
 
     const elapsedMs = Number(process.hrtime.bigint() - startNs) / 1_000_000;
     res.json({
       ok: true,
       mode,
-      model: 'BrowserHub-Nano-3B-Local (Zero-Key / On-Device Engine)',
+      model: 'BrowserHub-OnDevice',
+      engineLabel: 'On-device engine',
       inferenceMs: Math.max(0.8, Number(elapsedMs.toFixed(2))),
       responseText,
       bullets,
       keywords: topKeywords,
-      metrics,
     });
   });
 

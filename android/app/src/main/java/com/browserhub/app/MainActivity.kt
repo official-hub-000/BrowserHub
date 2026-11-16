@@ -234,11 +234,41 @@ class MainActivity : AppCompatActivity() {
                 null
             )
         }
-        view.evaluateJavascript(
-            "(function(){return (document.title||'') + '. ' + (document.body ? document.body.innerText.substring(0, 10000) : '');})()"
-        ) { value ->
-            if (!value.isNullOrBlank()) {
-                extractedPageText = value.replace("\\n", " ").replace("\\\"", "\"")
+        // Clean DOM article extractor: drops nav/menus/ads/cookie walls so the AI and
+        // Reader Mode receive real article text only. Search result pages return the
+        // title only, so result listings are never mistaken for article content.
+        val extractorJs = """
+            (function(){
+              try {
+                var isSearch = /[?&](q|query|search|p)=/.test(location.search) &&
+                  /google\.|bing\.com|duckduckgo\.com|search\.brave\.com|startpage\.com|ecosia\.org|yandex\.|yahoo\./.test(location.host);
+                if (isSearch) { return document.title || 'Search results'; }
+                var root = document.querySelector('article,main,[role=main],#rso,#links,.content,.post,.entry-content,.article-body') || document.body;
+                if (!root) { return document.title || ''; }
+                var clone = root.cloneNode(true);
+                var junk = clone.querySelectorAll('nav,header,footer,aside,form,button,select,input,script,style,noscript,iframe,svg,time,[role=navigation],[role=menu],[role=banner],[role=search],[role=complementary],[aria-hidden=true],.nav,.menu,.sidebar,.footer,.header,.breadcrumb,.breadcrumbs,.cookie,.cookies,.consent,.ad,.ads,.advert,.advertisement,.promo,.share,.social,.related,.comments,.newsletter,.subscribe,.pagination');
+                for (var i = 0; i < junk.length; i++) { if (junk[i].parentNode) { junk[i].parentNode.removeChild(junk[i]); } }
+                var text = (clone.innerText || '').replace(/\s+/g, ' ').trim();
+                return (document.title ? document.title + ' - ' : '') + text.substring(0, 9000);
+              } catch (e) {
+                return (document.title || '') + ' ' + ((document.body && document.body.innerText) || '').substring(0, 6000);
+              }
+            })()
+        """.trimIndent()
+        view.evaluateJavascript(extractorJs) { value ->
+            if (!value.isNullOrBlank() && value != "null" && value.length > 3) {
+                val unquoted = if (value.startsWith("\"") && value.endsWith("\"") && value.length >= 2) {
+                    value.substring(1, value.length - 1)
+                } else {
+                    value
+                }
+                val cleaned = unquoted
+                    .replace("\\n", "\n")
+                    .replace("\\/", "/")
+                    .replace("\\\"", "\"")
+                if (cleaned.trim().isNotEmpty()) {
+                    extractedPageText = cleaned
+                }
             }
         }
     }

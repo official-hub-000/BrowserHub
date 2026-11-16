@@ -107,7 +107,7 @@ export const ShieldsPanel: React.FC<ShieldsPanelProps> = ({
             >
               {shields.enabled ? 'ENABLED' : 'PAUSED'}
             </button>
-            <button onClick={onClose} className="p-1.5 rounded-xl hover:bg-slate-800 text-slate-400 cursor-pointer">
+            <button aria-label="Close" title="Close" onClick={onClose} className="p-1.5 rounded-xl hover:bg-slate-800 text-slate-400 cursor-pointer">
               <X className="w-4 h-4" />
             </button>
           </div>

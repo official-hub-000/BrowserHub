@@ -1,19 +1,43 @@
 @import "tailwindcss";
 
-@layer base {
-  * {
-    box-sizing: border-box;
-    -webkit-tap-highlight-color: transparent;
-  }
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
 
-  html,
-  body,
-  #root {
-    height: 100%;
-    width: 100%;
-    margin: 0;
-    padding: 0;
-  }
+html,
+body,
+#root {
+  height: 100%;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  background-color: #05070d;
+  color: #f1f5f9;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+/* Icon safety net: never let an icon be squashed or blown up by a flex container.
+   Explicit `size` props on each icon stay authoritative. */
+svg.lucide {
+  flex-shrink: 0;
+  display: inline-block;
+  vertical-align: middle;
+  max-width: 100%;
+}
+
+/* Comfortable, non-overlapping tap targets everywhere */
+button,
+[role='button'] {
+  touch-action: manipulation;
+  min-height: 0;
+}
+
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
 }
 
 /* Sleek mobile scrollbars */
@@ -37,12 +61,12 @@
 
 @keyframes pulseGlow {
   0%, 100% {
-    opacity: 0.7;
+    opacity: 0.75;
     transform: scale(1);
   }
   50% {
     opacity: 1;
-    transform: scale(1.06);
+    transform: scale(1.04);
   }
 }
 

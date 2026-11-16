@@ -12,12 +12,14 @@ export type ThemePresetId =
   | 'solar-amber';
 
 export type SearchEngineId =
+  | 'google'
   | 'duckduckgo'
   | 'brave'
+  | 'bing'
   | 'startpage'
+  | 'wikipedia'
   | 'github-live'
-  | 'searxng'
-  | 'google';
+  | 'searxng';
 
 export interface NetworkLogEntry {
   id: string;
@@ -142,6 +144,7 @@ export interface AiChatMessage {
   content: string;
   bullets?: string[];
   inferenceMs?: number;
+  engineLabel?: string;
   mode?: string;
   timestamp: string;
 }

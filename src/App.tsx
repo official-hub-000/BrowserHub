@@ -1,29 +1,24 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeft,
-  ArrowRight,
+  Home,
   RotateCw,
   ShieldCheck,
   ShieldOff,
-  Lock,
   Sparkles,
-  Puzzle,
-  Monitor,
-  Smartphone,
-  BookOpen,
-  Languages,
   Flame,
-  SlidersHorizontal,
   Search,
   X,
-  Columns2,
   Crosshair,
   PictureInPicture2,
-  Wifi,
-  BatteryCharging,
-  ZoomIn,
-  ZoomOut,
-  Download,
+  ChevronDown,
+  Menu,
+  Layers,
+  Check,
+  ArrowRight,
+  Monitor,
+  BookOpen,
+  Languages,
 } from 'lucide-react';
 import type {
   BrowserCustomization,
@@ -35,11 +30,12 @@ import type {
   VpnState,
 } from './types/browser';
 import {
+  getSearchEngineOption,
   GLOBAL_VPN_NODES,
   INITIAL_EXTENSIONS,
+  SEARCH_ENGINE_OPTIONS,
   THEME_PRESETS,
 } from './data/presets';
-import { SUPPORTED_LANGUAGES } from './utils/translator';
 import { WebViewport } from './components/WebViewport';
 import { ShieldsPanel } from './components/ShieldsPanel';
 import { VpnModal } from './components/VpnModal';
@@ -49,20 +45,22 @@ import { TabsDrawer } from './components/TabsDrawer';
 import { CustomizeDrawer } from './components/CustomizeDrawer';
 import { DevToolsPanel } from './components/DevToolsPanel';
 import { PlayStoreDownloadModal } from './components/PlayStoreDownloadModal';
+import { MenuHubModal } from './components/MenuHubModal';
+import { TranslateModal } from './components/TranslateModal';
 import { AndroidHybridBridge } from './bridge/androidHybridBridge';
 
 function deriveTitleFromUrl(url: string): string {
-  if (url === 'browserhub://start') return 'BrowserHub Start';
-  if (url === 'browserhub://benchmark') return '100/100 Speed & Privacy Benchmark';
-  if (url === 'browserhub://architecture') return 'Hybrid Android Architecture';
-  if (url.includes('techpulse.news')) return 'TechPulse — Hybrid AI & Privacy Browsers';
-  if (url.includes('youtube.com')) return 'StreamTube 4K — 120Hz Browser Engineering';
-  if (url.includes('news.ycombinator.com')) return 'Hacker News';
-  if (url.includes('wikipedia.org')) return 'Web browser — Wikipedia';
-  if (url.startsWith('gh-search:')) return `GitHub Search: ${url.replace('gh-search:', '')}`;
+  if (url === 'browserhub://start') return 'New Tab';
+  if (url === 'browserhub://benchmark') return 'System Benchmark';
+  if (url === 'browserhub://architecture') return 'Hybrid Architecture';
+  if (url.startsWith('gh-search:')) return `GitHub: ${url.replace('gh-search:', '')}`;
   try {
     const u = new URL(url.startsWith('http') ? url : `https://${url}`);
-    return u.hostname + (u.pathname !== '/' ? u.pathname : '');
+    const q = u.searchParams.get('q') || u.searchParams.get('query') || u.searchParams.get('search');
+    if (q) {
+      return `${q} — ${u.hostname.replace(/^www\./, '')}`;
+    }
+    return u.hostname.replace(/^www\./, '') + (u.pathname !== '/' ? u.pathname : '');
   } catch {
     return url;
   }
@@ -71,7 +69,7 @@ function deriveTitleFromUrl(url: string): string {
 function cleanTrackingUrl(raw: string, stripEnabled: boolean): { url: string; strippedCount: number } {
   if (!stripEnabled || !raw.includes('?')) return { url: raw, strippedCount: 0 };
   try {
-    const u = new URL(raw.startsWith('http') ? raw : `https://${raw}`);
+    const u = new URL(raw.startsWith('http') ? urlSafe(raw) : `https://${raw}`);
     const trackingKeys = [
       'utm_source',
       'utm_medium',
@@ -97,80 +95,40 @@ function cleanTrackingUrl(raw: string, stripEnabled: boolean): { url: string; st
   }
 }
 
+function urlSafe(raw: string): string {
+  return raw.trim();
+}
+
 export function App() {
-  // Core Tabs State
+  // Start with 1 clean Home Tab (no pre-cluttered demo tabs)
   const [tabs, setTabs] = useState<BrowserTab[]>([
     {
       id: 'tab-1',
-      title: 'BrowserHub Start',
+      title: 'New Tab',
       url: 'browserhub://start',
       isIncognito: false,
-      isPinned: true,
+      isPinned: false,
       isDesktopMode: false,
       isReaderMode: false,
       isHibernated: false,
       groupId: 'main',
       history: ['browserhub://start'],
       historyIndex: 0,
-      adsBlocked: 12,
-      trackersBlocked: 29,
-      bytesSavedKb: 840,
+      adsBlocked: 0,
+      trackersBlocked: 0,
+      bytesSavedKb: 0,
       translatedLang: null,
       bilingualTranslate: false,
       zappedSelectors: [],
       zoomLevel: 100,
-      memoryMb: 42,
-    },
-    {
-      id: 'tab-2',
-      title: 'TechPulse — Hybrid AI & Privacy Browsers',
-      url: 'https://techpulse.news/ai-privacy-browsers-2026',
-      isIncognito: false,
-      isPinned: false,
-      isDesktopMode: false,
-      isReaderMode: false,
-      isHibernated: false,
-      groupId: 'research',
-      history: ['https://techpulse.news/ai-privacy-browsers-2026'],
-      historyIndex: 0,
-      adsBlocked: 7,
-      trackersBlocked: 14,
-      bytesSavedKb: 1420,
-      translatedLang: null,
-      bilingualTranslate: false,
-      zappedSelectors: [],
-      zoomLevel: 100,
-      memoryMb: 54,
-    },
-    {
-      id: 'tab-3',
-      title: 'StreamTube 4K — 120Hz Browser Engineering',
-      url: 'https://www.youtube.com/watch?v=bh-100x',
-      isIncognito: false,
-      isPinned: false,
-      isDesktopMode: false,
-      isReaderMode: false,
-      isHibernated: true,
-      groupId: 'media',
-      history: ['https://www.youtube.com/watch?v=bh-100x'],
-      historyIndex: 0,
-      adsBlocked: 4,
-      trackersBlocked: 11,
-      bytesSavedKb: 2680,
-      translatedLang: null,
-      bilingualTranslate: false,
-      zappedSelectors: [],
-      zoomLevel: 100,
-      memoryMb: 68,
+      memoryMb: 28,
     },
   ]);
 
-  const [activeTabId, setActiveTabId] = useState('tab-1');
+  const [activeTabId, setActiveTabId] = useState<string>('tab-1');
   const [splitTabId, setSplitTabId] = useState<string | null>(null);
-  const [omniboxText, setOmniboxText] = useState('browserhub://start');
-  const [omniboxFocused, setOmniboxFocused] = useState(false);
 
-  // Shields, VPN, Extensions, Customization
+  // Shields & Privacy State
   const [shields, setShields] = useState<ShieldState>({
     enabled: true,
     blockAds: true,
@@ -180,58 +138,71 @@ export function App() {
     antiFingerprinting: true,
     httpsEverywhere: true,
     blockCryptominers: true,
-    turboDataSaver: true,
-    totalAdsBlocked: 1428,
-    totalTrackersBlocked: 4912,
-    totalDataSavedMb: 186.4,
-    totalTimeSavedSec: 94,
+    turboDataSaver: false,
+    totalAdsBlocked: 0,
+    totalTrackersBlocked: 0,
+    totalDataSavedMb: 0,
+    totalTimeSavedSec: 0,
   });
 
+  // VPN State
   const [vpn, setVpn] = useState<VpnState>({
-    connected: !AndroidHybridBridge.hasJniBridge(),
+    connected: false,
     connecting: false,
-    selectedNodeId: 'ch-zurich',
+    selectedNodeId: GLOBAL_VPN_NODES[0].id,
     protocol: 'WireGuard',
     dohProvider: 'mullvad',
     killSwitch: true,
     blockWebRtcLeak: true,
-    splitTunnelBypassLocal: false,
-    encryptedMb: 42.8,
+    splitTunnelBypassLocal: true,
+    encryptedMb: 0,
   });
 
+  // Extensions State
   const [extensions, setExtensions] = useState<BrowserExtension[]>(INITIAL_EXTENSIONS);
 
+  // Customization State — clean full-bleed layout + Google default search (switchable in 1 tap)
   const [customization, setCustomization] = useState<BrowserCustomization>({
     theme: 'cyber-cyan',
     customAccentHex: '#22d3ee',
-    addressBarPosition: 'bottom',
+    addressBarPosition: 'top',
     engine: 'hybrid-auto',
-    searchEngine: 'duckduckgo',
+    searchEngine: 'google',
     phoneFrameMode: false,
     uiDensity: 'comfortable',
-    showBookmarksBar: true,
+    showBookmarksBar: false,
     showVirtualCursorInDesktop: true,
-    biometricLockIncognito: true,
-    readerFont: 'serif',
-    readerTheme: 'amoled',
+    biometricLockIncognito: false,
+    readerFont: 'sans',
+    readerTheme: 'slate',
     readerFontSize: 17,
   });
 
-  const [downloads, setDownloads] = useState<DownloadItem[]>([
+  const [downloads, setDownloads] = useState<DownloadItem[]>([]);
+  const [networkLogs, setNetworkLogs] = useState<NetworkLogEntry[]>([
     {
-      id: 'dl-init-1',
-      filename: 'uBlock0_1.62.0.firefox.signed.xpi',
-      url: 'https://addons.mozilla.org/ublock-origin',
-      sizeMb: 3.8,
-      downloadedMb: 3.8,
-      threads: 16,
-      speedMbps: 28.4,
-      status: 'completed',
-      category: 'extension',
+      id: 'n1',
+      domain: 'browserhub.local',
+      url: 'browserhub://start',
+      type: 'document',
+      status: 'allowed',
+      latencyMs: 4,
+      sizeKb: 18,
+      timestamp: 'Now',
     },
   ]);
 
-  // Modals & Interactive States
+  // Omnibox & Modals State
+  const [omniboxText, setOmniboxText] = useState('');
+  const [omniboxFocused, setOmniboxFocused] = useState(false);
+  const [suggestionsOpen, setSuggestionsOpen] = useState(false);
+  const [zapperMode, setZapperMode] = useState(false);
+  const [findQuery, setFindQuery] = useState('');
+  const [showFindBar, setShowFindBar] = useState(false);
+
+  const [showMenuHub, setShowMenuHub] = useState(false);
+  const [showEnginePicker, setShowEnginePicker] = useState(false);
+  const [showTranslateModal, setShowTranslateModal] = useState(false);
   const [showShields, setShowShields] = useState(false);
   const [showVpn, setShowVpn] = useState(false);
   const [showExtensions, setShowExtensions] = useState(false);
@@ -242,15 +213,12 @@ export function App() {
   }>({ open: false });
   const [showTabs, setShowTabs] = useState(false);
   const [showCustomize, setShowCustomize] = useState(false);
-  const [showTranslateMenu, setShowTranslateMenu] = useState(false);
   const [showDevTools, setShowDevTools] = useState(false);
-  const [showFindBar, setShowFindBar] = useState(false);
-  const [findQuery, setFindQuery] = useState('');
-  const [zapperMode, setZapperMode] = useState(false);
+  const [showPlayStoreModal, setShowPlayStoreModal] = useState(false);
+
   const [fireSweepAnim, setFireSweepAnim] = useState(false);
   const [pipTitle, setPipTitle] = useState<string | null>(null);
   const [livePageTexts, setLivePageTexts] = useState<Record<string, string>>({});
-  const [showPlayStoreModal, setShowPlayStoreModal] = useState(false);
   const [deferredInstallPrompt, setDeferredInstallPrompt] = useState<any>(null);
   const viewportContainerRef = useRef<HTMLDivElement>(null);
 
@@ -274,39 +242,33 @@ export function App() {
   );
 
   const themeStyle = THEME_PRESETS[customization.theme];
-  const activeVpnNode =
-    GLOBAL_VPN_NODES.find((n) => n.id === vpn.selectedNodeId) || GLOBAL_VPN_NODES[0];
+  const activeSearchEngine = getSearchEngineOption(customization.searchEngine);
 
+  // Sync omnibox display text cleanly (empty on Home screen so placeholder is clear!)
   useEffect(() => {
     if (!omniboxFocused) {
-      setOmniboxText(activeTab.url);
+      setOmniboxText(activeTab.url === 'browserhub://start' ? '' : activeTab.url);
     }
   }, [activeTab.url, omniboxFocused]);
 
   const anyModalOpen =
+    showMenuHub ||
+    showEnginePicker ||
+    showTranslateModal ||
     showShields ||
     showVpn ||
     showExtensions ||
     aiDrawerState.open ||
     showTabs ||
     showCustomize ||
-    showTranslateMenu ||
     showPlayStoreModal;
 
   const isNativeRealWebUrl = (u: string) => {
     if (!AndroidHybridBridge.hasJniBridge()) return false;
-    if (!u.startsWith('http://') && !u.startsWith('https://')) return false;
-    if (
-      u.includes('techpulse.news') ||
-      u.includes('search.browserhub.local') ||
-      u.includes('youtube.com/watch?v=bh-100x')
-    ) {
-      return false;
-    }
-    return true;
+    return u.startsWith('http://') || u.startsWith('https://');
   };
 
-  // Sync real Android Native WebView viewport & live callbacks when installed as APK!
+  // Sync real Android Native WebView viewport & live callbacks when installed as APK
   useEffect(() => {
     if (!AndroidHybridBridge.hasJniBridge() || !window.BrowserHubNative) return;
 
@@ -316,11 +278,10 @@ export function App() {
       isNativeRealWebUrl(activeTab.url) &&
       !anyModalOpen &&
       !activeTab.isReaderMode &&
-      !splitTab &&
-      !omniboxFocused;
+      !splitTab;
 
     const el = viewportContainerRef.current;
-    const rect = el ? el.getBoundingClientRect() : { top: 56, bottom: window.innerHeight - 64 };
+    const rect = el ? el.getBoundingClientRect() : { top: 60, bottom: window.innerHeight - 60 };
     const topCss = Math.max(0, Math.round(rect.top));
     const bottomCss = Math.max(0, Math.round(window.innerHeight - rect.bottom));
 
@@ -357,7 +318,6 @@ export function App() {
     activeTab.isReaderMode,
     activeTab.zoomLevel,
     anyModalOpen,
-    omniboxFocused,
     splitTab,
     shields.enabled,
     shields.blockAds,
@@ -387,158 +347,97 @@ export function App() {
       );
     };
 
-    window.__onNativeAdBlocked = () => {
-      setTabs((prev) =>
-        prev.map((t) =>
-          t.id === activeTabId
-            ? { ...t, adsBlocked: t.adsBlocked + 1, bytesSavedKb: t.bytesSavedKb + 38 }
-            : t
-        )
-      );
+    window.__onNativeAdBlocked = (domain: string) => {
       setShields((prev) => ({
         ...prev,
         totalAdsBlocked: prev.totalAdsBlocked + 1,
-        totalDataSavedMb: Number((prev.totalDataSavedMb + 0.04).toFixed(2)),
       }));
+      setTabs((prev) =>
+        prev.map((t) =>
+          t.id === activeTabId ? { ...t, adsBlocked: t.adsBlocked + 1 } : t
+        )
+      );
+      setNetworkLogs((prev) => [
+        {
+          id: `blk-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          domain: domain || 'ad-tracker',
+          url: `https://${domain || 'tracker'}`,
+          type: 'tracker',
+          status: 'blocked',
+          ruleMatched: 'Native HubShield Filter',
+          latencyMs: 0,
+          sizeKb: 0,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+        },
+        ...prev.slice(0, 49),
+      ]);
     };
 
     window.__onAndroidBackPressed = () => {
       if (anyModalOpen) {
+        setShowMenuHub(false);
+        setShowEnginePicker(false);
+        setShowTranslateModal(false);
         setShowShields(false);
         setShowVpn(false);
         setShowExtensions(false);
         setAiDrawerState({ open: false });
         setShowTabs(false);
         setShowCustomize(false);
-        setShowTranslateMenu(false);
         setShowPlayStoreModal(false);
         return true;
       }
-      if (window.BrowserHubNative?.nativeGoBack?.()) {
+      if (activeTab.historyIndex > 0) {
+        handleGoBack();
+        return true;
+      }
+      if (activeTab.url !== 'browserhub://start') {
+        navigateTab(activeTab.id, 'browserhub://start');
         return true;
       }
       return false;
     };
-  }, [activeTabId, anyModalOpen]);
+  }, [activeTabId, activeTab.historyIndex, activeTab.url, anyModalOpen]);
 
-  // Animate active downloads with 16-thread acceleration!
-  useEffect(() => {
-    const hasActive = downloads.some((d) => d.status === 'downloading');
-    if (!hasActive) return;
-    const interval = setInterval(() => {
-      setDownloads((prev) =>
-        prev.map((d) => {
-          if (d.status !== 'downloading') return d;
-          const nextMb = Math.min(d.sizeMb, Number((d.downloadedMb + d.speedMbps * 0.45).toFixed(1)));
-          return {
-            ...d,
-            downloadedMb: nextMb,
-            status: nextMb >= d.sizeMb ? 'completed' : 'downloading',
-          };
-        })
-      );
-    }, 350);
-    return () => clearInterval(interval);
-  }, [downloads]);
-
-  // Omnibox Instant Calculator Preview
+  // Instant Omnibox Math Calculator
   const instantMathResult = useMemo(() => {
     const expr = omniboxText.trim();
-    if (!/^[0-9+\-*/().\s%]{3,}$/.test(expr) || !/[+\-*/%]/.test(expr)) return null;
+    if (!expr || expr.startsWith('http') || expr.includes('://')) return null;
+    if (!/^[\d\s+\-*/().]+$/.test(expr) || !/[+\-*/]/.test(expr) || !/\d/.test(expr)) {
+      return null;
+    }
     try {
       const val = Function(`"use strict"; return (${expr});`)();
-      return typeof val === 'number' && Number.isFinite(val) ? String(Number(val.toFixed(6))) : null;
+      if (typeof val === 'number' && Number.isFinite(val)) {
+        return Number(val.toFixed(6)).toString();
+      }
+      return null;
     } catch {
       return null;
     }
   }, [omniboxText]);
-
-  // Dynamic Network & Shields Logs for DevTools
-  const networkLogs = useMemo<NetworkLogEntry[]>(
-    () => [
-      {
-        id: 'n1',
-        domain: activeTab.url.slice(0, 38),
-        url: activeTab.url,
-        type: 'document',
-        status: 'allowed',
-        latencyMs: 19,
-        sizeKb: 42,
-        timestamp: 'now',
-      },
-      {
-        id: 'n2',
-        domain: 'pagead2.googlesyndication.com',
-        url: 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js',
-        type: 'ad-banner',
-        status: shields.enabled && shields.blockAds ? 'blocked' : 'allowed',
-        ruleMatched: shields.enabled && shields.blockAds ? '||googlesyndication.com^$3p' : undefined,
-        latencyMs: 0,
-        sizeKb: 418,
-        timestamp: 'now',
-      },
-      {
-        id: 'n3',
-        domain: 'bat.bing.com / analytics.js',
-        url: 'https://bat.bing.com/bat.js',
-        type: 'tracker',
-        status: shields.enabled && shields.blockTrackers ? 'blocked' : 'allowed',
-        ruleMatched: shields.enabled && shields.blockTrackers ? 'EasyPrivacy: ||bat.bing.com^' : undefined,
-        latencyMs: 0,
-        sizeKb: 96,
-        timestamp: 'now',
-      },
-      {
-        id: 'n4',
-        domain: `doh.${vpn.dohProvider}.dns`,
-        url: `https://doh.${vpn.dohProvider}.dns/dns-query`,
-        type: 'xhr',
-        status: 'allowed',
-        latencyMs: 8,
-        sizeKb: 2,
-        timestamp: 'now',
-      },
-    ],
-    [activeTab.url, shields.enabled, shields.blockAds, shields.blockTrackers, vpn.dohProvider]
-  );
 
   const updateTab = (tabId: string, updater: (t: BrowserTab) => BrowserTab) => {
     setTabs((prev) => prev.map((t) => (t.id === tabId ? updater(t) : t)));
   };
 
   const navigateTab = (targetTabId: string, rawInput: string) => {
-    let targetUrl = rawInput.trim();
-    if (!targetUrl) return;
+    const trimmed = rawInput.trim();
+    if (!trimmed) return;
 
+    let targetUrl = trimmed;
     const isProtocol =
-      targetUrl.startsWith('http://') ||
-      targetUrl.startsWith('https://') ||
+      /^https?:\/\//i.test(targetUrl) ||
       targetUrl.startsWith('browserhub://') ||
       targetUrl.startsWith('gh-search:');
     const looksLikeDomain =
-      !targetUrl.includes(' ') &&
-      /\.[a-z]{2,}(\/|$)/i.test(targetUrl);
+      !targetUrl.includes(' ') && /\.[a-z]{2,}(\/|$)/i.test(targetUrl);
 
     if (!isProtocol) {
       if (looksLikeDomain) {
         targetUrl = `https://${targetUrl}`;
-      } else if (AndroidHybridBridge.hasJniBridge()) {
-        const q = encodeURIComponent(targetUrl);
-        if (customization.searchEngine === 'brave') {
-          targetUrl = `https://search.brave.com/search?q=${q}`;
-        } else if (customization.searchEngine === 'startpage') {
-          targetUrl = `https://www.startpage.com/sp/search?query=${q}`;
-        } else if (customization.searchEngine === 'google') {
-          targetUrl = `https://www.google.com/search?q=${q}`;
-        } else if (customization.searchEngine === 'github-live') {
-          targetUrl = `https://github.com/search?q=${q}&type=repositories`;
-        } else {
-          targetUrl = `https://duckduckgo.com/?q=${q}`;
-        }
-      } else if (customization.searchEngine === 'github-live') {
-        targetUrl = `gh-search:${targetUrl}`;
       } else {
-        targetUrl = `https://search.browserhub.local/?q=${encodeURIComponent(targetUrl)}`;
+        targetUrl = activeSearchEngine.buildUrl(targetUrl);
       }
     }
 
@@ -549,9 +448,6 @@ export function App() {
     targetUrl = cleaned.url;
 
     const newTitle = deriveTitleFromUrl(targetUrl);
-    const blockedAdsDelta = shields.enabled && shields.blockAds ? 4 : 0;
-    const blockedTrackersDelta =
-      (shields.enabled && shields.blockTrackers ? 7 : 0) + cleaned.strippedCount;
 
     updateTab(targetTabId, (t) => {
       const nextHistory = [...t.history.slice(0, t.historyIndex + 1), targetUrl];
@@ -563,35 +459,35 @@ export function App() {
         isReaderMode: false,
         history: nextHistory,
         historyIndex: nextHistory.length - 1,
-        adsBlocked: t.adsBlocked + blockedAdsDelta,
-        trackersBlocked: t.trackersBlocked + blockedTrackersDelta,
-        bytesSavedKb: t.bytesSavedKb + (blockedAdsDelta > 0 ? 520 : 0),
+        trackersBlocked: t.trackersBlocked + cleaned.strippedCount,
       };
     });
 
-    if (blockedAdsDelta + blockedTrackersDelta > 0) {
-      setShields((prev) => ({
-        ...prev,
-        totalAdsBlocked: prev.totalAdsBlocked + blockedAdsDelta,
-        totalTrackersBlocked: prev.totalTrackersBlocked + blockedTrackersDelta,
-        totalDataSavedMb: Number((prev.totalDataSavedMb + 0.5).toFixed(1)),
-        totalTimeSavedSec: prev.totalTimeSavedSec + 1,
-      }));
-    }
-
-    if (vpn.connected) {
-      setVpn((prev) => ({
-        ...prev,
-        encryptedMb: Number((prev.encryptedMb + 0.6).toFixed(1)),
-      }));
-    }
+    setNetworkLogs((prev) => [
+      {
+        id: `nav-${Date.now()}`,
+        domain: newTitle,
+        url: targetUrl,
+        type: 'document',
+        status: cleaned.strippedCount > 0 ? 'stripped' : 'allowed',
+        latencyMs: 18,
+        sizeKb: 42,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      },
+      ...prev.slice(0, 49),
+    ]);
   };
 
   const handleGoBack = () => {
     if (isNativeRealWebUrl(activeTab.url) && window.BrowserHubNative?.nativeGoBack?.()) {
       return;
     }
-    if (activeTab.historyIndex <= 0) return;
+    if (activeTab.historyIndex <= 0) {
+      if (activeTab.url !== 'browserhub://start') {
+        navigateTab(activeTab.id, 'browserhub://start');
+      }
+      return;
+    }
     updateTab(activeTab.id, (t) => {
       const nextIdx = t.historyIndex - 1;
       const nextUrl = t.history[nextIdx];
@@ -621,11 +517,19 @@ export function App() {
     });
   };
 
+  const handleReload = () => {
+    if (isNativeRealWebUrl(activeTab.url) && window.BrowserHubNative?.nativeReload) {
+      window.BrowserHubNative.nativeReload();
+      return;
+    }
+    navigateTab(activeTab.id, activeTab.url);
+  };
+
   const handleNewTab = (incognito: boolean, groupId: BrowserTab['groupId'] = 'main') => {
     const id = `tab-${Date.now()}`;
     const newTab: BrowserTab = {
       id,
-      title: incognito ? 'Incognito Vault Start' : 'BrowserHub Start',
+      title: incognito ? 'Incognito Tab' : 'New Tab',
       url: 'browserhub://start',
       isIncognito: incognito,
       isPinned: false,
@@ -675,7 +579,7 @@ export function App() {
       setTabs([
         {
           id: cleanId,
-          title: 'BrowserHub Start',
+          title: 'New Tab',
           url: 'browserhub://start',
           isIncognito: false,
           isPinned: false,
@@ -700,7 +604,7 @@ export function App() {
       setLivePageTexts({});
       setPipTitle(null);
     }, 450);
-    setTimeout(() => setFireSweepAnim(false), 1200);
+    setTimeout(() => setFireSweepAnim(false), 1100);
   };
 
   const handleTriggerDownload = (
@@ -724,560 +628,705 @@ export function App() {
     setShowCustomize(true);
   };
 
-  // Address & Control Toolbar Component (renders at Bottom OR Top!)
-  const AddressToolbar = (
+  // ============================================================================
+  // CLEAN SEARCH & URL BAR (Spacious, Uncluttered, Instant Search Engine Picker)
+  // ============================================================================
+  const SearchAddressBar = (
     <div
       style={{
         backgroundColor: activeTab.isIncognito ? '#160926' : themeStyle.bgBar,
         borderColor: themeStyle.border,
       }}
-      className={`px-2.5 py-2 border-y flex flex-col gap-1.5 shrink-0 z-20 transition-colors`}
+      className="px-2.5 py-2 border-b flex flex-col gap-1.5 shrink-0 z-20"
     >
-      {/* Instant Calculator Result Banner */}
       {instantMathResult && (
-        <div className="px-3 py-1 rounded-xl bg-cyan-500/15 border border-cyan-500/30 text-xs flex items-center justify-between text-cyan-200">
-          <span>Instant Omnibox Calculator:</span>
+        <div
+          className="px-3 py-1.5 rounded-xl border border-cyan-500/40 text-xs flex items-center justify-between text-cyan-200"
+          style={{ backgroundColor: '#0c2438' }}
+        >
+          <span>Calculator:</span>
           <strong className="font-mono text-sm text-emerald-300">= {instantMathResult}</strong>
         </div>
       )}
 
-      {/* Element Zapper Active Banner */}
       {zapperMode && (
-        <div className="px-3 py-1.5 rounded-xl bg-rose-500/20 border border-rose-500/50 text-xs flex items-center justify-between text-rose-200">
+        <div
+          className="px-3 py-1.5 rounded-xl border border-rose-500/50 text-xs flex items-center justify-between text-rose-200"
+          style={{ backgroundColor: '#310b19' }}
+        >
           <span className="inline-flex items-center gap-1.5 font-semibold">
-            <Crosshair className="w-3.5 h-3.5 text-rose-400 animate-spin" />
-            Element Zapper Active — Tap any block on the page to vaporize it!
+            <Crosshair size={14} className="text-rose-400" />
+            <span>Element Zapper Active</span>
           </span>
           <button
             onClick={() => setZapperMode(false)}
-            className="px-2 py-0.5 rounded bg-rose-500 text-white font-bold text-[11px] cursor-pointer"
+            className="px-2.5 py-0.5 rounded-lg bg-rose-500 text-white font-bold text-[11px] cursor-pointer"
           >
             Done
           </button>
         </div>
       )}
 
-      {/* Main Omnibox Row */}
       <div className="flex items-center gap-1.5">
+        {/* Search Engine Selector — always labelled so it is never a mystery icon */}
         <button
-          onClick={handleGoBack}
-          disabled={activeTab.historyIndex <= 0}
-          className="p-2 rounded-xl hover:bg-white/10 disabled:opacity-30 text-slate-200 cursor-pointer"
-          title="Back"
+          type="button"
+          onClick={() => setShowEnginePicker(true)}
+          title={`Search engine: ${activeSearchEngine.name} — tap to change`}
+          aria-label={`Search engine: ${activeSearchEngine.name}. Tap to change.`}
+          className="h-11 px-2.5 rounded-xl border border-slate-700 hover:border-cyan-400 text-xs font-semibold text-white flex items-center gap-1.5 shrink-0 cursor-pointer max-w-[104px]"
+          style={{ backgroundColor: '#0f172a' }}
         >
-          <ArrowLeft className="w-4 h-4" />
+          <span className="text-sm leading-none">{activeSearchEngine.icon}</span>
+          <span className="truncate text-slate-200">{activeSearchEngine.shortLabel}</span>
+          <ChevronDown size={12} className="text-slate-400" />
         </button>
 
-        <button
-          onClick={handleGoForward}
-          disabled={activeTab.historyIndex >= activeTab.history.length - 1}
-          className="hidden sm:inline-flex p-2 rounded-xl hover:bg-white/10 disabled:opacity-30 text-slate-200 cursor-pointer"
-          title="Forward"
-        >
-          <ArrowRight className="w-4 h-4" />
-        </button>
-
-        <button
-          onClick={() => navigateTab(activeTab.id, activeTab.url)}
-          className="p-2 rounded-xl hover:bg-white/10 text-slate-200 cursor-pointer"
-          title="Reload"
-        >
-          <RotateCw className="w-4 h-4" />
-        </button>
-
-        {/* Omnibox Pill */}
+        {/* Wide Search & URL Form */}
         <form
           onSubmit={(e) => {
             e.preventDefault();
+            if (!omniboxText.trim()) return;
             navigateTab(activeTab.id, omniboxText);
+            setSuggestionsOpen(false);
             (document.activeElement as HTMLElement | null)?.blur();
           }}
-          className="flex-1 flex items-center gap-1.5 rounded-2xl bg-black/45 border border-white/12 focus-within:border-cyan-400 px-2.5 py-1.5 min-w-0"
+          className="flex-1 min-w-[96px] h-11 flex items-center gap-1.5 rounded-xl border border-slate-700 focus-within:border-cyan-400 px-2.5"
+          style={{ backgroundColor: '#070b14' }}
         >
-          {/* Shields Button + Counter */}
-          <button
-            type="button"
-            onClick={() => setShowShields(true)}
-            title="Direct Ad Blocker & Anti-Fingerprinting Shields"
-            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[11px] font-bold shrink-0 cursor-pointer ${
-              shields.enabled
-                ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
-            }`}
-          >
-            {shields.enabled ? (
-              <ShieldCheck className="w-3.5 h-3.5" />
-            ) : (
-              <ShieldOff className="w-3.5 h-3.5" />
-            )}
-            <span>{activeTab.adsBlocked + activeTab.trackersBlocked}</span>
-          </button>
-
+          <Search size={15} className="text-slate-400 shrink-0" />
           <input
             value={omniboxText}
             onFocus={(e) => {
               setOmniboxFocused(true);
+              setSuggestionsOpen(true);
               e.currentTarget.select();
             }}
-            onBlur={() => setOmniboxFocused(false)}
-            onChange={(e) => setOmniboxText(e.target.value)}
-            placeholder="Search or type URL..."
-            className="flex-1 bg-transparent text-xs sm:text-sm text-white placeholder-slate-400 focus:outline-none min-w-0"
+            onBlur={() => {
+              setOmniboxFocused(false);
+              window.setTimeout(() => setSuggestionsOpen(false), 180);
+            }}
+            onChange={(e) => {
+              setOmniboxText(e.target.value);
+              setSuggestionsOpen(true);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') {
+                setSuggestionsOpen(false);
+                e.currentTarget.blur();
+              }
+            }}
+            placeholder={
+              activeTab.url === 'browserhub://start'
+                ? activeSearchEngine.placeholder
+                : 'Search or enter address'
+            }
+            enterKeyHint="go"
+            inputMode="search"
+            aria-label="Search or enter website address"
+            className="flex-1 min-w-0 bg-transparent text-[13px] text-white placeholder-slate-400 focus:outline-none py-0.5"
           />
 
-          {/* Reader Mode Quick Button */}
-          {activeTab.url !== 'browserhub://start' && (
+          {omniboxText && (
             <button
               type="button"
-              onClick={() =>
-                updateTab(activeTab.id, (t) => ({ ...t, isReaderMode: !t.isReaderMode }))
-              }
-              title="Toggle Reader View & TTS"
-              className={`p-1 rounded-lg cursor-pointer ${
-                activeTab.isReaderMode ? 'bg-cyan-500 text-slate-950' : 'text-slate-400 hover:text-white'
-              }`}
+              onClick={() => {
+                setOmniboxText('');
+                setSuggestionsOpen(true);
+              }}
+              className="p-1.5 text-slate-400 hover:text-white cursor-pointer shrink-0"
+              title="Clear text"
+              aria-label="Clear text"
             >
-              <BookOpen className="w-3.5 h-3.5" />
+              <X size={14} />
             </button>
           )}
 
-          {/* 1-Tap Translate Menu Trigger */}
-          <div className="relative">
+          {omniboxText.trim() ? (
             <button
-              type="button"
-              onClick={() => setShowTranslateMenu((v) => !v)}
-              title="Zero-Key Local Page Translator (14 Languages)"
-              className={`p-1 rounded-lg cursor-pointer ${
-                activeTab.translatedLang
-                  ? 'bg-indigo-500 text-white'
-                  : 'text-slate-400 hover:text-white'
-              }`}
+              type="submit"
+              className="p-1.5 rounded-lg bg-cyan-400 text-slate-950 cursor-pointer shrink-0"
+              title="Go"
+              aria-label="Go"
             >
-              <Languages className="w-3.5 h-3.5" />
+              <ArrowRight size={14} />
             </button>
-
-            {showTranslateMenu && (
-              <div
-                className={`absolute right-0 ${
-                  customization.addressBarPosition === 'bottom' ? 'bottom-9' : 'top-9'
-                } w-64 rounded-2xl bg-slate-950 border border-slate-700 shadow-2xl p-2.5 z-50 space-y-2`}
+          ) : (
+            activeTab.url !== 'browserhub://start' && (
+              <button
+                type="button"
+                onClick={handleReload}
+                className="p-1.5 text-slate-400 hover:text-white cursor-pointer shrink-0"
+                title="Reload page"
+                aria-label="Reload page"
               >
-                <div className="flex items-center justify-between text-[11px] font-bold text-slate-300 px-1">
-                  <span>Local Neural Translate</span>
-                  {activeTab.translatedLang && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        updateTab(activeTab.id, (t) => ({ ...t, translatedLang: null }));
-                        setShowTranslateMenu(false);
-                      }}
-                      className="text-rose-400 hover:underline cursor-pointer"
-                    >
-                      Original
-                    </button>
-                  )}
-                </div>
-
-                <label className="flex items-center justify-between px-2 py-1 rounded-lg bg-slate-900 text-[11px] text-slate-300 cursor-pointer">
-                  <span>Bilingual Side-by-Side</span>
-                  <input
-                    type="checkbox"
-                    checked={activeTab.bilingualTranslate}
-                    onChange={(e) =>
-                      updateTab(activeTab.id, (t) => ({
-                        ...t,
-                        bilingualTranslate: e.target.checked,
-                      }))
-                    }
-                  />
-                </label>
-
-                <div className="grid grid-cols-2 gap-1 max-h-48 overflow-y-auto">
-                  {SUPPORTED_LANGUAGES.map((lang) => (
-                    <button
-                      key={lang.code}
-                      type="button"
-                      onClick={() => {
-                        updateTab(activeTab.id, (t) => ({ ...t, translatedLang: lang.code }));
-                        setShowTranslateMenu(false);
-                      }}
-                      className={`px-2 py-1.5 rounded-xl text-left text-[11px] flex items-center gap-1.5 cursor-pointer ${
-                        activeTab.translatedLang === lang.code
-                          ? 'bg-indigo-500 text-white font-bold'
-                          : 'hover:bg-slate-900 text-slate-200'
-                      }`}
-                    >
-                      <span>{lang.flag}</span>
-                      <span className="truncate">{lang.nativeName}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
+                <RotateCw size={14} />
+              </button>
+            )
+          )}
         </form>
 
-        {/* Desktop Mode 1-Tap Toggle */}
+        {/* Shields status — labelled with a count, tap opens full panel */}
         <button
-          onClick={() =>
-            updateTab(activeTab.id, (t) => ({ ...t, isDesktopMode: !t.isDesktopMode }))
-          }
-          title="Toggle Full Desktop Mode"
-          className={`p-2 rounded-xl border transition cursor-pointer ${
-            activeTab.isDesktopMode
-              ? 'bg-cyan-500/20 border-cyan-400 text-cyan-300'
-              : 'border-transparent hover:bg-white/10 text-slate-300'
+          type="button"
+          onClick={() => setShowShields(true)}
+          title="AdBlock & privacy shields"
+          aria-label="AdBlock and privacy shields"
+          className={`h-11 px-2 rounded-xl border text-xs font-bold flex flex-col items-center justify-center gap-0.5 shrink-0 cursor-pointer ${
+            shields.enabled
+              ? 'border-emerald-500/40 text-emerald-300'
+              : 'border-rose-500/40 text-rose-300'
           }`}
+          style={{ backgroundColor: shields.enabled ? '#06281e' : '#2c0b14' }}
         >
-          {activeTab.isDesktopMode ? (
-            <Monitor className="w-4 h-4" />
-          ) : (
-            <Smartphone className="w-4 h-4" />
-          )}
-        </button>
-
-        {/* Built-In VPN Pill */}
-        <button
-          onClick={() => setShowVpn(true)}
-          title="Built-in Zero-Log VPN (WireGuard / Multi-Hop / Tor)"
-          className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-bold border transition cursor-pointer ${
-            vpn.connected
-              ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300'
-              : 'bg-slate-800/80 border-slate-700 text-slate-400'
-          }`}
-        >
-          <Lock className="w-3.5 h-3.5" />
-          <span className="hidden md:inline">{vpn.connected ? activeVpnNode.flag : 'VPN'}</span>
-        </button>
-
-        {/* Universal Extensions Button */}
-        <button
-          onClick={() => setShowExtensions(true)}
-          title="Universal Extensions (.CRX / .XPI / Userscripts)"
-          className="relative p-2 rounded-xl hover:bg-white/10 text-purple-300 cursor-pointer"
-        >
-          <Puzzle className="w-4 h-4" />
-          <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-purple-500 text-[9px] font-bold text-white flex items-center justify-center">
-            {extensions.filter((e) => e.enabled).length}
+          {shields.enabled ? <ShieldCheck size={15} /> : <ShieldOff size={15} />}
+          <span className="text-[9px] leading-none font-bold">
+            {activeTab.adsBlocked + activeTab.trackersBlocked}
           </span>
         </button>
-
-        {/* Zero-Key Local AI Copilot */}
-        <button
-          onClick={() => setAiDrawerState({ open: true, mode: 'summarize' })}
-          title="Zero-Key Private Local AI Copilot"
-          className="p-2 rounded-xl bg-gradient-to-br from-cyan-500/25 to-emerald-500/25 border border-cyan-400/40 text-cyan-200 hover:opacity-90 cursor-pointer"
-        >
-          <Sparkles className="w-4 h-4" />
-        </button>
-
-        {/* Tabs Switcher Counter */}
-        <button
-          onClick={() => setShowTabs(true)}
-          title="Tabs, Incognito Vault & Split-Screen"
-          className={`px-2.5 py-1 rounded-xl border-2 text-xs font-extrabold cursor-pointer ${
-            activeTab.isIncognito
-              ? 'border-purple-400 text-purple-200 bg-purple-950/60'
-              : 'border-slate-400 text-white hover:border-cyan-400'
-          }`}
-        >
-          {tabs.length}
-        </button>
-
-        {/* DuckDuckGo Style Fire Button */}
-        <button
-          onClick={handleFireBurnAll}
-          title="Fire Button: Instant Session & Tracker Incineration"
-          className="p-2 rounded-xl hover:bg-orange-500/20 text-orange-400 cursor-pointer"
-        >
-          <Flame className="w-4 h-4" />
-        </button>
-
-        {/* Customize & Power Menu */}
-        <button
-          onClick={() => setShowCustomize(true)}
-          title="Theme Studio, Engine, Downloads & DevTools"
-          className="p-2 rounded-xl hover:bg-white/10 text-slate-200 cursor-pointer"
-        >
-          <SlidersHorizontal className="w-4 h-4" />
-        </button>
       </div>
 
-      {/* Compact Utility Sub-Strip (Quick Find, Zoom, Split Indicator, Phone Bezel Toggle) */}
-      <div className="flex items-center justify-between text-[11px] text-slate-400 px-1 pt-0.5">
-        <div className="flex items-center gap-2 overflow-x-auto">
-          <button
-            onClick={() => setShowPlayStoreModal(true)}
-            className="px-2 py-0.5 rounded-md bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 font-bold inline-flex items-center gap-1 hover:bg-emerald-500/30 cursor-pointer shrink-0"
-          >
-            <Download className="w-3 h-3" /> Download / Play Store
-          </button>
-          <span className="opacity-30">•</span>
-          <button
-            onClick={() => setShowFindBar((v) => !v)}
-            className="hover:text-cyan-300 inline-flex items-center gap-1 cursor-pointer shrink-0"
-          >
-            <Search className="w-3 h-3" /> Find in Page
-          </button>
-          <span className="opacity-30">•</span>
-          <button
-            onClick={() => setZapperMode((v) => !v)}
-            className={`inline-flex items-center gap-1 cursor-pointer shrink-0 ${
-              zapperMode ? 'text-rose-400 font-bold' : 'hover:text-rose-300'
-            }`}
-          >
-            <Crosshair className="w-3 h-3" /> Element Zapper
-          </button>
-          <span className="opacity-30">•</span>
-          <button
-            onClick={() => setShowDevTools((v) => !v)}
-            className="hover:text-purple-300 cursor-pointer shrink-0"
-          >
-            {showDevTools ? 'Hide DevTools' : 'DevTools'}
-          </button>
-          {splitTab && (
+      {/* Live suggestion panel — instant engine switch + real search */}
+      {suggestionsOpen && (
+        <div
+          className="rounded-xl border border-slate-700 overflow-hidden divide-y divide-slate-800"
+          style={{ backgroundColor: '#0b1120' }}
+        >
+          {omniboxText.trim() ? (
             <>
-              <span className="opacity-30">•</span>
               <button
-                onClick={() => setSplitTabId(null)}
-                className="text-purple-300 font-semibold inline-flex items-center gap-1 cursor-pointer shrink-0"
+                type="button"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => {
+                  navigateTab(activeTab.id, omniboxText);
+                  setOmniboxText('');
+                  setSuggestionsOpen(false);
+                }}
+                className="w-full px-3 py-2.5 flex items-center gap-2.5 text-left hover:bg-slate-800 cursor-pointer"
               >
-                <Columns2 className="w-3 h-3" /> Exit Split View
+                <Search size={15} className="text-cyan-400 shrink-0" />
+                <span className="text-[13px] text-white truncate">
+                  Search <strong className="font-semibold">{omniboxText}</strong> on{' '}
+                  {activeSearchEngine.name}
+                </span>
               </button>
+              {SEARCH_ENGINE_OPTIONS.filter((e) => e.id !== customization.searchEngine)
+                .slice(0, 3)
+                .map((eng) => (
+                  <button
+                    key={eng.id}
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => {
+                      setCustomization((prev) => ({ ...prev, searchEngine: eng.id }));
+                      navigateTab(activeTab.id, eng.buildUrl(omniboxText.trim()));
+                      setOmniboxText('');
+                      setSuggestionsOpen(false);
+                    }}
+                    className="w-full px-3 py-2 flex items-center gap-2.5 text-left hover:bg-slate-800 cursor-pointer"
+                  >
+                    <span className="text-sm shrink-0">{eng.icon}</span>
+                    <span className="text-[12px] text-slate-300 truncate">
+                      instead search on {eng.name}
+                    </span>
+                  </button>
+                ))}
             </>
+          ) : (
+            <div className="px-3 py-2.5 space-y-1">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                Search with
+              </div>
+              <div className="flex flex-wrap gap-1.5 pt-0.5">
+                {SEARCH_ENGINE_OPTIONS.map((eng) => {
+                  const sel = customization.searchEngine === eng.id;
+                  return (
+                    <button
+                      key={eng.id}
+                      type="button"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => {
+                        setCustomization((prev) => ({ ...prev, searchEngine: eng.id }));
+                        setSuggestionsOpen(false);
+                      }}
+                      className={`px-2.5 py-1.5 rounded-lg border text-[11px] font-semibold flex items-center gap-1 cursor-pointer ${
+                        sel
+                          ? 'bg-cyan-500/20 border-cyan-400 text-white'
+                          : 'bg-slate-900 border-slate-700 text-slate-300'
+                      }`}
+                    >
+                      <span>{eng.icon}</span>
+                      <span>{eng.shortLabel}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           )}
         </div>
-
-        <div className="flex items-center gap-2 shrink-0">
-          <button
-            onClick={() =>
-              updateTab(activeTab.id, (t) => ({
-                ...t,
-                zoomLevel: Math.max(75, t.zoomLevel - 10),
-              }))
-            }
-            className="hover:text-white cursor-pointer"
-            title="Zoom Out"
-          >
-            <ZoomOut className="w-3 h-3" />
-          </button>
-          <span className="font-mono text-[10px]">{activeTab.zoomLevel}%</span>
-          <button
-            onClick={() =>
-              updateTab(activeTab.id, (t) => ({
-                ...t,
-                zoomLevel: Math.min(150, t.zoomLevel + 10),
-              }))
-            }
-            className="hover:text-white cursor-pointer"
-            title="Zoom In"
-          >
-            <ZoomIn className="w-3 h-3" />
-          </button>
-          <button
-            onClick={() =>
-              setCustomization((prev) => ({
-                ...prev,
-                phoneFrameMode: !prev.phoneFrameMode,
-              }))
-            }
-            className="ml-1 px-2 py-0.5 rounded bg-white/8 hover:bg-white/15 text-cyan-300 text-[10px] font-semibold cursor-pointer"
-          >
-            {customization.phoneFrameMode ? 'Full Screen' : 'Phone Frame'}
-          </button>
-        </div>
-      </div>
+      )}
     </div>
+  );
+
+  // ============================================================================
+  // CONTEXTUAL PAGE TOOL STRIP (only appears on real sites, one tap each)
+  // ============================================================================
+  const isRealPage =
+    activeTab.url.startsWith('http://') || activeTab.url.startsWith('https://');
+
+  const PageToolStrip = isRealPage ? (
+    <div
+      className="px-2.5 py-1.5 border-b border-slate-800 flex items-center gap-1.5 overflow-x-auto shrink-0"
+      style={{ backgroundColor: '#080d18' }}
+    >
+      <button
+        onClick={() => updateTab(activeTab.id, (t) => ({ ...t, isReaderMode: !t.isReaderMode }))}
+        className={`px-2.5 py-1 rounded-lg border text-[11px] font-semibold flex items-center gap-1 shrink-0 cursor-pointer ${
+          activeTab.isReaderMode
+            ? 'bg-emerald-500/20 border-emerald-400 text-emerald-200'
+            : 'bg-slate-900 border-slate-700 text-slate-300'
+        }`}
+      >
+        <BookOpen size={12} />
+        <span>Reader</span>
+      </button>
+      <button
+        onClick={() => setAiDrawerState({ open: true, mode: 'summarize' })}
+        className="px-2.5 py-1 rounded-lg border border-cyan-500/40 bg-cyan-950/50 text-[11px] font-semibold text-cyan-200 flex items-center gap-1 shrink-0 cursor-pointer"
+      >
+        <Sparkles size={12} />
+        <span>Summarize</span>
+      </button>
+      <button
+        onClick={() =>
+          updateTab(activeTab.id, (t) => ({ ...t, isDesktopMode: !t.isDesktopMode }))
+        }
+        className={`px-2.5 py-1 rounded-lg border text-[11px] font-semibold flex items-center gap-1 shrink-0 cursor-pointer ${
+          activeTab.isDesktopMode
+            ? 'bg-cyan-500/20 border-cyan-400 text-cyan-200'
+            : 'bg-slate-900 border-slate-700 text-slate-300'
+        }`}
+      >
+        <Monitor size={12} />
+        <span>Desktop</span>
+      </button>
+      <button
+        onClick={() => setShowTranslateModal(true)}
+        className="px-2.5 py-1 rounded-lg border border-slate-700 bg-slate-900 text-[11px] font-semibold text-slate-300 flex items-center gap-1 shrink-0 cursor-pointer"
+      >
+        <Languages size={12} />
+        <span>{activeTab.translatedLang ? activeTab.translatedLang.toUpperCase() : 'Translate'}</span>
+      </button>
+      <button
+        onClick={() => setShowFindBar(true)}
+        className="px-2.5 py-1 rounded-lg border border-slate-700 bg-slate-900 text-[11px] font-semibold text-slate-300 flex items-center gap-1 shrink-0 cursor-pointer"
+      >
+        <Search size={12} />
+        <span>Find</span>
+      </button>
+      <button
+        onClick={() => setZapperMode((v) => !v)}
+        className={`px-2.5 py-1 rounded-lg border text-[11px] font-semibold flex items-center gap-1 shrink-0 cursor-pointer ${
+          zapperMode
+            ? 'bg-rose-500/20 border-rose-400 text-rose-200'
+            : 'bg-slate-900 border-slate-700 text-slate-300'
+        }`}
+      >
+        <Crosshair size={12} />
+        <span>Zap</span>
+      </button>
+    </div>
+  ) : null;
+
+  // ============================================================================
+  // LABELED 5-BUTTON BOTTOM NAVIGATION BAR (Zero Mystery Icons — Every Action Labeled)
+  // ============================================================================
+  const canGoBack = activeTab.historyIndex > 0 || activeTab.url !== 'browserhub://start';
+  const enabledExtCount = extensions.filter((e) => e.enabled).length;
+
+  const BottomNavDock = (
+    <nav
+      style={{
+        backgroundColor: activeTab.isIncognito ? '#160926' : themeStyle.bgBar,
+        borderColor: themeStyle.border,
+      }}
+      className="px-2 py-1.5 border-t grid grid-cols-5 gap-1 shrink-0 z-20 select-none"
+    >
+      <button
+        onClick={() => {
+          if (canGoBack) {
+            handleGoBack();
+          } else {
+            navigateTab(activeTab.id, 'browserhub://start');
+          }
+        }}
+        className="py-1.5 rounded-xl hover:bg-slate-800/70 text-slate-200 flex flex-col items-center justify-center gap-0.5 cursor-pointer"
+      >
+        {canGoBack ? <ArrowLeft size={18} /> : <Home size={18} />}
+        <span className="text-[10px] font-semibold">{canGoBack ? 'Back' : 'Home'}</span>
+      </button>
+
+      <button
+        onClick={() => setShowShields(true)}
+        className="py-1.5 rounded-xl hover:bg-slate-800/70 text-slate-200 flex flex-col items-center justify-center gap-0.5 cursor-pointer"
+      >
+        <ShieldCheck size={18} className={shields.enabled ? 'text-emerald-400' : 'text-slate-400'} />
+        <span className="text-[10px] font-semibold">Shields</span>
+      </button>
+
+      <button
+        onClick={() => setAiDrawerState({ open: true, mode: 'idle' })}
+        className="py-1.5 rounded-xl border border-cyan-500/40 text-cyan-200 flex flex-col items-center justify-center gap-0.5 cursor-pointer"
+        style={{ backgroundColor: '#0b2938' }}
+      >
+        <Sparkles size={18} className="text-cyan-300" />
+        <span className="text-[10px] font-bold text-cyan-200">Ask AI</span>
+      </button>
+
+      <button
+        onClick={() => setShowTabs(true)}
+        className="py-1.5 rounded-xl hover:bg-slate-800/70 text-slate-200 flex flex-col items-center justify-center gap-0.5 cursor-pointer"
+      >
+        <div className="relative flex items-center justify-center">
+          <Layers size={18} className={activeTab.isIncognito ? 'text-purple-300' : 'text-slate-200'} />
+          <span className="ml-1 px-1.5 py-0.2 rounded-md bg-slate-800 border border-slate-600 text-[10px] font-extrabold text-white">
+            {tabs.length}
+          </span>
+        </div>
+        <span className="text-[10px] font-semibold">Tabs</span>
+      </button>
+
+      <button
+        onClick={() => setShowMenuHub(true)}
+        className="py-1.5 rounded-xl hover:bg-slate-800/70 text-slate-200 flex flex-col items-center justify-center gap-0.5 cursor-pointer"
+      >
+        <Menu size={18} />
+        <span className="text-[10px] font-semibold">Menu</span>
+      </button>
+    </nav>
   );
 
   return (
     <div
       style={{ backgroundColor: themeStyle.bgShell }}
-      className={`h-full w-full flex items-center justify-center overflow-hidden ${
-        customization.phoneFrameMode ? 'p-2 sm:p-4 bg-slate-950' : ''
-      }`}
+      className="h-full w-full flex flex-col overflow-hidden relative"
     >
-      {/* Outer Shell (Either Fullscreen Responsive OR Realistic Android 15 Flagship Bezel) */}
+      {/* Top Address Bar Placement */}
+      {customization.addressBarPosition === 'top' && SearchAddressBar}
+      {PageToolStrip}
+
+      {/* Optional Find-in-Page Bar */}
+      {showFindBar && (
+        <div
+          className="px-3 py-2 border-b border-slate-800 flex items-center gap-2 shrink-0 z-20"
+          style={{ backgroundColor: '#0f172a' }}
+        >
+          <Search size={15} className="text-amber-400 shrink-0" />
+          <input
+            autoFocus
+            value={findQuery}
+            onChange={(e) => setFindQuery(e.target.value)}
+            placeholder="Find text on page..."
+            className="flex-1 bg-transparent text-xs text-white focus:outline-none"
+          />
+          <button
+            onClick={() => {
+              setFindQuery('');
+              setShowFindBar(false);
+            }}
+            className="p-1 text-slate-400 hover:text-white cursor-pointer"
+          >
+            <X size={15} />
+          </button>
+        </div>
+      )}
+
+      {/* Main Browsing Viewport */}
       <div
-        style={{ backgroundColor: themeStyle.bgShell }}
-        className={`flex flex-col overflow-hidden relative transition-all ${
-          customization.phoneFrameMode
-            ? 'w-full max-w-[430px] h-full max-h-[900px] rounded-[2.5rem] border-[6px] border-slate-800 shadow-2xl shadow-cyan-950/50'
-            : 'w-full h-full'
+        ref={viewportContainerRef}
+        className={`flex-1 min-h-0 relative ${
+          splitTab
+            ? 'grid grid-rows-2 sm:grid-rows-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-cyan-500/40'
+            : 'flex'
         }`}
       >
-        {/* Android 15 Status Bar when in Phone Frame Mode */}
-        {customization.phoneFrameMode && (
-          <div className="px-5 py-1.5 bg-black/80 text-[11px] text-slate-300 flex items-center justify-between shrink-0 select-none">
-            <div className="flex items-center gap-2 font-semibold">
-              <span>12:00</span>
-              <span className="px-1.5 py-0.2 rounded bg-cyan-500/20 text-cyan-300 text-[9px]">
-                120Hz
-              </span>
-              {vpn.connected && (
-                <span className="text-emerald-400 text-[10px]">🔑 {activeVpnNode.flag}</span>
-              )}
+        <div className="h-full w-full min-h-0 overflow-hidden">
+          <WebViewport
+            tab={activeTab}
+            shields={shields}
+            vpn={vpn}
+            extensions={extensions}
+            customization={customization}
+            zapperMode={zapperMode}
+            findQuery={findQuery}
+            onNavigate={(u) => navigateTab(activeTab.id, u)}
+            onSelectSearchEngine={(id) =>
+              setCustomization((prev) => ({ ...prev, searchEngine: id }))
+            }
+            onZapElement={(zapId) =>
+              updateTab(activeTab.id, (t) => ({
+                ...t,
+                zappedSelectors: [...t.zappedSelectors, zapId],
+                adsBlocked: t.adsBlocked + 1,
+              }))
+            }
+            onOpenAi={(mode, query) => setAiDrawerState({ open: true, mode, query })}
+            onOpenVpn={() => setShowVpn(true)}
+            onOpenShields={() => setShowShields(true)}
+            onOpenExtensions={() => setShowExtensions(true)}
+            onToggleDesktop={() =>
+              updateTab(activeTab.id, (t) => ({ ...t, isDesktopMode: !t.isDesktopMode }))
+            }
+            onOpenNewIncognito={() => handleNewTab(true)}
+            onTriggerDownload={handleTriggerDownload}
+            onEnablePip={(title) => setPipTitle(title)}
+            onOpenPlayStore={() => setShowPlayStoreModal(true)}
+            onLiveContentLoaded={(summaryText, pageTitle) => {
+              setLivePageTexts((prev) => ({ ...prev, [activeTab.id]: summaryText }));
+              updateTab(activeTab.id, (t) => ({ ...t, title: pageTitle }));
+            }}
+          />
+        </div>
+
+        {splitTab && (
+          <div className="h-full w-full min-h-0 overflow-hidden relative">
+            <div className="absolute top-2 right-2 z-20 px-2.5 py-1 rounded-full bg-purple-700 text-white text-[10px] font-bold flex items-center gap-1.5">
+              <span>Split View</span>
+              <button onClick={() => setSplitTabId(null)} className="cursor-pointer">
+                <X size={12} />
+              </button>
             </div>
-            <div className="w-16 h-3.5 rounded-full bg-black border border-slate-800" />
-            <div className="flex items-center gap-1.5">
-              <Wifi className="w-3.5 h-3.5 text-emerald-400" />
-              <BatteryCharging className="w-4 h-4 text-emerald-400" />
-            </div>
-          </div>
-        )}
-
-        {/* Top Bar Placement */}
-        {customization.addressBarPosition === 'top' && AddressToolbar}
-
-        {/* Optional Find-in-Page Bar */}
-        {showFindBar && (
-          <div className="px-3 py-1.5 bg-slate-900 border-b border-slate-800 flex items-center gap-2 shrink-0 z-20">
-            <Search className="w-3.5 h-3.5 text-amber-400" />
-            <input
-              autoFocus
-              value={findQuery}
-              onChange={(e) => setFindQuery(e.target.value)}
-              placeholder="Highlight words on page..."
-              className="flex-1 bg-transparent text-xs text-white focus:outline-none"
-            />
-            <button
-              onClick={() => {
-                setFindQuery('');
-                setShowFindBar(false);
-              }}
-              className="p-1 text-slate-400 hover:text-white cursor-pointer"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        )}
-
-        {/* Main Browsing Viewport (Single Tab OR Dual Split-Screen!) */}
-        <div
-          ref={viewportContainerRef}
-          className={`flex-1 min-h-0 relative ${
-            splitTab ? 'grid grid-rows-2 sm:grid-rows-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-cyan-500/40' : 'flex'
-          }`}
-        >
-          <div className="h-full w-full min-h-0 overflow-hidden">
             <WebViewport
-              tab={activeTab}
+              tab={splitTab}
               shields={shields}
               vpn={vpn}
               extensions={extensions}
               customization={customization}
               zapperMode={zapperMode}
               findQuery={findQuery}
-              onNavigate={(u) => navigateTab(activeTab.id, u)}
+              onNavigate={(u) => navigateTab(splitTab.id, u)}
+              onSelectSearchEngine={(id) =>
+                setCustomization((prev) => ({ ...prev, searchEngine: id }))
+              }
               onZapElement={(zapId) =>
-                updateTab(activeTab.id, (t) => ({
+                updateTab(splitTab.id, (t) => ({
                   ...t,
                   zappedSelectors: [...t.zappedSelectors, zapId],
-                  adsBlocked: t.adsBlocked + 1,
                 }))
               }
               onOpenAi={(mode, query) => setAiDrawerState({ open: true, mode, query })}
               onOpenVpn={() => setShowVpn(true)}
+              onOpenShields={() => setShowShields(true)}
               onOpenExtensions={() => setShowExtensions(true)}
               onToggleDesktop={() =>
-                updateTab(activeTab.id, (t) => ({ ...t, isDesktopMode: !t.isDesktopMode }))
+                updateTab(splitTab.id, (t) => ({ ...t, isDesktopMode: !t.isDesktopMode }))
               }
               onOpenNewIncognito={() => handleNewTab(true)}
               onTriggerDownload={handleTriggerDownload}
               onEnablePip={(title) => setPipTitle(title)}
-              onOpenPlayStore={() => setShowPlayStoreModal(true)}
-              onLiveContentLoaded={(summaryText, pageTitle) => {
-                setLivePageTexts((prev) => ({ ...prev, [activeTab.id]: summaryText }));
-                updateTab(activeTab.id, (t) => ({ ...t, title: pageTitle }));
-              }}
             />
           </div>
-
-          {splitTab && (
-            <div className="h-full w-full min-h-0 overflow-hidden relative">
-              <div className="absolute top-2 right-2 z-20 px-2 py-0.5 rounded-full bg-purple-600/90 text-white text-[10px] font-bold">
-                Split Pane 2
-              </div>
-              <WebViewport
-                tab={splitTab}
-                shields={shields}
-                vpn={vpn}
-                extensions={extensions}
-                customization={customization}
-                zapperMode={zapperMode}
-                findQuery={findQuery}
-                onNavigate={(u) => navigateTab(splitTab.id, u)}
-                onZapElement={(zapId) =>
-                  updateTab(splitTab.id, (t) => ({
-                    ...t,
-                    zappedSelectors: [...t.zappedSelectors, zapId],
-                  }))
-                }
-                onOpenAi={(mode, query) => setAiDrawerState({ open: true, mode, query })}
-                onOpenVpn={() => setShowVpn(true)}
-                onOpenExtensions={() => setShowExtensions(true)}
-                onToggleDesktop={() =>
-                  updateTab(splitTab.id, (t) => ({ ...t, isDesktopMode: !t.isDesktopMode }))
-                }
-                onOpenNewIncognito={() => handleNewTab(true)}
-                onTriggerDownload={handleTriggerDownload}
-                onEnablePip={(title) => setPipTitle(title)}
-              />
-            </div>
-          )}
-
-          {/* Floating Background Video Picture-in-Picture (PiP) Mini-Player */}
-          {pipTitle && (
-            <div className="absolute bottom-3 right-3 z-30 w-60 rounded-2xl bg-slate-950/95 border border-cyan-400/50 shadow-2xl p-2.5 space-y-1.5">
-              <div className="flex items-center justify-between text-[10px] text-cyan-300 font-bold">
-                <span className="inline-flex items-center gap-1">
-                  <PictureInPicture2 className="w-3 h-3" /> PiP Active Across Tabs
-                </span>
-                <button
-                  onClick={() => setPipTitle(null)}
-                  className="text-slate-400 hover:text-white cursor-pointer"
-                >
-                  <X className="w-3 h-3" />
-                </button>
-              </div>
-              <div className="h-20 rounded-xl bg-gradient-to-br from-indigo-900 via-slate-900 to-cyan-950 flex items-center justify-center p-2 text-center text-[11px] font-semibold text-white">
-                ▶ {pipTitle}
-              </div>
-            </div>
-          )}
-
-          {/* Fire Button Incineration Overlay Animation */}
-          {fireSweepAnim && (
-            <div className="absolute inset-0 z-50 bg-gradient-to-t from-orange-600 via-rose-600/90 to-transparent flex flex-col items-center justify-center text-white animate-fire-sweep pointer-events-none">
-              <Flame className="w-16 h-16 text-amber-200 mb-2" />
-              <div className="text-lg font-black tracking-wide">
-                INCINERATING TRACKERS, COOKIES &amp; RAM...
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Desktop-Class Mobile DevTools Drawer */}
-        {showDevTools && (
-          <DevToolsPanel
-            tab={activeTab}
-            networkLogs={networkLogs}
-            onClose={() => setShowDevTools(false)}
-          />
         )}
 
-        {/* Bottom Ergonomic Bar Placement */}
-        {customization.addressBarPosition === 'bottom' && AddressToolbar}
+        {pipTitle && (
+          <div
+            className="absolute bottom-3 right-3 z-30 w-56 rounded-2xl border border-cyan-400/50 shadow-2xl p-2.5 space-y-1.5"
+            style={{ backgroundColor: '#090e1a' }}
+          >
+            <div className="flex items-center justify-between text-[10px] text-cyan-300 font-bold">
+              <span className="inline-flex items-center gap-1">
+                <PictureInPicture2 size={12} /> PiP Player
+              </span>
+              <button
+                onClick={() => setPipTitle(null)}
+                className="text-slate-400 hover:text-white cursor-pointer"
+              >
+                <X size={12} />
+              </button>
+            </div>
+            <div className="h-16 rounded-xl bg-slate-900 flex items-center justify-center p-2 text-center text-[11px] font-semibold text-white">
+              ▶ {pipTitle}
+            </div>
+          </div>
+        )}
 
-        {/* Android Gesture Pill when in Phone Frame Mode */}
-        {customization.phoneFrameMode && (
-          <div className="py-1.5 bg-black flex justify-center shrink-0">
-            <div className="w-28 h-1 rounded-full bg-slate-600" />
+        {fireSweepAnim && (
+          <div className="absolute inset-0 z-50 bg-orange-600/90 flex flex-col items-center justify-center text-white animate-fire-sweep pointer-events-none">
+            <Flame size={48} className="text-amber-200 mb-2" />
+            <div className="text-base font-extrabold tracking-wide">
+              CLEARING COOKIES, CACHE &amp; SESSION...
+            </div>
           </div>
         )}
       </div>
 
-      {/* Modals & Drawers */}
+      {showDevTools && (
+        <DevToolsPanel
+          tab={activeTab}
+          networkLogs={networkLogs}
+          onClose={() => setShowDevTools(false)}
+        />
+      )}
+
+      {/* Optional Bottom Search Bar Placement (above Bottom Nav Dock) */}
+      {customization.addressBarPosition === 'bottom' && SearchAddressBar}
+
+      {/* Permanent Ergonomic 5-Item Labeled Bottom Bar */}
+      {BottomNavDock}
+
+      {/* ==================================================================== */}
+      {/* MODALS & DRAWERS                                                     */}
+      {/* ==================================================================== */}
+
+      {/* Search Engine Picker Sheet */}
+      {showEnginePicker && (
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
+          style={{ backgroundColor: 'rgba(2, 6, 23, 0.8)' }}
+          onClick={() => setShowEnginePicker(false)}
+        >
+          <div
+            className="w-full max-w-sm rounded-t-3xl sm:rounded-3xl border border-slate-800 shadow-2xl overflow-hidden"
+            style={{ backgroundColor: '#0b1120' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div
+              className="px-5 py-3.5 border-b border-slate-800 flex items-center justify-between"
+              style={{ backgroundColor: '#0f172a' }}
+            >
+              <div>
+                <div className="text-sm font-bold text-white">Choose Search Engine</div>
+                <div className="text-[11px] text-slate-400">
+                  Used by both the address bar and Home search
+                </div>
+              </div>
+              <button
+                onClick={() => setShowEnginePicker(false)}
+                className="p-2 rounded-xl hover:bg-slate-800 text-slate-300 cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="p-3 space-y-1.5 max-h-[70vh] overflow-y-auto">
+              {SEARCH_ENGINE_OPTIONS.map((eng) => {
+                const selected = customization.searchEngine === eng.id;
+                return (
+                  <button
+                    key={eng.id}
+                    onClick={() => {
+                      setCustomization((prev) => ({ ...prev, searchEngine: eng.id }));
+                      setShowEnginePicker(false);
+                    }}
+                    className={`w-full px-3.5 py-3 rounded-xl border text-left flex items-center justify-between cursor-pointer transition ${
+                      selected
+                        ? 'bg-cyan-500/20 border-cyan-400 text-white font-bold'
+                        : 'bg-slate-900 hover:bg-slate-800 border-slate-800 text-slate-200'
+                    }`}
+                  >
+                    <span className="flex items-center gap-3">
+                      <span className="text-lg">{eng.icon}</span>
+                      <span>
+                        <span className="block text-xs font-semibold">{eng.name}</span>
+                        <span className="block text-[10px] text-slate-400">{eng.homeUrl}</span>
+                      </span>
+                    </span>
+                    {selected && <Check size={16} className="text-cyan-400 shrink-0" />}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Categorized Control Menu Hub */}
+      {showMenuHub && (
+        <MenuHubModal
+          tab={activeTab}
+          tabsCount={tabs.length}
+          shields={shields}
+          vpn={vpn}
+          enabledExtensionsCount={enabledExtCount}
+          customization={customization}
+          zapperMode={zapperMode}
+          showDevTools={showDevTools}
+          hasSplitView={Boolean(splitTab)}
+          canGoForward={activeTab.historyIndex < activeTab.history.length - 1}
+          onClose={() => setShowMenuHub(false)}
+          onSelectSearchEngine={(id) =>
+            setCustomization((prev) => ({ ...prev, searchEngine: id }))
+          }
+          onNewTab={(incog) => handleNewTab(incog)}
+          onGoHome={() => navigateTab(activeTab.id, 'browserhub://start')}
+          onReload={handleReload}
+          onGoForward={handleGoForward}
+          onToggleDesktop={() =>
+            updateTab(activeTab.id, (t) => ({ ...t, isDesktopMode: !t.isDesktopMode }))
+          }
+          onToggleReader={() =>
+            updateTab(activeTab.id, (t) => ({ ...t, isReaderMode: !t.isReaderMode }))
+          }
+          onOpenTranslate={() => setShowTranslateModal(true)}
+          onOpenFind={() => setShowFindBar(true)}
+          onToggleSplit={() => {
+            if (splitTabId) {
+              setSplitTabId(null);
+            } else {
+              const other = tabs.find((t) => t.id !== activeTab.id);
+              if (other) {
+                setSplitTabId(other.id);
+              } else {
+                const newId = `tab-${Date.now()}`;
+                const secondTab: BrowserTab = {
+                  ...activeTab,
+                  id: newId,
+                  title: 'New Tab',
+                  url: 'browserhub://start',
+                  history: ['browserhub://start'],
+                  historyIndex: 0,
+                };
+                setTabs((prev) => [...prev, secondTab]);
+                setSplitTabId(newId);
+              }
+            }
+          }}
+          onChangeZoom={(nextZoom) =>
+            updateTab(activeTab.id, (t) => ({ ...t, zoomLevel: nextZoom }))
+          }
+          onOpenShields={() => setShowShields(true)}
+          onOpenVpn={() => setShowVpn(true)}
+          onToggleZapper={() => setZapperMode((v) => !v)}
+          onFireWipe={handleFireBurnAll}
+          onOpenExtensions={() => setShowExtensions(true)}
+          onOpenCustomize={() => setShowCustomize(true)}
+          onToggleDevTools={() => setShowDevTools((v) => !v)}
+          onOpenBenchmark={() => navigateTab(activeTab.id, 'browserhub://benchmark')}
+          onOpenAi={(mode) => setAiDrawerState({ open: true, mode })}
+          onToggleToolbarPosition={() =>
+            setCustomization((prev) => ({
+              ...prev,
+              addressBarPosition: prev.addressBarPosition === 'top' ? 'bottom' : 'top',
+            }))
+          }
+          onOpenPlayStore={() => setShowPlayStoreModal(true)}
+        />
+      )}
+
+      {/* Dedicated Clean Page Translator Modal */}
+      {showTranslateModal && (
+        <TranslateModal
+          activeLang={activeTab.translatedLang}
+          bilingual={activeTab.bilingualTranslate}
+          onSelectLang={(code) =>
+            updateTab(activeTab.id, (t) => ({ ...t, translatedLang: code }))
+          }
+          onToggleBilingual={(val) =>
+            updateTab(activeTab.id, (t) => ({ ...t, bilingualTranslate: val }))
+          }
+          onClose={() => setShowTranslateModal(false)}
+        />
+      )}
+
       {showShields && (
         <ShieldsPanel
           tab={activeTab}
@@ -1379,4 +1428,5 @@ export function App() {
     </div>
   );
 }
+
 export default App;

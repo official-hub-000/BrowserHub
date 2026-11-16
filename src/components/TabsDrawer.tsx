@@ -97,7 +97,7 @@ export const TabsDrawer: React.FC<TabsDrawerProps> = ({
               <Flame className="w-3.5 h-3.5" />
               Fire Wipe
             </button>
-            <button onClick={onClose} className="p-1.5 rounded-xl hover:bg-slate-800 text-slate-400 cursor-pointer">
+            <button aria-label="Close" title="Close" onClick={onClose} className="p-1.5 rounded-xl hover:bg-slate-800 text-slate-400 cursor-pointer">
               <X className="w-4 h-4" />
             </button>
           </div>
@@ -177,6 +177,8 @@ export const TabsDrawer: React.FC<TabsDrawerProps> = ({
                         e.stopPropagation();
                         onCloseTab(t.id);
                       }}
+                      aria-label={`Close ${t.title}`}
+                      title="Close tab"
                       className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 shrink-0 cursor-pointer"
                     >
                       <X className="w-3.5 h-3.5" />
@@ -194,6 +196,7 @@ export const TabsDrawer: React.FC<TabsDrawerProps> = ({
                       <button
                         onClick={() => onTogglePin(t.id)}
                         title="Pin Tab"
+                        aria-label="Pin tab"
                         className={`p-1 rounded hover:bg-slate-800 cursor-pointer ${
                           t.isPinned ? 'text-amber-400' : 'text-slate-400'
                         }`}
@@ -203,6 +206,7 @@ export const TabsDrawer: React.FC<TabsDrawerProps> = ({
                       <button
                         onClick={() => onToggleHibernate(t.id)}
                         title="Hibernate Tab to Free RAM"
+                        aria-label="Hibernate tab to free RAM"
                         className={`p-1 rounded hover:bg-slate-800 cursor-pointer ${
                           t.isHibernated ? 'text-emerald-400' : 'text-slate-400'
                         }`}
@@ -216,6 +220,7 @@ export const TabsDrawer: React.FC<TabsDrawerProps> = ({
                             onClose();
                           }}
                           title="Open Side-by-Side Split View"
+                          aria-label="Open side-by-side split view"
                           className={`inline-flex items-center gap-1 px-2 py-0.5 rounded font-semibold cursor-pointer ${
                             isSplit
                               ? 'bg-purple-500 text-white'

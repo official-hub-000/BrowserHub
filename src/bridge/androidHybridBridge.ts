@@ -29,6 +29,10 @@ export interface AndroidJniBridge {
   nativeGoBack?: () => boolean;
   nativeGoForward?: () => boolean;
   nativeReload?: () => void;
+  /** Starts a zero-key AI request on a native worker thread (no CORS, no UI freeze). */
+  startAiRequest?: (requestId: string, prompt: string, systemPrompt: string) => void;
+  /** Returns the JSON result envelope once ready, or null while pending. */
+  pollAiResult?: (requestId: string) => string | null;
 }
 
 declare global {

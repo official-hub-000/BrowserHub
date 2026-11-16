@@ -27,3 +27,13 @@ android/app/src/main/assets/public/
 .env.local
 .vite/
 *.tsbuildinfo
+
+# Local render previews
+.preview/
+
+# Standalone APK toolchain binaries (re-download per build-tools/README.md)
+build-tools/*.jar
+build-tools/*.exe
+build-tools/android.jar
+build-tools/aapt2
+build-tools/zipalign

@@ -15,7 +15,7 @@ import type {
   SearchEngineId,
   ThemePresetId,
 } from '../types/browser';
-import { THEME_PRESETS } from '../data/presets';
+import { SEARCH_ENGINE_OPTIONS, THEME_PRESETS } from '../data/presets';
 import { AndroidHybridBridge } from '../bridge/androidHybridBridge';
 
 interface CustomizeDrawerProps {
@@ -49,7 +49,7 @@ export const CustomizeDrawer: React.FC<CustomizeDrawerProps> = ({
               </div>
             </div>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-xl hover:bg-slate-800 text-slate-400 cursor-pointer">
+          <button aria-label="Close" title="Close" onClick={onClose} className="p-1.5 rounded-xl hover:bg-slate-800 text-slate-400 cursor-pointer">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -181,29 +181,21 @@ export const CustomizeDrawer: React.FC<CustomizeDrawerProps> = ({
           <div className="space-y-2">
             <div className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
               <Search className="w-3.5 h-3.5 text-amber-400" />
-              Default Search Provider
+              Default Search Engine
             </div>
-            <div className="grid grid-cols-3 gap-1.5 text-[11px]">
-              {(
-                [
-                  'duckduckgo',
-                  'brave',
-                  'startpage',
-                  'github-live',
-                  'searxng',
-                  'google',
-                ] as SearchEngineId[]
-              ).map((se) => (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 text-[11px]">
+              {SEARCH_ENGINE_OPTIONS.map((eng) => (
                 <button
-                  key={se}
-                  onClick={() => onUpdateCustomization({ searchEngine: se })}
-                  className={`py-1.5 px-2 rounded-xl border uppercase font-semibold cursor-pointer ${
-                    customization.searchEngine === se
+                  key={eng.id}
+                  onClick={() => onUpdateCustomization({ searchEngine: eng.id })}
+                  className={`py-2 px-2 rounded-xl border font-semibold flex items-center justify-center gap-1 cursor-pointer ${
+                    customization.searchEngine === eng.id
                       ? 'bg-amber-500/20 border-amber-400 text-amber-200'
-                      : 'bg-slate-900 border-slate-800 text-slate-400'
+                      : 'bg-slate-900 border-slate-800 text-slate-300'
                   }`}
                 >
-                  {se}
+                  <span>{eng.icon}</span>
+                  <span className="truncate">{eng.shortLabel}</span>
                 </button>
               ))}
             </div>
@@ -215,12 +207,12 @@ export const CustomizeDrawer: React.FC<CustomizeDrawerProps> = ({
               <BookOpen className="w-3.5 h-3.5 text-cyan-400" />
               Reader Mode Paper &amp; Font
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-1.5">
               {(['amoled', 'sepia', 'slate'] as const).map((rt) => (
                 <button
                   key={rt}
                   onClick={() => onUpdateCustomization({ readerTheme: rt })}
-                  className={`flex-1 py-1.5 rounded-xl border text-xs capitalize cursor-pointer ${
+                  className={`flex-1 min-w-[64px] py-1.5 rounded-xl border text-xs capitalize cursor-pointer ${
                     customization.readerTheme === rt
                       ? 'border-cyan-400 bg-cyan-500/20 text-white'
                       : 'border-slate-800 bg-slate-900 text-slate-400'
@@ -233,7 +225,7 @@ export const CustomizeDrawer: React.FC<CustomizeDrawerProps> = ({
                 <button
                   key={rf}
                   onClick={() => onUpdateCustomization({ readerFont: rf })}
-                  className={`flex-1 py-1.5 rounded-xl border text-xs capitalize cursor-pointer ${
+                  className={`flex-1 min-w-[64px] py-1.5 rounded-xl border text-xs capitalize cursor-pointer ${
                     customization.readerFont === rf
                       ? 'border-purple-400 bg-purple-500/20 text-white'
                       : 'border-slate-800 bg-slate-900 text-slate-400'

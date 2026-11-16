@@ -77,7 +77,7 @@ export const PlayStoreDownloadModal: React.FC<PlayStoreDownloadModalProps> = ({
               </div>
             </div>
           </div>
-          <button
+          <button aria-label="Close" title="Close"
             onClick={onClose}
             className="p-1.5 rounded-xl hover:bg-slate-800 text-slate-400 cursor-pointer"
           >

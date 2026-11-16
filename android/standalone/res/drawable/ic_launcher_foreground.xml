@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Outer Cyber Shield -->
+    <path
+        android:fillColor="#22D3EE"
+        android:pathData="M54,24 L78,33 L78,53 C78,69 67.5,80.5 54,85 C40.5,80.5 30,69 30,53 L30,33 Z" />
+    <!-- Inner Dark Core -->
+    <path
+        android:fillColor="#060B16"
+        android:pathData="M54,29 L73,36.5 L73,53 C73,65.5 64.5,75.2 54,79.2 C43.5,75.2 35,65.5 35,53 L35,36.5 Z" />
+    <!-- Super Speed Lightning Bolt -->
+    <path
+        android:fillColor="#34D399"
+        android:pathData="M57,36 L44,55 L53,55 L50,71 L64,51 L55,51 Z" />
+</vector>

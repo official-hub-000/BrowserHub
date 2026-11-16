@@ -6,6 +6,7 @@ import android.webkit.JavascriptInterface
 import com.browserhub.app.BuildConfig
 import com.browserhub.app.MainActivity
 import com.browserhub.app.ai.LocalNeuralEngine
+import com.browserhub.app.ai.NativeAiClient
 import com.browserhub.app.engine.HybridBrowserEngine
 import com.browserhub.app.extensions.UniversalExtensionManager
 import com.browserhub.app.privacy.HubShieldEngine
@@ -114,4 +115,16 @@ class BrowserHubJavascriptBridge(
     fun runLocalInference(prompt: String, pageText: String): String {
         return neural.inferZeroKeyLocal(prompt, pageText)
     }
+
+    /**
+     * Zero-key live AI. Runs on a native worker thread so the WebView JS thread never
+     * freezes and CORS is bypassed; the page polls pollAiResult() until ready.
+     */
+    @JavascriptInterface
+    fun startAiRequest(requestId: String, prompt: String, systemPrompt: String) {
+        NativeAiClient.start(requestId, prompt, systemPrompt)
+    }
+
+    @JavascriptInterface
+    fun pollAiResult(requestId: String): String? = NativeAiClient.poll(requestId)
 }
