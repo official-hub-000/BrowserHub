@@ -56,14 +56,14 @@ export const VpnModal: React.FC<VpnModalProps> = ({ vpn, onUpdateVpn, onClose })
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-3" onClick={onClose}>
-      <div className="w-full max-w-md rounded-3xl bg-slate-950 border border-slate-800 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+    <div className="bh-overlay fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-3" onClick={onClose}>
+      <div className="bh-dialog w-full max-w-md rounded-3xl bg-black border border-slate-800 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
-        <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-gradient-to-r from-slate-900 to-cyan-950/40">
+        <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-gradient-to-r from-black to-cyan-950/40">
           <div className="flex items-center gap-2.5">
             <div
               className={`w-9 h-9 rounded-2xl flex items-center justify-center ${
-                vpn.connected ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-800 text-slate-400'
+                vpn.connected ? 'bg-emerald-500/20 text-emerald-400' : 'bg-[#121216] text-slate-400'
               }`}
             >
               <Lock className="w-5 h-5" />
@@ -80,7 +80,7 @@ export const VpnModal: React.FC<VpnModalProps> = ({ vpn, onUpdateVpn, onClose })
               </div>
             </div>
           </div>
-          <button aria-label="Close" title="Close" onClick={onClose} className="p-1.5 rounded-xl hover:bg-slate-800 text-slate-400 cursor-pointer">
+          <button aria-label="Close" title="Close" onClick={onClose} className="p-1.5 rounded-xl hover:bg-[#121216] text-slate-400 cursor-pointer">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -98,7 +98,7 @@ export const VpnModal: React.FC<VpnModalProps> = ({ vpn, onUpdateVpn, onClose })
         </div>
 
         {/* Big Power Ring & Tunnel Telemetry */}
-        <div className="p-4 bg-slate-900/50 border-b border-slate-800 flex items-center justify-between gap-4">
+        <div className="p-4 bg-[#050506] border-b border-slate-800 flex items-center justify-between gap-4">
           <div className="space-y-1">
             <div className="text-xs font-semibold text-slate-400">Tunnel Status</div>
             <div
@@ -132,7 +132,7 @@ export const VpnModal: React.FC<VpnModalProps> = ({ vpn, onUpdateVpn, onClose })
             className={`w-16 h-16 rounded-full flex items-center justify-center border-2 transition-all shrink-0 cursor-pointer ${
               vpn.connected
                 ? 'bg-emerald-500/20 border-emerald-400 text-emerald-300 shadow-lg shadow-emerald-500/25'
-                : 'bg-slate-800 border-slate-600 text-slate-300 hover:border-cyan-400'
+                : 'bg-[#121216] border-slate-600 text-slate-300 hover:border-cyan-400'
             }`}
           >
             <Power className="w-7 h-7" />
@@ -161,7 +161,7 @@ export const VpnModal: React.FC<VpnModalProps> = ({ vpn, onUpdateVpn, onClose })
                     className={`w-full flex items-center justify-between p-2.5 rounded-2xl border text-left transition cursor-pointer ${
                       selected
                         ? 'bg-cyan-500/15 border-cyan-400/50 text-white'
-                        : 'bg-slate-900/70 border-slate-800/80 text-slate-300 hover:bg-slate-900'
+                        : 'bg-[#060608] border-slate-800/80 text-slate-300 hover:bg-[#121216]'
                     }`}
                   >
                     <div className="flex items-center gap-2.5 min-w-0">
@@ -177,7 +177,7 @@ export const VpnModal: React.FC<VpnModalProps> = ({ vpn, onUpdateVpn, onClose })
                       <span className="text-[11px] font-mono text-emerald-400">
                         {node.baseLatencyMs}ms
                       </span>
-                      <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-slate-800 text-slate-400 font-semibold">
+                      <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-[#121216] text-slate-400 font-semibold">
                         planned
                       </span>
                       {selected && <Check className="w-4 h-4 text-cyan-400" />}
@@ -189,7 +189,7 @@ export const VpnModal: React.FC<VpnModalProps> = ({ vpn, onUpdateVpn, onClose })
           </div>
 
           {/* Encrypted DNS-over-HTTPS Selector */}
-          <div className="rounded-2xl bg-slate-900/80 border border-slate-800 p-3 space-y-2">
+          <div className="rounded-2xl bg-[#08080b] border border-slate-800 p-3 space-y-2">
             <div className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
               <Globe className="w-3.5 h-3.5 text-cyan-400" />
               Encrypted DNS-over-HTTPS (RFC 8484)
@@ -210,7 +210,7 @@ export const VpnModal: React.FC<VpnModalProps> = ({ vpn, onUpdateVpn, onClose })
                   className={`px-2 py-1.5 rounded-xl text-[11px] font-semibold border cursor-pointer ${
                     vpn.dohProvider === dns.id
                       ? 'bg-cyan-500/20 border-cyan-400 text-cyan-200'
-                      : 'bg-slate-950 border-slate-800 text-slate-400'
+                      : 'bg-black border-slate-800 text-slate-400'
                   }`}
                 >
                   {dns.label}
@@ -226,7 +226,7 @@ export const VpnModal: React.FC<VpnModalProps> = ({ vpn, onUpdateVpn, onClose })
               className={`p-2.5 rounded-2xl border text-left cursor-pointer ${
                 vpn.killSwitch
                   ? 'bg-emerald-950/30 border-emerald-500/40 text-emerald-200'
-                  : 'bg-slate-900 border-slate-800 text-slate-400'
+                  : 'bg-black border-slate-800 text-slate-400'
               }`}
             >
               <div className="text-xs font-bold flex items-center gap-1">
@@ -242,7 +242,7 @@ export const VpnModal: React.FC<VpnModalProps> = ({ vpn, onUpdateVpn, onClose })
               className={`p-2.5 rounded-2xl border text-left cursor-pointer ${
                 vpn.blockWebRtcLeak
                   ? 'bg-cyan-950/30 border-cyan-500/40 text-cyan-200'
-                  : 'bg-slate-900 border-slate-800 text-slate-400'
+                  : 'bg-black border-slate-800 text-slate-400'
               }`}
             >
               <div className="text-xs font-bold flex items-center gap-1">

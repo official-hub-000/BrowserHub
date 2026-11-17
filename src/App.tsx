@@ -211,7 +211,7 @@ export function App() {
   // Customization State — clean full-bleed layout + Google default search (switchable in 1 tap)
   const [customization, setCustomization] = useState<BrowserCustomization>(() =>
     withStored<BrowserCustomization>('customization', {
-    theme: 'cyber-cyan',
+    theme: 'amoled-pitch',
     customAccentHex: '#22d3ee',
     addressBarPosition: 'top',
     searchEngine: 'google',
@@ -844,7 +844,7 @@ export function App() {
   const SearchAddressBar = (
     <div
       style={{
-        backgroundColor: activeTab.isIncognito ? '#160926' : themeStyle.bgBar,
+        backgroundColor: activeTab.isIncognito ? '#120a1b' : themeStyle.bgBar,
         borderColor: themeStyle.border,
         gap: customization.uiDensity === 'compact' ? 4 : 6,
       }}
@@ -856,7 +856,7 @@ export function App() {
       {instantMathResult && (
         <div
           className="px-3 py-1.5 rounded-xl border border-cyan-500/40 text-xs flex items-center justify-between text-cyan-200"
-          style={{ backgroundColor: '#0c2438' }}
+          style={{ backgroundColor: '#08080b' }}
         >
           <span>Calculator:</span>
           <strong className="font-mono text-sm text-emerald-300">= {instantMathResult}</strong>
@@ -889,7 +889,7 @@ export function App() {
           title={`Search engine: ${activeSearchEngine.name} — tap to change`}
           aria-label={`Search engine: ${activeSearchEngine.name}. Tap to change.`}
           className="h-11 px-2.5 rounded-xl border border-slate-700 hover:border-cyan-400 text-xs font-semibold text-white flex items-center gap-1.5 shrink-0 cursor-pointer max-w-[104px]"
-          style={{ backgroundColor: '#0f172a' }}
+          style={{ backgroundColor: '#000000' }}
         >
           <SearchEngineIcon id={activeSearchEngine.id} size={17} />
           <span className="truncate text-slate-200">{activeSearchEngine.shortLabel}</span>
@@ -906,7 +906,7 @@ export function App() {
             (document.activeElement as HTMLElement | null)?.blur();
           }}
           className="flex-1 min-w-[96px] h-11 flex items-center gap-1.5 rounded-xl border border-slate-700 focus-within:border-cyan-400 px-2.5"
-          style={{ backgroundColor: '#070b14' }}
+          style={{ backgroundColor: '#000000' }}
         >
           <Search size={15} className="text-slate-400 shrink-0" />
           <input
@@ -1003,8 +1003,8 @@ export function App() {
       {/* Live suggestion panel — instant engine switch + real search */}
       {suggestionsOpen && (
         <div
-          className="rounded-xl border border-slate-700 overflow-hidden divide-y divide-slate-800"
-          style={{ backgroundColor: '#0b1120' }}
+          className="bh-pop rounded-xl border border-slate-700 overflow-hidden divide-y divide-slate-800"
+          style={{ backgroundColor: '#000000' }}
         >
           {omniboxText.trim() ? (
             <>
@@ -1016,7 +1016,7 @@ export function App() {
                   setOmniboxText('');
                   setSuggestionsOpen(false);
                 }}
-                className="w-full px-3 py-2.5 flex items-center gap-2.5 text-left hover:bg-slate-800 cursor-pointer"
+                className="w-full px-3 py-2.5 flex items-center gap-2.5 text-left hover:bg-[#121216] cursor-pointer"
               >
                 <Search size={15} className="text-cyan-400 shrink-0" />
                 <span className="text-[13px] text-white truncate">
@@ -1037,7 +1037,7 @@ export function App() {
                       setOmniboxText('');
                       setSuggestionsOpen(false);
                     }}
-                    className="w-full px-3 py-2 flex items-center gap-2.5 text-left hover:bg-slate-800 cursor-pointer"
+                    className="w-full px-3 py-2 flex items-center gap-2.5 text-left hover:bg-[#121216] cursor-pointer"
                   >
                     <SearchEngineIcon id={eng.id} size={15} />
                     <span className="text-[12px] text-slate-300 truncate">
@@ -1066,7 +1066,7 @@ export function App() {
                       className={`px-2.5 py-1.5 rounded-lg border text-[11px] font-semibold flex items-center gap-1 cursor-pointer ${
                         sel
                           ? 'bg-cyan-500/20 border-cyan-400 text-white'
-                          : 'bg-slate-900 border-slate-700 text-slate-300'
+                          : 'bg-black border-slate-700 text-slate-300'
                       }`}
                     >
                       <SearchEngineIcon id={eng.id} size={13} />
@@ -1091,14 +1091,14 @@ export function App() {
   const PageToolStrip = isRealPage ? (
     <div
       className="px-2.5 py-1.5 border-b border-slate-800 flex items-center gap-1.5 overflow-x-auto shrink-0"
-      style={{ backgroundColor: '#080d18' }}
+      style={{ backgroundColor: '#000000' }}
     >
       <button
         onClick={() => updateTab(activeTab.id, (t) => ({ ...t, isReaderMode: !t.isReaderMode }))}
         className={`px-2.5 py-1 rounded-lg border text-[11px] font-semibold flex items-center gap-1 shrink-0 cursor-pointer ${
           activeTab.isReaderMode
             ? 'bg-emerald-500/20 border-emerald-400 text-emerald-200'
-            : 'bg-slate-900 border-slate-700 text-slate-300'
+            : 'bg-black border-slate-700 text-slate-300'
         }`}
       >
         <BookOpen size={12} />
@@ -1118,7 +1118,7 @@ export function App() {
         className={`px-2.5 py-1 rounded-lg border text-[11px] font-semibold flex items-center gap-1 shrink-0 cursor-pointer ${
           activeTab.isDesktopMode
             ? 'bg-cyan-500/20 border-cyan-400 text-cyan-200'
-            : 'bg-slate-900 border-slate-700 text-slate-300'
+            : 'bg-black border-slate-700 text-slate-300'
         }`}
       >
         <Monitor size={12} />
@@ -1126,14 +1126,14 @@ export function App() {
       </button>
       <button
         onClick={() => setShowTranslateModal(true)}
-        className="px-2.5 py-1 rounded-lg border border-slate-700 bg-slate-900 text-[11px] font-semibold text-slate-300 flex items-center gap-1 shrink-0 cursor-pointer"
+        className="px-2.5 py-1 rounded-lg border border-slate-700 bg-black text-[11px] font-semibold text-slate-300 flex items-center gap-1 shrink-0 cursor-pointer"
       >
         <Languages size={12} />
         <span>{activeTab.translatedLang ? activeTab.translatedLang.toUpperCase() : 'Translate'}</span>
       </button>
       <button
         onClick={() => setShowFindBar(true)}
-        className="px-2.5 py-1 rounded-lg border border-slate-700 bg-slate-900 text-[11px] font-semibold text-slate-300 flex items-center gap-1 shrink-0 cursor-pointer"
+        className="px-2.5 py-1 rounded-lg border border-slate-700 bg-black text-[11px] font-semibold text-slate-300 flex items-center gap-1 shrink-0 cursor-pointer"
       >
         <Search size={12} />
         <span>Find</span>
@@ -1143,7 +1143,7 @@ export function App() {
         className={`px-2.5 py-1 rounded-lg border text-[11px] font-semibold flex items-center gap-1 shrink-0 cursor-pointer ${
           zapperMode
             ? 'bg-rose-500/20 border-rose-400 text-rose-200'
-            : 'bg-slate-900 border-slate-700 text-slate-300'
+            : 'bg-black border-slate-700 text-slate-300'
         }`}
       >
         <Crosshair size={12} />
@@ -1161,7 +1161,7 @@ export function App() {
   const BottomNavDock = (
     <nav
       style={{
-        backgroundColor: activeTab.isIncognito ? '#160926' : themeStyle.bgBar,
+        backgroundColor: activeTab.isIncognito ? '#120a1b' : themeStyle.bgBar,
         borderColor: themeStyle.border,
       }}
       className="px-2 py-1.5 border-t grid grid-cols-5 gap-1 shrink-0 z-20 select-none"
@@ -1174,7 +1174,7 @@ export function App() {
             navigateTab(activeTab.id, 'browserhub://start');
           }
         }}
-        className="py-1.5 rounded-xl hover:bg-slate-800/70 text-slate-200 flex flex-col items-center justify-center gap-0.5 cursor-pointer"
+        className="py-1.5 rounded-xl hover:bg-[#121216] text-slate-200 flex flex-col items-center justify-center gap-0.5 cursor-pointer"
       >
         {canGoBack ? <ArrowLeft size={18} /> : <Home size={18} />}
         <span className="text-[10px] font-semibold">{canGoBack ? 'Back' : 'Home'}</span>
@@ -1182,7 +1182,7 @@ export function App() {
 
       <button
         onClick={() => setShowShields(true)}
-        className="py-1.5 rounded-xl hover:bg-slate-800/70 text-slate-200 flex flex-col items-center justify-center gap-0.5 cursor-pointer"
+        className="py-1.5 rounded-xl hover:bg-[#121216] text-slate-200 flex flex-col items-center justify-center gap-0.5 cursor-pointer"
       >
         <ShieldCheck size={18} className={shields.enabled ? 'text-emerald-400' : 'text-slate-400'} />
         <span className="text-[10px] font-semibold">Shields</span>
@@ -1191,7 +1191,7 @@ export function App() {
       <button
         onClick={() => setAiDrawerState({ open: true, mode: 'idle' })}
         className="py-1.5 rounded-xl border border-cyan-500/40 text-cyan-200 flex flex-col items-center justify-center gap-0.5 cursor-pointer"
-        style={{ backgroundColor: '#0b2938' }}
+        style={{ backgroundColor: '#0d0d10' }}
       >
         <Sparkles size={18} className="text-cyan-300" />
         <span className="text-[10px] font-bold text-cyan-200">Ask AI</span>
@@ -1199,13 +1199,13 @@ export function App() {
 
       <button
         onClick={() => setShowTabs(true)}
-        className={`py-1.5 rounded-xl hover:bg-slate-800/70 text-slate-200 flex flex-col items-center justify-center gap-0.5 cursor-pointer ${
+        className={`py-1.5 rounded-xl hover:bg-[#121216] text-slate-200 flex flex-col items-center justify-center gap-0.5 cursor-pointer ${
           tabs.length > 1 ? 'bh-dock-active' : ''
         }`}
       >
         <div className="relative flex items-center justify-center">
           <Layers size={18} className={activeTab.isIncognito ? 'text-purple-300' : 'text-slate-200'} />
-          <span className="ml-1 px-1.5 py-0.2 rounded-md bg-slate-800 border border-slate-600 text-[10px] font-extrabold text-white">
+          <span className="ml-1 px-1.5 py-0.2 rounded-md bg-[#121216] border border-slate-600 text-[10px] font-extrabold text-white">
             {tabs.length}
           </span>
         </div>
@@ -1214,7 +1214,7 @@ export function App() {
 
       <button
         onClick={() => setShowMenuHub(true)}
-        className="py-1.5 rounded-xl hover:bg-slate-800/70 text-slate-200 flex flex-col items-center justify-center gap-0.5 cursor-pointer"
+        className="py-1.5 rounded-xl hover:bg-[#121216] text-slate-200 flex flex-col items-center justify-center gap-0.5 cursor-pointer"
       >
         <Menu size={18} />
         <span className="text-[10px] font-semibold">Menu</span>
@@ -1241,7 +1241,7 @@ export function App() {
 
       {/* Real feedback from the native offline translator */}
       {translateNotice && activeTab.translatedLang && (
-        <div className="px-2.5 py-1 bg-indigo-950/80 border-b border-indigo-500/40 text-[10px] text-indigo-200 flex items-center justify-between shrink-0">
+        <div className="px-2.5 py-1 bg-[#0a0a12] border-b border-indigo-500/40 text-[10px] text-indigo-200 flex items-center justify-between shrink-0">
           <span className="inline-flex items-center gap-1.5">
             <Languages size={11} className="shrink-0" />
             <span>
@@ -1266,7 +1266,7 @@ export function App() {
       {showFindBar && (
         <div
           className="px-3 py-2 border-b border-slate-800 flex items-center gap-2 shrink-0 z-20"
-          style={{ backgroundColor: '#0f172a' }}
+          style={{ backgroundColor: '#000000' }}
         >
           <Search size={15} className="text-amber-400 shrink-0" />
           <input
@@ -1313,7 +1313,7 @@ export function App() {
             : 'flex'
         }`}
       >
-        <div className="h-full w-full min-h-0 overflow-hidden">
+        <div key={activeTab.id} className="bh-viewport-enter h-full w-full min-h-0 overflow-hidden">
           <WebViewport
             tab={activeTab}
             shields={shields}
@@ -1402,7 +1402,7 @@ export function App() {
       </div>
 
       {pipTitle && (
-        <div className="fixed bottom-24 right-3 z-40 w-56 rounded-2xl border border-cyan-400/50 shadow-2xl p-2.5 space-y-1.5" style={{ backgroundColor: '#090e1a' }}>
+        <div className="fixed bottom-24 right-3 z-40 w-56 rounded-2xl border border-cyan-400/50 shadow-2xl p-2.5 space-y-1.5" style={{ backgroundColor: '#000000' }}>
             <div className="flex items-center justify-between text-[10px] text-cyan-300 font-bold">
               <span className="inline-flex items-center gap-1">
                 <PictureInPicture2 size={12} /> PiP Player
@@ -1414,7 +1414,7 @@ export function App() {
                 <X size={12} />
               </button>
             </div>
-          <div className="h-16 rounded-xl bg-slate-900 flex items-center justify-center p-2 text-center text-[11px] font-semibold text-white">
+          <div className="h-16 rounded-xl bg-black flex items-center justify-center p-2 text-center text-[11px] font-semibold text-white">
             ▶ {pipTitle}
           </div>
         </div>
@@ -1441,18 +1441,18 @@ export function App() {
       {/* Search Engine Picker Sheet */}
       {showEnginePicker && (
         <div
-          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
-          style={{ backgroundColor: 'rgba(2, 6, 23, 0.8)' }}
+          className="bh-overlay fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
+          style={{ backgroundColor: 'rgba(0, 0, 0, 0.88)' }}
           onClick={() => setShowEnginePicker(false)}
         >
           <div
-            className="w-full max-w-sm rounded-t-3xl sm:rounded-3xl border border-slate-800 shadow-2xl overflow-hidden"
-            style={{ backgroundColor: '#0b1120' }}
+            className="bh-sheet w-full max-w-sm rounded-t-3xl sm:rounded-3xl border border-slate-800 shadow-2xl overflow-hidden"
+            style={{ backgroundColor: '#000000' }}
             onClick={(e) => e.stopPropagation()}
           >
             <div
               className="px-5 py-3.5 border-b border-slate-800 flex items-center justify-between"
-              style={{ backgroundColor: '#0f172a' }}
+              style={{ backgroundColor: '#000000' }}
             >
               <div>
                 <div className="text-sm font-bold text-white">Choose Search Engine</div>
@@ -1462,7 +1462,7 @@ export function App() {
               </div>
               <button
                 onClick={() => setShowEnginePicker(false)}
-                className="p-2 rounded-xl hover:bg-slate-800 text-slate-300 cursor-pointer"
+                className="p-2 rounded-xl hover:bg-[#121216] text-slate-300 cursor-pointer"
               >
                 <X size={18} />
               </button>
@@ -1480,7 +1480,7 @@ export function App() {
                     className={`w-full px-3.5 py-3 rounded-xl border text-left flex items-center justify-between cursor-pointer transition ${
                       selected
                         ? 'bg-cyan-500/20 border-cyan-400 text-white font-bold'
-                        : 'bg-slate-900 hover:bg-slate-800 border-slate-800 text-slate-200'
+                        : 'bg-black hover:bg-[#121216] border-slate-800 text-slate-200'
                     }`}
                   >
                     <span className="flex items-center gap-3">
@@ -1642,6 +1642,7 @@ export function App() {
         <AiCopilotDrawer
           tab={activeTab}
           livePageText={livePageTexts[activeTab.id]}
+          searchEngineId={customization.searchEngine}
           initialMode={aiDrawerState.mode}
           initialQuery={aiDrawerState.query}
           onClose={() => setAiDrawerState({ open: false })}

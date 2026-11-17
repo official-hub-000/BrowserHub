@@ -67,6 +67,12 @@ class BrowserHubJavascriptBridge(
     @JavascriptInterface
     fun getActivePageText(): String = activity.extractedPageText
 
+    /** Reliable clipboard write for Android WebView (execCommand often fails). */
+    @JavascriptInterface
+    fun copyToClipboard(text: String) {
+        activity.copyToClipboard(text)
+    }
+
     @JavascriptInterface
     fun setUserScripts(code: String) {
         activity.applyUserScripts(code)

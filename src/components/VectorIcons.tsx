@@ -98,7 +98,7 @@ export const SearchEngineIcon: React.FC<EngineIconProps> = ({ id, size = 16, cla
     case 'wikipedia':
       return (
         <svg {...common}>
-          <circle cx="12" cy="12" r="11.2" fill="#1e293b" />
+          <circle cx="12" cy="12" r="11.2" fill="#1a1a1f" />
           <path
             fill="#e2e8f0"
             d="M4.4 7.3h2.5l2.2 7 2.1-7h1.7l2.1 7 2.2-7h2.4l-3.5 9.4h-2L12.2 10l-1.9 6.7h-2z"
@@ -109,7 +109,7 @@ export const SearchEngineIcon: React.FC<EngineIconProps> = ({ id, size = 16, cla
     case 'github-live':
       return (
         <svg {...common}>
-          <circle cx="12" cy="12" r="11.2" fill="#0d1117" />
+          <circle cx="12" cy="12" r="11.2" fill="#000000" />
           <path
             fill="#e6edf3"
             d="M12 3.8a8.3 8.3 0 0 0-2.6 16.2c.4.1.6-.2.6-.4v-1.4c-2.3.5-2.8-1.1-2.8-1.1-.4-1-.9-1.2-.9-1.2-.8-.5 0-.5 0-.5.8.1 1.2.8 1.2.8.8 1.3 2 .9 2.5.7.1-.6.3-1 .6-1.2-1.9-.2-3.8-.9-3.8-4.1 0-.9.3-1.6.8-2.2-.1-.2-.4-1 .1-2.1 0 0 .7-.2 2.3.8a8 8 0 0 1 4.2 0c1.6-1 2.3-.8 2.3-.8.5 1.1.2 1.9.1 2.1.5.6.8 1.3.8 2.2 0 3.2-1.9 3.9-3.8 4.1.4.3.6.8.6 1.6v2.3c0 .2.2.5.6.4A8.3 8.3 0 0 0 12 3.8z"
@@ -263,8 +263,8 @@ export const SiteIcon: React.FC<EngineIconProps> = ({ id, size = 18, className =
       return (
         <svg {...common}>
           <rect x="1.8" y="1.8" width="8.6" height="8.6" fill="#BB1919" />
-          <rect x="13.6" y="1.8" width="8.6" height="8.6" fill="#1e293b" />
-          <rect x="1.8" y="13.6" width="8.6" height="8.6" fill="#1e293b" />
+          <rect x="13.6" y="1.8" width="8.6" height="8.6" fill="#1a1a1f" />
+          <rect x="1.8" y="13.6" width="8.6" height="8.6" fill="#1a1a1f" />
           <rect x="13.6" y="13.6" width="8.6" height="8.6" fill="#BB1919" />
         </svg>
       );

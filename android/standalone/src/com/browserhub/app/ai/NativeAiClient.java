@@ -23,6 +23,12 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public final class NativeAiClient {
     private static final String ENDPOINT = "https://text.pollinations.ai/openai";
+    /**
+     * Free, key-less models tried in order. A single hardcoded model meant one
+     * rate-limited model broke every question after it — the exact "answered
+     * 'Who is Ronaldo' then failed 'Who is goat'" behaviour.
+     */
+    private static final String[] MODELS = {"openai", "mistral", "llama", "openai-fast"};
     private static final ConcurrentHashMap<String, String> RESULTS = new ConcurrentHashMap<String, String>();
 
     private NativeAiClient() {}
@@ -52,10 +58,22 @@ public final class NativeAiClient {
     }
 
     private static String call(String userPrompt, String systemPrompt) {
+        String lastError = "no model answered";
+        long deadline = System.currentTimeMillis() + 20000L;
+        for (String model : MODELS) {
+            if (System.currentTimeMillis() >= deadline) break;
+            String result = callOnce(model, userPrompt, systemPrompt);
+            if (result.startsWith("{\"ok\":true")) return result;
+            lastError = result;
+        }
+        return error(lastError);
+    }
+
+    private static String callOnce(String model, String userPrompt, String systemPrompt) {
         HttpURLConnection conn = null;
         try {
             JSONObject payload = new JSONObject();
-            payload.put("model", "openai");
+            payload.put("model", model);
 
             JSONArray messages = new JSONArray();
             messages.put(new JSONObject()
@@ -69,8 +87,8 @@ public final class NativeAiClient {
             byte[] body = payload.toString().getBytes(StandardCharsets.UTF_8);
             conn = (HttpURLConnection) new URL(ENDPOINT).openConnection();
             conn.setRequestMethod("POST");
-            conn.setConnectTimeout(8000);
-            conn.setReadTimeout(25000);
+            conn.setConnectTimeout(6000);
+            conn.setReadTimeout(12000);
             conn.setDoOutput(true);
             conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
             conn.setRequestProperty("Accept", "application/json");

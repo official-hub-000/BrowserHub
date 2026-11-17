@@ -12,7 +12,7 @@ body,
   width: 100%;
   margin: 0;
   padding: 0;
-  background-color: #05070d;
+  background-color: #000000;
   color: #f1f5f9;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
@@ -128,4 +128,167 @@ textarea {
   color: var(--bh-accent) !important;
   border-color: var(--bh-accent) !important;
   box-shadow: inset 0 0 0 1px var(--bh-accent);
+}
+
+/* ==================================================================
+   Motion system — tabs, sheets, modals, panels.
+   Everything is transform/opacity only so it stays GPU-composited inside
+   Android WebView, and every animation is opt-out under
+   prefers-reduced-motion.
+   ================================================================== */
+
+/* Sheet rising from the bottom edge (mobile modal sheets). */
+@keyframes bhSheetUp {
+  from {
+    opacity: 0;
+    transform: translateY(14%) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Dialog scaling in from the centre. */
+@keyframes bhDialogIn {
+  from {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Side drawer sliding in from its edge. */
+@keyframes bhDrawerRight {
+  from {
+    opacity: 0;
+    transform: translateX(22%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes bhDrawerLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-22%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Scrim fade so overlays never pop in. */
+@keyframes bhFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Tab/viewport crossfade when switching tabs. */
+@keyframes bhViewportIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.997);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Dropdown / suggestion panel. */
+@keyframes bhPopDown {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scaleY(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scaleY(1);
+  }
+}
+
+.bh-overlay {
+  animation: bhFadeIn 160ms ease-out both;
+}
+
+.bh-sheet {
+  animation: bhSheetUp 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.bh-dialog {
+  animation: bhDialogIn 200ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.bh-drawer-right {
+  animation: bhDrawerRight 240ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.bh-drawer-left {
+  animation: bhDrawerLeft 240ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* `backwards` (not `both`) on purpose: a lingering transform would make this
+   element a containing block for position:fixed children, so a later overlay
+   would be clipped to the viewport box instead of the screen. */
+.bh-viewport-enter {
+  animation: bhViewportIn 180ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
+.bh-pop {
+  animation: bhPopDown 150ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  transform-origin: top center;
+}
+
+/* Press feedback for every interactive control. */
+button:not(:disabled),
+[role='button']:not([aria-disabled='true']) {
+  transition:
+    background-color 140ms ease,
+    border-color 140ms ease,
+    color 140ms ease,
+    transform 90ms ease,
+    opacity 140ms ease;
+}
+
+button:not(:disabled):active,
+[role='button']:not([aria-disabled='true']):active {
+  transform: scale(0.97);
+}
+
+/* Dock items animate their icon on selection instead of hard-swapping. */
+.bh-app-shell nav button {
+  transition:
+    background-color 160ms ease,
+    color 160ms ease,
+    transform 120ms ease;
+}
+
+/* Honour the platform accessibility setting. */
+@media (prefers-reduced-motion: reduce) {
+  .bh-overlay,
+  .bh-sheet,
+  .bh-dialog,
+  .bh-drawer-right,
+  .bh-drawer-left,
+  .bh-viewport-enter,
+  .bh-pop,
+  .animate-fire-sweep,
+  .animate-pulse-glow {
+    animation-duration: 1ms !important;
+  }
+  button:not(:disabled):active,
+  [role='button']:not([aria-disabled='true']):active {
+    transform: none;
+  }
 }

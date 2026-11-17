@@ -76,10 +76,10 @@ export const ShieldsPanel: React.FC<ShieldsPanelProps> = ({
   ];
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/65 backdrop-blur-sm flex items-center justify-center p-3" onClick={onClose}>
-      <div className="w-full max-w-md rounded-3xl bg-slate-950 border border-slate-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+    <div className="bh-overlay fixed inset-0 z-50 bg-black/65 backdrop-blur-sm flex items-center justify-center p-3" onClick={onClose}>
+      <div className="bh-dialog w-full max-w-md rounded-3xl bg-black border border-slate-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
-        <div className="p-4 bg-gradient-to-r from-emerald-950/70 to-slate-900 border-b border-slate-800 flex items-center justify-between">
+        <div className="p-4 bg-gradient-to-r from-emerald-950/70 to-black border-b border-slate-800 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             {shields.enabled ? (
               <ShieldCheck className="w-6 h-6 text-emerald-400" />
@@ -107,14 +107,14 @@ export const ShieldsPanel: React.FC<ShieldsPanelProps> = ({
             >
               {shields.enabled ? 'ENABLED' : 'PAUSED'}
             </button>
-            <button aria-label="Close" title="Close" onClick={onClose} className="p-1.5 rounded-xl hover:bg-slate-800 text-slate-400 cursor-pointer">
+            <button aria-label="Close" title="Close" onClick={onClose} className="p-1.5 rounded-xl hover:bg-[#121216] text-slate-400 cursor-pointer">
               <X className="w-4 h-4" />
             </button>
           </div>
         </div>
 
         {/* Live Tab Stats */}
-        <div className="grid grid-cols-3 gap-2 p-3 bg-slate-900/60 border-b border-slate-800 text-center">
+        <div className="grid grid-cols-3 gap-2 p-3 bg-[#060608] border-b border-slate-800 text-center">
           <div>
             <div className="text-lg font-extrabold text-emerald-400">{tab.adsBlocked}</div>
             <div className="text-[10px] text-slate-400">Ads Blocked (Tab)</div>
@@ -144,7 +144,7 @@ export const ShieldsPanel: React.FC<ShieldsPanelProps> = ({
             {tab.zappedSelectors.length > 0 && (
               <button
                 onClick={onResetZapped}
-                className="px-2 py-1.5 rounded-xl bg-slate-800 text-[11px] text-slate-300 hover:bg-slate-700 cursor-pointer"
+                className="px-2 py-1.5 rounded-xl bg-[#121216] text-[11px] text-slate-300 hover:bg-[#1a1a1f] cursor-pointer"
               >
                 Restore ({tab.zappedSelectors.length})
               </button>
@@ -173,7 +173,7 @@ export const ShieldsPanel: React.FC<ShieldsPanelProps> = ({
               <div
                 key={item.key}
                 onClick={() => onUpdateShields({ [item.key]: !active })}
-                className="flex items-center justify-between gap-3 p-2.5 rounded-2xl bg-slate-900/80 hover:bg-slate-900 border border-slate-800/80 cursor-pointer"
+                className="flex items-center justify-between gap-3 p-2.5 rounded-2xl bg-[#08080b] hover:bg-black border border-slate-800/80 cursor-pointer"
               >
                 <div className="flex items-start gap-2.5">
                   <div className="mt-0.5">{item.icon}</div>
@@ -184,7 +184,7 @@ export const ShieldsPanel: React.FC<ShieldsPanelProps> = ({
                 </div>
                 <div
                   className={`w-9 h-5 rounded-full p-0.5 transition shrink-0 ${
-                    active && shields.enabled ? 'bg-emerald-500' : 'bg-slate-700'
+                    active && shields.enabled ? 'bg-emerald-500' : 'bg-[#1a1a1f]'
                   }`}
                 >
                   <div

@@ -36,6 +36,8 @@ export interface AndroidJniBridge {
   nativeReload?: () => void;
   /** Starts a zero-key AI request on a native worker thread (no CORS, no UI freeze). */
   startAiRequest?: (requestId: string, prompt: string, systemPrompt: string) => void;
+  /** Native clipboard write (WebView's execCommand('copy') is unreliable). */
+  copyToClipboard?: (text: string) => void;
   /** Injects the user's enabled Userscript (Violentmonkey-style) into the page. */
   setUserScripts?: (code: string) => void;
   /** Applies (or clears) offline phrase translation inside the real page. */

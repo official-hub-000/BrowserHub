@@ -20,6 +20,13 @@ import java.util.concurrent.ConcurrentHashMap
  */
 object NativeAiClient {
     private const val ENDPOINT = "https://text.pollinations.ai/openai"
+
+    /**
+     * Free, key-less models tried in order. One hardcoded model meant a single
+     * rate-limited model broke every question after it — the exact
+     * "answered 'Who is Ronaldo', then failed 'Who is goat'" behaviour.
+     */
+    private val MODELS = listOf("openai", "mistral", "llama", "openai-fast")
     private const val FALLBACK_SYSTEM =
         "You are BrowserHub AI. Reply in clean Markdown. Be concise, accurate and friendly."
 
@@ -43,9 +50,21 @@ object NativeAiClient {
     }
 
     private fun call(userPrompt: String, systemPrompt: String?): String {
+        val deadline = System.currentTimeMillis() + 20_000L
+        var lastError = "no model answered"
+        for (model in MODELS) {
+            if (System.currentTimeMillis() >= deadline) break
+            val result = callOnce(model, userPrompt, systemPrompt)
+            if (result.startsWith("{\"ok\":true")) return result
+            lastError = result
+        }
+        return error(lastError)
+    }
+
+    private fun callOnce(model: String, userPrompt: String, systemPrompt: String?): String {
         var conn: HttpURLConnection? = null
         return try {
-            val payload = JSONObject().put("model", "openai")
+            val payload = JSONObject().put("model", model)
             val messages = JSONArray()
             messages.put(
                 JSONObject()
@@ -58,8 +77,8 @@ object NativeAiClient {
             val body = payload.toString().toByteArray(StandardCharsets.UTF_8)
             conn = (URL(ENDPOINT).openConnection() as HttpURLConnection).apply {
                 requestMethod = "POST"
-                connectTimeout = 8000
-                readTimeout = 25000
+                connectTimeout = 6000
+                readTimeout = 12000
                 doOutput = true
                 setRequestProperty("Content-Type", "application/json; charset=utf-8")
                 setRequestProperty("Accept", "application/json")

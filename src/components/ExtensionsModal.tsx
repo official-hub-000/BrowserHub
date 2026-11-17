@@ -112,10 +112,10 @@ export const ExtensionsModal: React.FC<ExtensionsModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-3" onClick={onClose}>
-      <div className="w-full max-w-2xl rounded-3xl bg-slate-950 border border-slate-800 shadow-2xl flex flex-col max-h-[90vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
+    <div className="bh-overlay fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-3" onClick={onClose}>
+      <div className="bh-dialog w-full max-w-2xl rounded-3xl bg-black border border-slate-800 shadow-2xl flex flex-col max-h-[90vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
-        <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-gradient-to-r from-purple-950/50 to-slate-900">
+        <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-gradient-to-r from-[#0b0713] to-black">
           <div className="flex items-center gap-2.5">
             <div className="w-9 h-9 rounded-2xl bg-purple-500/20 text-purple-300 flex items-center justify-center">
               <Puzzle className="w-5 h-5" />
@@ -129,13 +129,13 @@ export const ExtensionsModal: React.FC<ExtensionsModalProps> = ({
               </div>
             </div>
           </div>
-          <button aria-label="Close" title="Close" onClick={onClose} className="p-1.5 rounded-xl hover:bg-slate-800 text-slate-400 cursor-pointer">
+          <button aria-label="Close" title="Close" onClick={onClose} className="p-1.5 rounded-xl hover:bg-[#121216] text-slate-400 cursor-pointer">
             <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Navigation Tabs */}
-        <div className="grid grid-cols-4 gap-1 p-2 bg-slate-900/70 border-b border-slate-800 text-xs">
+        <div className="grid grid-cols-4 gap-1 p-2 bg-[#060608] border-b border-slate-800 text-xs">
           {[
             { id: 'installed', label: `Installed (${extensions.length})` },
             { id: 'store', label: '1-Tap Hub' },
@@ -148,7 +148,7 @@ export const ExtensionsModal: React.FC<ExtensionsModalProps> = ({
               className={`py-2 px-2 rounded-xl font-semibold transition cursor-pointer ${
                 activeTab === t.id
                   ? 'bg-purple-500 text-white'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-[#121216]'
               }`}
             >
               {t.label}
@@ -169,14 +169,14 @@ export const ExtensionsModal: React.FC<ExtensionsModalProps> = ({
             extensions.map((ext) => (
               <div
                 key={ext.id}
-                className="rounded-2xl bg-slate-900/80 border border-slate-800 p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                className="rounded-2xl bg-[#08080b] border border-slate-800 p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
               >
                 <div className="flex items-start gap-3 min-w-0">
-                  <div className="w-8 h-8 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center shrink-0 mt-0.5"><SiteIcon id={ext.icon} size={18} /></div>
+                  <div className="w-8 h-8 rounded-lg bg-[#121216] border border-slate-700 flex items-center justify-center shrink-0 mt-0.5"><SiteIcon id={ext.icon} size={18} /></div>
                   <div className="min-w-0 space-y-1">
                     <div className="flex flex-wrap items-center gap-1.5">
                       <span className="text-xs font-bold text-white">{ext.name}</span>
-                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-cyan-300 font-mono">
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#121216] text-cyan-300 font-mono">
                         {ext.format}
                       </span>
                       <span className="text-[10px] text-slate-500">v{ext.version}</span>
@@ -209,7 +209,7 @@ export const ExtensionsModal: React.FC<ExtensionsModalProps> = ({
                   className={`px-3.5 py-1.5 rounded-full text-xs font-bold shrink-0 cursor-pointer ${
                     ext.enabled
                       ? 'bg-emerald-500 text-slate-950'
-                      : 'bg-slate-800 text-slate-400'
+                      : 'bg-[#121216] text-slate-400'
                   }`}
                 >
                   {ext.enabled ? 'ON' : 'OFF'}
@@ -219,7 +219,7 @@ export const ExtensionsModal: React.FC<ExtensionsModalProps> = ({
 
           {activeTab === 'store' && (
             <>
-            <div className="rounded-xl border border-slate-800 bg-slate-900/60 px-3 py-2 text-[10px] leading-relaxed text-slate-400">
+            <div className="rounded-xl border border-slate-800 bg-[#060608] px-3 py-2 text-[10px] leading-relaxed text-slate-400">
               <strong className="text-slate-200">RUNS HERE</strong> extensions change
               real pages in this build (request filtering, injected CSS/JS, URL
               cleanup). <strong className="text-slate-200">PREVIEW</strong> entries are
@@ -235,14 +235,14 @@ export const ExtensionsModal: React.FC<ExtensionsModalProps> = ({
                 return (
                   <div
                     key={item.id}
-                    className="rounded-2xl bg-slate-900/80 border border-slate-800 p-3.5 flex items-center justify-between gap-3"
+                    className="rounded-2xl bg-[#08080b] border border-slate-800 p-3.5 flex items-center justify-between gap-3"
                   >
                     <div className="flex items-start gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center"><SiteIcon id={item.icon} size={22} /></div>
+                      <div className="w-10 h-10 rounded-xl bg-[#121216] border border-slate-700 flex items-center justify-center"><SiteIcon id={item.icon} size={22} /></div>
                       <div>
                         <div className="text-xs font-bold text-white flex items-center gap-2 flex-wrap">
                           <span>{item.name}</span>
-                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-purple-300">
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#121216] text-purple-300">
                             {item.format}
                           </span>
                           <span
@@ -263,6 +263,8 @@ export const ExtensionsModal: React.FC<ExtensionsModalProps> = ({
                     </div>
                     <button
                       disabled={alreadyInstalled}
+                      title={alreadyInstalled ? 'Already installed' : `Add ${item.name}`}
+                      aria-label={alreadyInstalled ? 'Already installed' : `Add ${item.name}`}
                       onClick={() => {
                         onInstallExtension({
                           ...item,
@@ -273,7 +275,7 @@ export const ExtensionsModal: React.FC<ExtensionsModalProps> = ({
                       }}
                       className={`px-3 py-1.5 rounded-xl text-xs font-bold shrink-0 cursor-pointer ${
                         alreadyInstalled
-                          ? 'bg-slate-800 text-slate-500 cursor-default'
+                          ? 'bg-[#121216] text-slate-500 cursor-default'
                           : 'bg-purple-500 hover:bg-purple-400 text-white'
                       }`}
                     >
@@ -291,7 +293,7 @@ export const ExtensionsModal: React.FC<ExtensionsModalProps> = ({
               {/* Store URL Importer */}
               <form
                 onSubmit={handleImportStoreUrl}
-                className="rounded-2xl bg-slate-900 border border-slate-800 p-4 space-y-3"
+                className="rounded-2xl bg-black border border-slate-800 p-4 space-y-3"
               >
                 <div className="text-xs font-bold text-white flex items-center gap-1.5">
                   <Globe className="w-4 h-4 text-cyan-400" />
@@ -305,7 +307,7 @@ export const ExtensionsModal: React.FC<ExtensionsModalProps> = ({
                     value={storeUrlInput}
                     onChange={(e) => setStoreUrlInput(e.target.value)}
                     placeholder="https://chromewebstore.google.com/detail/refined-github/..."
-                    className="flex-1 rounded-xl bg-slate-950 border border-slate-700 px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-400"
+                    className="flex-1 rounded-xl bg-black border border-slate-700 px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-400"
                   />
                   <button
                     type="submit"
@@ -350,7 +352,7 @@ export const ExtensionsModal: React.FC<ExtensionsModalProps> = ({
                   <Code2 className="w-4 h-4 text-emerald-400" />
                   Live Userscript &amp; Custom CSS Studio
                 </span>
-                <div className="flex gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800 text-[11px]">
+                <div className="flex gap-1 bg-black p-1 rounded-xl border border-slate-800 text-[11px]">
                   <button
                     type="button"
                     onClick={() => setStudioType('css')}
@@ -381,14 +383,14 @@ export const ExtensionsModal: React.FC<ExtensionsModalProps> = ({
                 value={studioName}
                 onChange={(e) => setStudioName(e.target.value)}
                 placeholder="Extension / Script Name"
-                className="w-full rounded-xl bg-slate-900 border border-slate-800 px-3 py-2 text-xs text-white"
+                className="w-full rounded-xl bg-black border border-slate-800 px-3 py-2 text-xs text-white"
               />
 
               <textarea
                 rows={6}
                 value={studioCode}
                 onChange={(e) => setStudioCode(e.target.value)}
-                className="w-full rounded-xl bg-slate-950 border border-slate-800 p-3 text-xs font-mono text-emerald-300 focus:outline-none focus:border-emerald-500"
+                className="w-full rounded-xl bg-black border border-slate-800 p-3 text-xs font-mono text-emerald-300 focus:outline-none focus:border-emerald-500"
               />
 
               <button

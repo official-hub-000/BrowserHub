@@ -36,6 +36,8 @@ BrowserHub/
 │   │   └── DevToolsPanel.tsx             # Live Network/Shields Monitor, JS REPL Console & DOM Inspector
 │   └── utils/
 │       ├── extensionUnpacker.ts          # Real Cr24 binary CRX2/CRX3 + JSZip manifest.json & Userscript parser
+│       ├── localAiEngine.ts              # Live zero-key AI with model rotation, answer cache & honest offline fallback
+│       ├── aiCache.ts                    # Memory + localStorage answer cache, single-flight, WebView-safe clipboard
 │       └── translator.ts                 # 14-language zero-key local neural/lexical page translator
 ├── server/
 │   ├── apiMiddleware.ts                  # Hybrid backend: live GitHub/NPM/PyPI fetcher & Zero-Key Local NLP AI
@@ -49,12 +51,68 @@ BrowserHub/
 │       ├── privacy/HubShieldEngine.kt
 │       ├── vpn/HubVpnService.kt          # Android VpnService local shield + Encrypted DoH preference
 │       └── ai/LocalNeuralEngine.kt       # On-device zero-key GGUF / local NLP & translation engine
+├── scripts/                              # 15 release gates, all runnable offline
+│   ├── verify-release.sh                 # One command: every gate + signed APK verification
+│   ├── fetch-apk-tools.sh                # Restores the Gradle-free APK toolchain into build-tools/
+│   ├── amoled-motion-check.mjs           # Canvas is #000000, no navy tints, every overlay animates
+│   ├── button-wiring-check.mjs           # No dead, no-op, fake or silently-disabled controls
+│   └── ai-reliability-check.mjs          # Model rotation + bounded deadline in engine + both native shells
 ├── docs/
 │   ├── ARCHITECTURE.md                   # Complete 3-layer hybrid Android engineering blueprint
 │   └── FEATURE_MATRIX.md                 # 100/100 head-to-head comparison matrix
 ├── capacitor.config.ts                   # Android Hybrid APK configuration
 └── .github/workflows/build-android-apk.yml # Automated Android APK CI build pipeline
 ```
+
+---
+
+## 🖤 Pure AMOLED black, 60/120 Hz motion, wired controls
+
+The whole shell paints **`#000000`**, not a dark-blue theme. Panels sit on neutral near-black
+(`#040405`–`#121216`), scrims are `rgba(0,0,0,0.88)`, and the AMOLED Pitch Black theme is the
+default. Accent colours (cyan, emerald, amber) are used for icons and status only — never as a
+background band — because a solid navy fill is exactly what wastes power on an OLED panel.
+
+Motion is a single contract in `src/index.css`, and every surface opts in:
+
+| Class | Use | Timing |
+| --- | --- | --- |
+| `.bh-viewport-enter` | tab switch | 180 ms fade + 6 px rise, keyed on `activeTab.id` |
+| `.bh-sheet` | menu hub, translate, docked DevTools | 260 ms spring rise |
+| `.bh-dialog` | shields, extensions, tabs, VPN, store | 200 ms scale-in |
+| `.bh-drawer-right` / `.bh-drawer-left` | customize, AI copilot | 240 ms edge slide |
+| `.bh-overlay` | every scrim | 160 ms fade |
+| `.bh-pop` | omnibox suggestions | 150 ms drop |
+
+Buttons get a 90 ms press-scale and colour transitions, and all of it collapses to nothing under
+`prefers-reduced-motion: reduce`.
+
+**Nothing is a placeholder.** `scripts/button-wiring-check.mjs` fails the build on any button with
+no handler, an empty handler body, a `cursor-pointer` div that cannot respond, or a disabled
+control with no explanation of why it is unavailable. `scripts/amoled-motion-check.mjs` fails the
+build if the canvas stops being `#000000`, if a navy/slate surface returns, if an overlay loses its
+animation, or if the viewport animation is switched back to `fill-mode: both` (that leaves a
+transform behind, which silently breaks `position: fixed` overlays).
+
+If a render ever throws on device, `AppErrorBoundary` keeps the shell alive and offers **Reload** or
+**Reset saved session** instead of leaving a blank screen where every tap does nothing.
+
+## 🤖 How the AI stays reliable
+
+The device bug that mattered was this: "Who is Cristiano Ronaldo" answered in ~12 s, then
+"Who is goat?" — the same class of question, seconds later — fell through to an apology. The cause
+was a **single pinned free model** in both native clients; one rate-limited model broke everything
+after it. Now:
+
+- the engine and *both* native shells (`NativeAiClient.java`, `NativeAiClient.kt`) try
+  `openai → mistral → llama → openai-fast` in order under one bounded deadline;
+- answers are cached in memory **and** `localStorage` (`browserhub.ai.answers.v1`), so asking the
+  same question on the same page again is instant and survives a restart — the reply is labelled
+  `… (saved)`;
+- identical concurrent questions share one request (`singleFlight`) instead of racing;
+- when the live model is genuinely unreachable, the offline reply names the kind of question it was
+  (including slang such as "goat" = greatest of all time), offers three concrete next steps, and
+  **never invents facts**.
 
 ---
 

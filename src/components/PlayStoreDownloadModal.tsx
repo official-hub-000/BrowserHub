@@ -57,10 +57,10 @@ export const PlayStoreDownloadModal: React.FC<PlayStoreDownloadModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3" onClick={onClose}>
-      <div className="w-full max-w-2xl rounded-3xl bg-slate-950 border border-emerald-500/40 shadow-2xl flex flex-col max-h-[90vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
+    <div className="bh-overlay fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3" onClick={onClose}>
+      <div className="bh-dialog w-full max-w-2xl rounded-3xl bg-black border border-emerald-500/40 shadow-2xl flex flex-col max-h-[90vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
-        <div className="p-4 border-b border-slate-800 bg-gradient-to-r from-emerald-950/70 via-cyan-950/50 to-slate-950 flex items-center justify-between">
+        <div className="p-4 border-b border-slate-800 bg-gradient-to-r from-emerald-950/70 via-cyan-950/50 to-black flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <div className="w-10 h-10 rounded-2xl bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 flex items-center justify-center">
               <PackageCheck className="w-5 h-5" />
@@ -79,7 +79,7 @@ export const PlayStoreDownloadModal: React.FC<PlayStoreDownloadModalProps> = ({
           </div>
           <button aria-label="Close" title="Close"
             onClick={onClose}
-            className="p-1.5 rounded-xl hover:bg-slate-800 text-slate-400 cursor-pointer"
+            className="p-1.5 rounded-xl hover:bg-[#121216] text-slate-400 cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
@@ -115,7 +115,7 @@ export const PlayStoreDownloadModal: React.FC<PlayStoreDownloadModalProps> = ({
             <a
               href="./api/download/playstore-kit"
               download="BrowserHub-PlayStore-Android-Bundle.zip"
-              className="rounded-2xl bg-slate-900 border border-slate-700 hover:border-emerald-400 text-white p-3.5 flex flex-col justify-between gap-2 transition"
+              className="rounded-2xl bg-black border border-slate-700 hover:border-emerald-400 text-white p-3.5 flex flex-col justify-between gap-2 transition"
             >
               <div className="flex items-center justify-between text-emerald-300">
                 <FileArchive className="w-5 h-5" />
@@ -136,7 +136,7 @@ export const PlayStoreDownloadModal: React.FC<PlayStoreDownloadModalProps> = ({
             <a
               href="./api/download/store-assets"
               download="BrowserHub-PlayConsole-Assets-And-Policies.zip"
-              className="rounded-2xl bg-slate-900 border border-slate-700 hover:border-cyan-400 text-white p-3.5 flex flex-col justify-between gap-2 transition"
+              className="rounded-2xl bg-black border border-slate-700 hover:border-cyan-400 text-white p-3.5 flex flex-col justify-between gap-2 transition"
             >
               <div className="flex items-center justify-between text-cyan-300">
                 <Download className="w-5 h-5" />
@@ -156,7 +156,7 @@ export const PlayStoreDownloadModal: React.FC<PlayStoreDownloadModalProps> = ({
           </div>
 
           {/* Optional WebPWA + Privacy Policy */}
-          <div className="rounded-2xl bg-slate-900/90 border border-slate-800 p-3 flex flex-wrap items-center justify-between gap-2">
+          <div className="rounded-2xl bg-[#08080b] border border-slate-800 p-3 flex flex-wrap items-center justify-between gap-2">
             <div className="text-xs text-slate-300 flex items-center gap-2">
               <Smartphone className="w-4 h-4 text-purple-400 shrink-0" />
               <span>Allow &quot;Install unknown apps&quot; when opening the downloaded <code>.apk</code> on Android.</span>
@@ -166,7 +166,7 @@ export const PlayStoreDownloadModal: React.FC<PlayStoreDownloadModalProps> = ({
                 href="./privacy-policy.html"
                 target="_blank"
                 rel="noreferrer"
-                className="px-2.5 py-1 rounded-xl bg-slate-800 hover:bg-slate-700 text-[11px] text-cyan-300 font-semibold inline-flex items-center gap-1"
+                className="px-2.5 py-1 rounded-xl bg-[#121216] hover:bg-[#1a1a1f] text-[11px] text-cyan-300 font-semibold inline-flex items-center gap-1"
               >
                 Privacy Policy <ExternalLink className="w-3 h-3" />
               </a>
@@ -187,7 +187,7 @@ export const PlayStoreDownloadModal: React.FC<PlayStoreDownloadModalProps> = ({
           )}
 
           {/* 12-Point Release Verification */}
-          <div className="rounded-2xl bg-slate-900/60 border border-slate-800 p-3.5 space-y-2">
+          <div className="rounded-2xl bg-[#060608] border border-slate-800 p-3.5 space-y-2">
             <div className="text-xs font-bold text-emerald-300 flex items-center gap-1.5">
               <ShieldCheck className="w-4 h-4" />
               v1.0.0 Physical Device Release Capabilities

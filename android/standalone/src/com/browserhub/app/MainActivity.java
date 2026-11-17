@@ -441,6 +441,24 @@ public class MainActivity extends Activity {
         return extractedPageText;
     }
 
+    /** Copies text via the Android clipboard service. */
+    public void copyToClipboard(final String text) {
+        if (text == null) return;
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    android.content.ClipboardManager cm =
+                            (android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+                    if (cm != null) {
+                        cm.setPrimaryClip(android.content.ClipData.newPlainText("BrowserHub", text));
+                    }
+                } catch (Throwable ignored) {
+                }
+            }
+        });
+    }
+
     /** Runs the user's enabled Userscript inside the page (re-run on change). */
     public void applyUserScripts(final String code) {
         runOnUiThread(new Runnable() {

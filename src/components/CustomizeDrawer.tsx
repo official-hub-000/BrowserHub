@@ -37,10 +37,10 @@ export const CustomizeDrawer: React.FC<CustomizeDrawerProps> = ({
   onClose,
 }) => {
   return (
-    <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex justify-end" onClick={onClose}>
-      <div className="w-full max-w-md h-full bg-slate-950 border-l border-slate-800 flex flex-col shadow-2xl" onClick={(e) => e.stopPropagation()}>
+    <div className="bh-overlay fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex justify-end" onClick={onClose}>
+      <div className="bh-drawer-right w-full max-w-md h-full bg-black border-l border-slate-800 flex flex-col shadow-2xl" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
-        <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/80">
+        <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-[#08080b]">
           <div className="flex items-center gap-2.5">
             <Palette className="w-5 h-5 text-cyan-400" />
             <div>
@@ -52,7 +52,7 @@ export const CustomizeDrawer: React.FC<CustomizeDrawerProps> = ({
               </div>
             </div>
           </div>
-          <button aria-label="Close" title="Close" onClick={onClose} className="p-1.5 rounded-xl hover:bg-slate-800 text-slate-400 cursor-pointer">
+          <button aria-label="Close" title="Close" onClick={onClose} className="p-1.5 rounded-xl hover:bg-[#121216] text-slate-400 cursor-pointer">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -70,7 +70,7 @@ export const CustomizeDrawer: React.FC<CustomizeDrawerProps> = ({
                 className={`p-2.5 rounded-2xl border text-xs font-semibold cursor-pointer ${
                   customization.addressBarPosition === 'bottom'
                     ? 'bg-cyan-500/20 border-cyan-400 text-cyan-200'
-                    : 'bg-slate-900 border-slate-800 text-slate-400'
+                    : 'bg-black border-slate-800 text-slate-400'
                 }`}
               >
                 Bottom Bar (One-Handed)
@@ -80,7 +80,7 @@ export const CustomizeDrawer: React.FC<CustomizeDrawerProps> = ({
                 className={`p-2.5 rounded-2xl border text-xs font-semibold cursor-pointer ${
                   customization.addressBarPosition === 'top'
                     ? 'bg-cyan-500/20 border-cyan-400 text-cyan-200'
-                    : 'bg-slate-900 border-slate-800 text-slate-400'
+                    : 'bg-black border-slate-800 text-slate-400'
                 }`}
               >
                 Classic Top Omnibox
@@ -98,7 +98,7 @@ export const CustomizeDrawer: React.FC<CustomizeDrawerProps> = ({
                 className={`p-2.5 rounded-2xl border text-xs font-semibold cursor-pointer ${
                   customization.uiDensity === 'compact'
                     ? 'bg-emerald-500/20 border-emerald-400 text-emerald-200'
-                    : 'bg-slate-900 border-slate-800 text-slate-300'
+                    : 'bg-black border-slate-800 text-slate-300'
                 }`}
               >
                 <span className="inline-flex items-center gap-1.5">
@@ -135,7 +135,7 @@ export const CustomizeDrawer: React.FC<CustomizeDrawerProps> = ({
                     className={`flex items-center justify-between px-3 py-2 rounded-xl border text-xs cursor-pointer ${
                       active
                         ? 'border-cyan-400 bg-cyan-500/15 text-white font-bold'
-                        : 'border-slate-800 bg-slate-900/70 text-slate-300'
+                        : 'border-slate-800 bg-[#060608] text-slate-300'
                     }`}
                   >
                     <span className="flex items-center gap-2">
@@ -145,7 +145,7 @@ export const CustomizeDrawer: React.FC<CustomizeDrawerProps> = ({
                       />
                       {preset.name}
                     </span>
-                    <span className="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-400">
+                    <span className="text-[10px] px-2 py-0.5 rounded bg-[#121216] text-slate-400">
                       {preset.badge}
                     </span>
                   </button>
@@ -199,7 +199,7 @@ export const CustomizeDrawer: React.FC<CustomizeDrawerProps> = ({
                   className={`py-2 px-2 rounded-xl border font-semibold flex items-center justify-center gap-1 cursor-pointer ${
                     customization.searchEngine === eng.id
                       ? 'bg-amber-500/20 border-amber-400 text-amber-200'
-                      : 'bg-slate-900 border-slate-800 text-slate-300'
+                      : 'bg-black border-slate-800 text-slate-300'
                   }`}
                 >
                   <SearchEngineIcon id={eng.id} size={13} />
@@ -223,7 +223,7 @@ export const CustomizeDrawer: React.FC<CustomizeDrawerProps> = ({
                   className={`flex-1 min-w-[64px] py-1.5 rounded-xl border text-xs capitalize cursor-pointer ${
                     customization.readerTheme === rt
                       ? 'border-cyan-400 bg-cyan-500/20 text-white'
-                      : 'border-slate-800 bg-slate-900 text-slate-400'
+                      : 'border-slate-800 bg-black text-slate-400'
                   }`}
                 >
                   {rt}
@@ -236,7 +236,7 @@ export const CustomizeDrawer: React.FC<CustomizeDrawerProps> = ({
                   className={`flex-1 min-w-[64px] py-1.5 rounded-xl border text-xs capitalize cursor-pointer ${
                     customization.readerFont === rf
                       ? 'border-purple-400 bg-purple-500/20 text-white'
-                      : 'border-slate-800 bg-slate-900 text-slate-400'
+                      : 'border-slate-800 bg-black text-slate-400'
                   }`}
                 >
                   {rf}
@@ -256,13 +256,13 @@ export const CustomizeDrawer: React.FC<CustomizeDrawerProps> = ({
               return (
                 <div
                   key={dl.id}
-                  className="rounded-2xl bg-slate-900 border border-slate-800 p-3 space-y-1.5 text-xs"
+                  className="rounded-2xl bg-black border border-slate-800 p-3 space-y-1.5 text-xs"
                 >
                   <div className="flex items-center justify-between font-semibold text-white">
                     <span className="truncate">{dl.filename}</span>
                     <span className="text-emerald-400 shrink-0 ml-2">{pct}%</span>
                   </div>
-                  <div className="h-1.5 rounded-full bg-slate-800 overflow-hidden">
+                  <div className="h-1.5 rounded-full bg-[#121216] overflow-hidden">
                     <div
                       className="h-full bg-gradient-to-r from-cyan-400 to-emerald-400 transition-all"
                       style={{ width: `${pct}%` }}

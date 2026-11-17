@@ -232,7 +232,7 @@ export const WebViewport: React.FC<WebViewportProps> = ({
     const readerThemes = {
       amoled: { bg: '#000000', fg: '#f1f5f9' },
       sepia: { bg: '#f4ecd8', fg: '#3b2f2f' },
-      slate: { bg: '#0f172a', fg: '#f1f5f9' },
+      slate: { bg: '#000000', fg: '#f1f5f9' },
     };
     const readerFonts = {
       sans: 'font-sans',
@@ -287,7 +287,7 @@ export const WebViewport: React.FC<WebViewportProps> = ({
               <button
                 onClick={() => onEnablePip(tab.title || 'Reader Mode article')}
                 aria-label="Open this article in the floating mini player"
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 text-slate-200 font-semibold cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#121216] text-slate-200 font-semibold cursor-pointer"
               >
                 <ExternalLink size={14} />
                 <span>Mini player</span>
@@ -375,9 +375,9 @@ export const WebViewport: React.FC<WebViewportProps> = ({
                   title={`${site.title} — ${site.subtitle}`}
                   aria-label={`Open ${site.title}`}
                   className="rounded-2xl border border-slate-800 hover:border-cyan-500/50 p-2 flex flex-col items-center text-center gap-1 cursor-pointer transition min-w-0"
-                  style={{ backgroundColor: '#0f172a' }}
+                  style={{ backgroundColor: '#000000' }}
                 >
-                  <div className="w-9 h-9 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center shrink-0">
+                  <div className="w-9 h-9 rounded-xl bg-black border border-slate-800 flex items-center justify-center shrink-0">
                     <SiteIcon id={site.icon} size={19} />
                   </div>
                   <div className="text-[11px] leading-tight font-semibold text-white w-full break-words">
@@ -400,7 +400,7 @@ export const WebViewport: React.FC<WebViewportProps> = ({
               <button
                 onClick={() => onOpenShields?.()}
                 className="rounded-2xl border border-slate-800 hover:border-emerald-500/50 p-3.5 text-left space-y-1 cursor-pointer transition"
-                style={{ backgroundColor: '#0f172a' }}
+                style={{ backgroundColor: '#000000' }}
               >
                 <div className="flex items-center justify-between">
                   <ShieldCheck size={18} className="text-emerald-400" />
@@ -417,7 +417,7 @@ export const WebViewport: React.FC<WebViewportProps> = ({
               <button
                 onClick={onOpenVpn}
                 className="rounded-2xl border border-slate-800 hover:border-cyan-500/50 p-3.5 text-left space-y-1 cursor-pointer transition"
-                style={{ backgroundColor: '#0f172a' }}
+                style={{ backgroundColor: '#000000' }}
               >
                 <div className="flex items-center justify-between">
                   <Lock size={18} className="text-cyan-400" />
@@ -425,7 +425,7 @@ export const WebViewport: React.FC<WebViewportProps> = ({
                     className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
                       vpn.connected
                         ? 'bg-emerald-500/20 text-emerald-300'
-                        : 'bg-slate-800 text-slate-400'
+                        : 'bg-[#121216] text-slate-400'
                     }`}
                   >
                     {vpn.connected ? 'Connected' : 'Ready'}
@@ -441,7 +441,7 @@ export const WebViewport: React.FC<WebViewportProps> = ({
                 onClick={onOpenExtensions}
                 aria-label="Open the extensions hub"
                 className="rounded-2xl border border-slate-800 hover:border-purple-500/50 p-3.5 text-left space-y-1 cursor-pointer transition"
-                style={{ backgroundColor: '#0f172a' }}
+                style={{ backgroundColor: '#000000' }}
               >
                 <div className="flex items-center justify-between">
                   <Puzzle size={18} className="text-purple-400" />
@@ -466,7 +466,7 @@ export const WebViewport: React.FC<WebViewportProps> = ({
                 }
                 aria-label="Download the BrowserHub getting started guide"
                 className="rounded-2xl border border-slate-800 hover:border-emerald-500/50 p-3.5 text-left space-y-1 cursor-pointer transition"
-                style={{ backgroundColor: '#0f172a' }}
+                style={{ backgroundColor: '#000000' }}
               >
                 <div className="flex items-center justify-between">
                   <Download size={18} className="text-emerald-300" />
@@ -483,7 +483,7 @@ export const WebViewport: React.FC<WebViewportProps> = ({
               <button
                 onClick={() => onOpenAi('idle')}
                 className="rounded-2xl border border-slate-800 hover:border-cyan-400/50 p-3.5 text-left space-y-1 cursor-pointer transition"
-                style={{ backgroundColor: '#0f172a' }}
+                style={{ backgroundColor: '#000000' }}
               >
                 <div className="flex items-center justify-between">
                   <Sparkles size={18} className="text-cyan-300" />
@@ -507,14 +507,14 @@ export const WebViewport: React.FC<WebViewportProps> = ({
               className={`rounded-2xl border p-3 text-left space-y-1 cursor-pointer transition ${
                 tab.isDesktopMode
                   ? 'border-cyan-400 bg-cyan-950/60'
-                  : 'border-slate-800 bg-slate-900/70 hover:border-cyan-500/50'
+                  : 'border-slate-800 bg-[#060608] hover:border-cyan-500/50'
               }`}
             >
               <div className="flex items-center justify-between">
                 <Globe size={17} className="text-cyan-300" />
                 <span
                   className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold ${
-                    tab.isDesktopMode ? 'bg-cyan-400 text-slate-950' : 'bg-slate-800 text-slate-400'
+                    tab.isDesktopMode ? 'bg-cyan-400 text-slate-950' : 'bg-[#121216] text-slate-400'
                   }`}
                 >
                   {tab.isDesktopMode ? 'ON' : 'OFF'}
@@ -585,7 +585,7 @@ export const WebViewport: React.FC<WebViewportProps> = ({
         <div className="max-w-2xl mx-auto p-4 sm:p-6 space-y-4">
           <div
             className="rounded-2xl border border-slate-800 p-5 flex items-center justify-between gap-4"
-            style={{ backgroundColor: '#0f172a' }}
+            style={{ backgroundColor: '#000000' }}
           >
             <div className="space-y-1">
               <div className="text-xs font-bold text-amber-400 uppercase tracking-wider">
@@ -614,7 +614,7 @@ export const WebViewport: React.FC<WebViewportProps> = ({
               <div
                 key={p.name}
                 className="rounded-2xl border border-slate-800 p-3.5 space-y-1.5"
-                style={{ backgroundColor: '#0f172a' }}
+                style={{ backgroundColor: '#000000' }}
               >
                 <div className="flex items-center justify-between text-xs font-bold text-white">
                   <span className="inline-flex items-center gap-1.5">
@@ -639,7 +639,7 @@ export const WebViewport: React.FC<WebViewportProps> = ({
     return (
       <div className={wrapperClass} style={zoomStyle}>
         <div className="max-w-2xl mx-auto p-4 sm:p-6 space-y-4">
-          <div className="rounded-2xl border border-slate-800 p-5 space-y-2" style={{ backgroundColor: '#0f172a' }}>
+          <div className="rounded-2xl border border-slate-800 p-5 space-y-2" style={{ backgroundColor: '#000000' }}>
             <div className="text-xs font-bold text-emerald-400 uppercase">Native Android Stack</div>
             <h1 className="text-xl font-extrabold text-white">
               Dual-WebView Hybrid Android Architecture
@@ -670,10 +670,10 @@ export const WebViewport: React.FC<WebViewportProps> = ({
     return (
       <div
         className={`${wrapperClass} ${darkReaderOn ? 'text-slate-100' : 'text-slate-100'}`}
-        style={{ ...zoomStyle, backgroundColor: '#0d1117' }}
+        style={{ ...zoomStyle, backgroundColor: '#000000' }}
       >
         <div className="max-w-3xl mx-auto p-4 sm:p-6 space-y-4">
-          <div className="rounded-2xl border border-slate-800 p-4 space-y-2" style={{ backgroundColor: '#161b22' }}>
+          <div className="rounded-2xl border border-slate-800 p-4 space-y-2" style={{ backgroundColor: '#101013' }}>
             <div className="flex items-center justify-between gap-2">
               <span className="text-base font-bold text-cyan-300">{String(d.fullName)}</span>
               <span className="text-xs text-amber-300 font-semibold inline-flex items-center gap-1">
@@ -683,7 +683,7 @@ export const WebViewport: React.FC<WebViewportProps> = ({
             </div>
             <p className="text-xs text-slate-300">{highlightText(String(d.description || ''))}</p>
           </div>
-          <div className="rounded-2xl border border-slate-800 p-4 space-y-2" style={{ backgroundColor: '#161b22' }}>
+          <div className="rounded-2xl border border-slate-800 p-4 space-y-2" style={{ backgroundColor: '#101013' }}>
             <div className="flex items-center justify-between text-xs text-slate-400 pb-2 border-b border-slate-800">
               <span className="font-mono font-bold">README.md</span>
               <button
@@ -704,7 +704,7 @@ export const WebViewport: React.FC<WebViewportProps> = ({
 
   if (!isNativeAndroid && liveResult?.ok && liveResult.sourceType === 'github-search') {
     return (
-      <div className={wrapperClass} style={{ ...zoomStyle, backgroundColor: '#0d1117' }}>
+      <div className={wrapperClass} style={{ ...zoomStyle, backgroundColor: '#000000' }}>
         <div className="max-w-3xl mx-auto p-4 sm:p-6 space-y-3">
           <div className="text-xs text-emerald-400 font-semibold">
             Live GitHub Results for &quot;{liveResult.query}&quot;
@@ -714,7 +714,7 @@ export const WebViewport: React.FC<WebViewportProps> = ({
               key={item.fullName}
               onClick={() => onNavigate(item.url)}
               className="rounded-xl border border-slate-800 hover:border-cyan-500/50 p-3.5 cursor-pointer"
-              style={{ backgroundColor: '#161b22' }}
+              style={{ backgroundColor: '#101013' }}
             >
               <div className="flex items-center justify-between">
                 <span className="text-sm font-bold text-cyan-300">{item.fullName}</span>
@@ -739,9 +739,9 @@ export const WebViewport: React.FC<WebViewportProps> = ({
   ) {
     const d = liveResult.data;
     return (
-      <div className={wrapperClass} style={{ ...zoomStyle, backgroundColor: '#0b1120' }}>
+      <div className={wrapperClass} style={{ ...zoomStyle, backgroundColor: '#000000' }}>
         <div className="max-w-3xl mx-auto p-4 sm:p-6 space-y-4">
-          <div className="rounded-2xl border border-slate-800 p-4 space-y-1.5" style={{ backgroundColor: '#111827' }}>
+          <div className="rounded-2xl border border-slate-800 p-4 space-y-1.5" style={{ backgroundColor: '#0b0b0e' }}>
             <span className="text-[11px] font-bold text-emerald-400 uppercase">
               {liveResult.sourceType}
             </span>
@@ -754,7 +754,7 @@ export const WebViewport: React.FC<WebViewportProps> = ({
           </div>
           <pre
             className="text-xs text-slate-200 whitespace-pre-wrap font-mono p-4 rounded-2xl border border-slate-800 overflow-x-auto"
-            style={{ backgroundColor: '#111827' }}
+            style={{ backgroundColor: '#0b0b0e' }}
           >
             {highlightText(String(d.readme || d.description || '').slice(0, 4500))}
           </pre>
@@ -775,7 +775,7 @@ export const WebViewport: React.FC<WebViewportProps> = ({
         className={`h-full w-full flex flex-col items-center justify-center p-6 text-center select-none ${
           zapperMode ? 'zapper-active' : ''
         }`}
-        style={{ backgroundColor: '#060a12' }}
+        style={{ backgroundColor: '#000000' }}
       >
         <Globe size={28} className="text-cyan-400 mb-2 opacity-60" />
         <div className="text-sm font-semibold text-slate-200 max-w-xs truncate">
@@ -806,7 +806,7 @@ export const WebViewport: React.FC<WebViewportProps> = ({
       <div className="max-w-xl mx-auto p-5 sm:p-8 space-y-4">
         <div
           className="rounded-2xl border border-slate-800 p-5 space-y-4"
-          style={{ backgroundColor: '#0f172a' }}
+          style={{ backgroundColor: '#000000' }}
         >
           <div className="flex items-start gap-3">
             <div className="w-10 h-10 rounded-xl bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center text-cyan-300 shrink-0">
@@ -835,7 +835,7 @@ export const WebViewport: React.FC<WebViewportProps> = ({
 
             <button
               onClick={() => onNavigate('https://github.com/vitejs/vite')}
-              className="px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs inline-flex items-center gap-1.5 cursor-pointer"
+              className="px-3.5 py-2.5 rounded-xl bg-[#121216] hover:bg-[#1a1a1f] text-slate-200 font-semibold text-xs inline-flex items-center gap-1.5 cursor-pointer"
             >
               <Cpu size={14} className="text-emerald-400" />
               <span>Test Live GitHub Reader</span>
@@ -843,7 +843,7 @@ export const WebViewport: React.FC<WebViewportProps> = ({
 
             <button
               onClick={() => onNavigate('browserhub://start')}
-              className="px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs inline-flex items-center gap-1 cursor-pointer"
+              className="px-3.5 py-2.5 rounded-xl bg-[#121216] hover:bg-[#1a1a1f] text-slate-300 font-semibold text-xs inline-flex items-center gap-1 cursor-pointer"
             >
               <span>Back to Home</span>
               <ArrowRight size={13} />

@@ -73,6 +73,12 @@ public class BrowserHubBridge {
         );
     }
 
+    /** Reliable clipboard write for Android WebView (execCommand often fails). */
+    @JavascriptInterface
+    public void copyToClipboard(final String text) {
+        activity.copyToClipboard(text);
+    }
+
     @JavascriptInterface
     public void setUserScripts(String code) {
         activity.applyUserScripts(code);

@@ -340,6 +340,17 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    /** Copies text via the Android clipboard service. */
+    fun copyToClipboard(text: String) {
+        runOnUiThread {
+            try {
+                val cm = getSystemService(CLIPBOARD_SERVICE) as? android.content.ClipboardManager
+                cm?.setPrimaryClip(android.content.ClipData.newPlainText("BrowserHub", text))
+            } catch (_: Throwable) {
+            }
+        }
+    }
+
     /** Runs the user's enabled Userscript inside the page (re-run on change). */
     fun applyUserScripts(code: String) {
         runOnUiThread {

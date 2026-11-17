@@ -114,19 +114,19 @@ export const MenuHubModal: React.FC<MenuHubModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
-      style={{ backgroundColor: 'rgba(2, 6, 23, 0.82)' }}
+      className="bh-overlay fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
+      style={{ backgroundColor: 'rgba(0, 0, 0, 0.88)' }}
       onClick={onClose}
     >
       <div
-        className="w-full max-w-lg rounded-t-3xl sm:rounded-3xl border border-slate-800 shadow-2xl flex flex-col max-h-[88vh] overflow-hidden"
-        style={{ backgroundColor: '#090e1a' }}
+        className="bh-sheet w-full max-w-lg rounded-t-3xl sm:rounded-3xl border border-slate-800 shadow-2xl flex flex-col max-h-[88vh] overflow-hidden"
+        style={{ backgroundColor: '#000000' }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div
           className="px-5 py-3.5 border-b border-slate-800 flex items-center justify-between shrink-0"
-          style={{ backgroundColor: '#0f172a' }}
+          style={{ backgroundColor: '#000000' }}
         >
           <div>
             <div className="text-sm font-bold text-white">BrowserHub Control Menu</div>
@@ -136,7 +136,7 @@ export const MenuHubModal: React.FC<MenuHubModalProps> = ({
           </div>
           <button aria-label="Close" title="Close"
             onClick={onClose}
-            className="p-2 rounded-xl hover:bg-slate-800 text-slate-300 hover:text-white cursor-pointer"
+            className="p-2 rounded-xl hover:bg-[#121216] text-slate-300 hover:text-white cursor-pointer"
           >
             <X size={18} />
           </button>
@@ -154,7 +154,7 @@ export const MenuHubModal: React.FC<MenuHubModalProps> = ({
             </div>
 
             {/* Search Engine Selector Pills */}
-            <div className="rounded-2xl border border-slate-800 p-3 space-y-2" style={{ backgroundColor: '#111827' }}>
+            <div className="rounded-2xl border border-slate-800 p-3 space-y-2" style={{ backgroundColor: '#0b0b0e' }}>
               <div className="text-xs font-semibold text-slate-200">
                 Default Search Engine
               </div>
@@ -168,7 +168,7 @@ export const MenuHubModal: React.FC<MenuHubModalProps> = ({
                       className={`px-2.5 py-2 rounded-xl border text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition ${
                         active
                           ? 'bg-cyan-500/20 border-cyan-400 text-white'
-                          : 'bg-slate-900 hover:bg-slate-800 border-slate-800 text-slate-300'
+                          : 'bg-black hover:bg-[#121216] border-slate-800 text-slate-300'
                       }`}
                     >
                       <SearchEngineIcon id={eng.id} size={13} />
@@ -183,36 +183,38 @@ export const MenuHubModal: React.FC<MenuHubModalProps> = ({
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
               <button
                 onClick={() => runAndClose(() => onNewTab(false))}
-                className="p-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs font-semibold text-white flex items-center gap-2 cursor-pointer"
+                className="p-2.5 rounded-xl bg-black hover:bg-[#121216] border border-slate-800 text-xs font-semibold text-white flex items-center gap-2 cursor-pointer"
               >
                 <Plus size={16} className="text-cyan-400" />
                 <span>New Tab</span>
               </button>
               <button
                 onClick={() => runAndClose(() => onNewTab(true))}
-                className="p-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs font-semibold text-purple-300 flex items-center gap-2 cursor-pointer"
+                className="p-2.5 rounded-xl bg-black hover:bg-[#121216] border border-slate-800 text-xs font-semibold text-purple-300 flex items-center gap-2 cursor-pointer"
               >
                 <EyeOff size={16} className="text-purple-400" />
                 <span>Incognito</span>
               </button>
               <button
                 onClick={() => runAndClose(onGoHome)}
-                className="p-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs font-semibold text-slate-200 flex items-center gap-2 cursor-pointer"
+                className="p-2.5 rounded-xl bg-black hover:bg-[#121216] border border-slate-800 text-xs font-semibold text-slate-200 flex items-center gap-2 cursor-pointer"
               >
                 <Home size={16} className="text-emerald-400" />
                 <span>Home</span>
               </button>
               <button
                 onClick={() => runAndClose(onReload)}
-                className="p-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs font-semibold text-slate-200 flex items-center gap-2 cursor-pointer"
+                className="p-2.5 rounded-xl bg-black hover:bg-[#121216] border border-slate-800 text-xs font-semibold text-slate-200 flex items-center gap-2 cursor-pointer"
               >
                 <RotateCw size={16} className="text-sky-400" />
                 <span>Reload</span>
               </button>
               <button
                 disabled={!canGoForward}
+                title={canGoForward ? 'Go forward' : 'No forward history in this tab'}
+                aria-label={canGoForward ? 'Go forward' : 'Go forward (unavailable)'}
                 onClick={() => runAndClose(onGoForward)}
-                className="p-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 disabled:opacity-40 border border-slate-800 text-xs font-semibold text-slate-200 flex items-center gap-2 cursor-pointer"
+                className="p-2.5 rounded-xl bg-black hover:bg-[#121216] disabled:opacity-40 border border-slate-800 text-xs font-semibold text-slate-200 flex items-center gap-2 cursor-pointer"
               >
                 <ArrowRight size={16} className="text-slate-300" />
                 <span>Forward</span>
@@ -232,7 +234,7 @@ export const MenuHubModal: React.FC<MenuHubModalProps> = ({
                 className={`p-3 rounded-xl border text-left flex items-center justify-between cursor-pointer ${
                   tab.isDesktopMode
                     ? 'bg-cyan-950/60 border-cyan-500/60 text-white'
-                    : 'bg-slate-900 hover:bg-slate-800 border-slate-800 text-slate-200'
+                    : 'bg-black hover:bg-[#121216] border-slate-800 text-slate-200'
                 }`}
               >
                 <span className="flex items-center gap-2 min-w-0 text-[11px] font-semibold">
@@ -241,7 +243,7 @@ export const MenuHubModal: React.FC<MenuHubModalProps> = ({
                 </span>
                 <span
                   className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
-                    tab.isDesktopMode ? 'bg-cyan-400 text-slate-950' : 'bg-slate-800 text-slate-400'
+                    tab.isDesktopMode ? 'bg-cyan-400 text-slate-950' : 'bg-[#121216] text-slate-400'
                   }`}
                 >
                   {tab.isDesktopMode ? 'ON' : 'OFF'}
@@ -253,7 +255,7 @@ export const MenuHubModal: React.FC<MenuHubModalProps> = ({
                 className={`p-3 rounded-xl border text-left flex items-center justify-between cursor-pointer ${
                   tab.isReaderMode
                     ? 'bg-emerald-950/60 border-emerald-500/60 text-white'
-                    : 'bg-slate-900 hover:bg-slate-800 border-slate-800 text-slate-200'
+                    : 'bg-black hover:bg-[#121216] border-slate-800 text-slate-200'
                 }`}
               >
                 <span className="flex items-center gap-2 min-w-0 text-[11px] font-semibold">
@@ -262,7 +264,7 @@ export const MenuHubModal: React.FC<MenuHubModalProps> = ({
                 </span>
                 <span
                   className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
-                    tab.isReaderMode ? 'bg-emerald-400 text-slate-950' : 'bg-slate-800 text-slate-400'
+                    tab.isReaderMode ? 'bg-emerald-400 text-slate-950' : 'bg-[#121216] text-slate-400'
                   }`}
                 >
                   {tab.isReaderMode ? 'ON' : 'OFF'}
@@ -271,7 +273,7 @@ export const MenuHubModal: React.FC<MenuHubModalProps> = ({
 
               <button
                 onClick={() => runAndClose(onOpenTranslate)}
-                className="p-3 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-left flex items-center justify-between cursor-pointer"
+                className="p-3 rounded-xl bg-black hover:bg-[#121216] border border-slate-800 text-left flex items-center justify-between cursor-pointer"
               >
                 <span className="flex items-center gap-2 min-w-0 text-[11px] font-semibold text-slate-200">
                   <Languages size={16} className="text-indigo-400" />
@@ -286,7 +288,7 @@ export const MenuHubModal: React.FC<MenuHubModalProps> = ({
 
               <button
                 onClick={() => runAndClose(onOpenFind)}
-                className="p-3 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-left flex items-center gap-2.5 text-xs font-semibold text-slate-200 cursor-pointer"
+                className="p-3 rounded-xl bg-black hover:bg-[#121216] border border-slate-800 text-left flex items-center gap-2.5 text-xs font-semibold text-slate-200 cursor-pointer"
               >
                 <Search size={16} className="text-amber-400" />
                 <span>Find in Page</span>
@@ -294,7 +296,7 @@ export const MenuHubModal: React.FC<MenuHubModalProps> = ({
 
               <button
                 onClick={() => runAndClose(() => onOpenAi('summarize'))}
-                className="p-3 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-left flex items-center gap-2.5 text-xs font-semibold text-cyan-200 cursor-pointer"
+                className="p-3 rounded-xl bg-black hover:bg-[#121216] border border-slate-800 text-left flex items-center gap-2.5 text-xs font-semibold text-cyan-200 cursor-pointer"
               >
                 <Sparkles size={16} className="text-cyan-400" />
                 <span>AI Summarize Page</span>
@@ -305,14 +307,14 @@ export const MenuHubModal: React.FC<MenuHubModalProps> = ({
                 className={`p-3 rounded-xl border text-left flex items-center justify-between cursor-pointer ${
                   hasSplitView
                     ? 'bg-purple-950/60 border-purple-500/60 text-white'
-                    : 'bg-slate-900 hover:bg-slate-800 border-slate-800 text-slate-200'
+                    : 'bg-black hover:bg-[#121216] border-slate-800 text-slate-200'
                 }`}
               >
                 <span className="flex items-center gap-2 min-w-0 text-[11px] font-semibold">
                   <Columns2 size={16} className="text-purple-400" />
                   <span>Split Screen</span>
                 </span>
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 font-bold">
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#121216] text-slate-400 font-bold">
                   {hasSplitView ? 'ON' : 'OFF'}
                 </span>
               </button>
@@ -321,7 +323,7 @@ export const MenuHubModal: React.FC<MenuHubModalProps> = ({
             {/* Text Zoom Control Row */}
             <div
               className="rounded-xl border border-slate-800 px-3.5 py-2.5 flex items-center justify-between"
-              style={{ backgroundColor: '#111827' }}
+              style={{ backgroundColor: '#0b0b0e' }}
             >
               <span className="text-xs font-semibold text-slate-200">Page Text Zoom</span>
               <div className="flex items-center gap-2">
@@ -329,7 +331,7 @@ export const MenuHubModal: React.FC<MenuHubModalProps> = ({
                   onClick={() => onChangeZoom(Math.max(75, tab.zoomLevel - 10))}
                   aria-label="Decrease page text zoom"
                   title="Decrease text size"
-                  className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-white cursor-pointer"
+                  className="p-1.5 rounded-lg bg-[#121216] hover:bg-[#1a1a1f] text-white cursor-pointer"
                 >
                   <ZoomOut size={15} />
                 </button>
@@ -340,14 +342,14 @@ export const MenuHubModal: React.FC<MenuHubModalProps> = ({
                   onClick={() => onChangeZoom(Math.min(150, tab.zoomLevel + 10))}
                   aria-label="Increase page text zoom"
                   title="Increase text size"
-                  className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-white cursor-pointer"
+                  className="p-1.5 rounded-lg bg-[#121216] hover:bg-[#1a1a1f] text-white cursor-pointer"
                 >
                   <ZoomIn size={15} />
                 </button>
                 {tab.zoomLevel !== 100 && (
                   <button
                     onClick={() => onChangeZoom(100)}
-                    className="px-2 py-1 rounded-lg bg-slate-800 text-[11px] text-slate-300 cursor-pointer"
+                    className="px-2 py-1 rounded-lg bg-[#121216] text-[11px] text-slate-300 cursor-pointer"
                   >
                     Reset
                   </button>
@@ -365,7 +367,7 @@ export const MenuHubModal: React.FC<MenuHubModalProps> = ({
             <div className="grid grid-cols-2 gap-2 items-stretch">
               <button
                 onClick={() => runAndClose(onOpenShields)}
-                className="p-3 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-left flex items-center justify-between cursor-pointer"
+                className="p-3 rounded-xl bg-black hover:bg-[#121216] border border-slate-800 text-left flex items-center justify-between cursor-pointer"
               >
                 <span className="flex items-center gap-2 min-w-0 text-[11px] font-semibold text-white">
                   <ShieldCheck size={16} className="text-emerald-400" />
@@ -382,7 +384,7 @@ export const MenuHubModal: React.FC<MenuHubModalProps> = ({
 
               <button
                 onClick={() => runAndClose(onOpenVpn)}
-                className="p-3 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-left flex items-center justify-between cursor-pointer"
+                className="p-3 rounded-xl bg-black hover:bg-[#121216] border border-slate-800 text-left flex items-center justify-between cursor-pointer"
               >
                 <span className="flex items-center gap-2 min-w-0 text-[11px] font-semibold text-white">
                   <Lock size={16} className="text-cyan-400" />
@@ -390,7 +392,7 @@ export const MenuHubModal: React.FC<MenuHubModalProps> = ({
                 </span>
                 <span
                   className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
-                    vpn.connected ? 'bg-emerald-500/25 text-emerald-300' : 'bg-slate-800 text-slate-400'
+                    vpn.connected ? 'bg-emerald-500/25 text-emerald-300' : 'bg-[#121216] text-slate-400'
                   }`}
                 >
                   {vpn.connected ? 'ON' : 'OFF'}
@@ -402,14 +404,14 @@ export const MenuHubModal: React.FC<MenuHubModalProps> = ({
                 className={`p-3 rounded-xl border text-left flex items-center justify-between cursor-pointer ${
                   zapperMode
                     ? 'bg-rose-950/60 border-rose-500/60 text-white'
-                    : 'bg-slate-900 hover:bg-slate-800 border-slate-800 text-slate-200'
+                    : 'bg-black hover:bg-[#121216] border-slate-800 text-slate-200'
                 }`}
               >
                 <span className="flex items-center gap-2 min-w-0 text-[11px] font-semibold">
                   <Crosshair size={16} className="text-rose-400" />
                   <span>Element Zapper</span>
                 </span>
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 font-bold">
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#121216] text-slate-400 font-bold">
                   {zapperMode ? 'ON' : 'OFF'}
                 </span>
               </button>
@@ -433,7 +435,7 @@ export const MenuHubModal: React.FC<MenuHubModalProps> = ({
             <div className="grid grid-cols-2 gap-2 items-stretch">
               <button
                 onClick={() => runAndClose(onOpenExtensions)}
-                className="p-3 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-left flex items-center justify-between cursor-pointer"
+                className="p-3 rounded-xl bg-black hover:bg-[#121216] border border-slate-800 text-left flex items-center justify-between cursor-pointer"
               >
                 <span className="flex items-center gap-2 min-w-0 text-[11px] font-semibold text-white">
                   <Puzzle size={16} className="text-purple-400" />
@@ -446,20 +448,20 @@ export const MenuHubModal: React.FC<MenuHubModalProps> = ({
 
               <button
                 onClick={() => runAndClose(onToggleDevTools)}
-                className="p-3 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-left flex items-center justify-between cursor-pointer"
+                className="p-3 rounded-xl bg-black hover:bg-[#121216] border border-slate-800 text-left flex items-center justify-between cursor-pointer"
               >
                 <span className="flex items-center gap-2 min-w-0 text-[11px] font-semibold text-slate-200">
                   <Terminal size={16} className="text-sky-400" />
                   <span>Web DevTools</span>
                 </span>
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 font-bold">
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#121216] text-slate-400 font-bold">
                   {showDevTools ? 'ON' : 'OFF'}
                 </span>
               </button>
 
               <button
                 onClick={() => runAndClose(onOpenBenchmark)}
-                className="p-3 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-left flex items-center gap-2.5 text-xs font-semibold text-slate-200 cursor-pointer"
+                className="p-3 rounded-xl bg-black hover:bg-[#121216] border border-slate-800 text-left flex items-center gap-2.5 text-xs font-semibold text-slate-200 cursor-pointer"
               >
                 <Zap size={16} className="text-amber-400" />
                 <span>Speed Benchmark</span>
@@ -484,7 +486,7 @@ export const MenuHubModal: React.FC<MenuHubModalProps> = ({
             <div className="grid grid-cols-2 gap-2 items-stretch">
               <button
                 onClick={onToggleToolbarPosition}
-                className="p-3 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-left flex items-center justify-between cursor-pointer"
+                className="p-3 rounded-xl bg-black hover:bg-[#121216] border border-slate-800 text-left flex items-center justify-between cursor-pointer"
               >
                 <span className="flex items-center gap-2 min-w-0 text-[11px] font-semibold text-slate-200">
                   {customization.addressBarPosition === 'bottom' ? (
@@ -494,14 +496,14 @@ export const MenuHubModal: React.FC<MenuHubModalProps> = ({
                   )}
                   <span>Address Bar</span>
                 </span>
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-cyan-300 font-bold uppercase">
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#121216] text-cyan-300 font-bold uppercase">
                   {customization.addressBarPosition}
                 </span>
               </button>
 
               <button
                 onClick={() => runAndClose(onOpenCustomize)}
-                className="p-3 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-left flex items-center gap-2.5 text-xs font-semibold text-slate-200 cursor-pointer"
+                className="p-3 rounded-xl bg-black hover:bg-[#121216] border border-slate-800 text-left flex items-center gap-2.5 text-xs font-semibold text-slate-200 cursor-pointer"
               >
                 <SlidersHorizontal size={16} className="text-pink-400" />
                 <span>Themes &amp; Downloads</span>

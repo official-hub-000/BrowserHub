@@ -57,17 +57,17 @@ export const TabsDrawer: React.FC<TabsDrawerProps> = ({
     .reduce((acc, t) => acc + t.memoryMb, 0);
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-3" onClick={onClose}>
-      <div className="w-full max-w-2xl rounded-3xl bg-slate-950 border border-slate-800 shadow-2xl flex flex-col max-h-[88vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
+    <div className="bh-overlay fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-3" onClick={onClose}>
+      <div className="bh-dialog w-full max-w-2xl rounded-3xl bg-black border border-slate-800 shadow-2xl flex flex-col max-h-[88vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
-        <div className="p-4 border-b border-slate-800 flex flex-wrap items-center justify-between gap-2 bg-slate-900/80">
+        <div className="p-4 border-b border-slate-800 flex flex-wrap items-center justify-between gap-2 bg-[#08080b]">
           <div className="flex items-center gap-2">
             <button
               onClick={() => setMode('normal')}
               className={`px-3.5 py-1.5 rounded-xl text-xs font-bold cursor-pointer ${
                 mode === 'normal'
                   ? 'bg-cyan-500 text-slate-950'
-                  : 'bg-slate-800 text-slate-300'
+                  : 'bg-[#121216] text-slate-300'
               }`}
             >
               Tabs ({tabs.filter((t) => !t.isIncognito).length})
@@ -77,7 +77,7 @@ export const TabsDrawer: React.FC<TabsDrawerProps> = ({
               className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold cursor-pointer ${
                 mode === 'incognito'
                   ? 'bg-purple-500 text-white'
-                  : 'bg-slate-800 text-purple-300'
+                  : 'bg-[#121216] text-purple-300'
               }`}
             >
               <EyeOff className="w-3.5 h-3.5" />
@@ -97,14 +97,14 @@ export const TabsDrawer: React.FC<TabsDrawerProps> = ({
               <Flame className="w-3.5 h-3.5" />
               Fire Wipe
             </button>
-            <button aria-label="Close" title="Close" onClick={onClose} className="p-1.5 rounded-xl hover:bg-slate-800 text-slate-400 cursor-pointer">
+            <button aria-label="Close" title="Close" onClick={onClose} className="p-1.5 rounded-xl hover:bg-[#121216] text-slate-400 cursor-pointer">
               <X className="w-4 h-4" />
             </button>
           </div>
         </div>
 
         {/* Workspace / Tab Group Filter Strip */}
-        <div className="px-4 py-2 bg-slate-900/40 border-b border-slate-800 flex flex-wrap items-center justify-between gap-2 text-[11px]">
+        <div className="px-4 py-2 bg-[#040405] border-b border-slate-800 flex flex-wrap items-center justify-between gap-2 text-[11px]">
           <div className="flex items-center gap-1.5">
             <Layers className="w-3.5 h-3.5 text-slate-400" />
             {(['all', 'main', 'work', 'research', 'media'] as const).map((g) => (
@@ -161,7 +161,7 @@ export const TabsDrawer: React.FC<TabsDrawerProps> = ({
                       ? 'bg-cyan-500/10 border-cyan-400'
                       : isSplit
                         ? 'bg-purple-500/10 border-purple-400'
-                        : 'bg-slate-900/80 border-slate-800 hover:border-slate-700'
+                        : 'bg-[#08080b] border-slate-800 hover:border-slate-700'
                   }`}
                 >
                   <div className="flex items-start justify-between gap-2">
@@ -180,7 +180,7 @@ export const TabsDrawer: React.FC<TabsDrawerProps> = ({
                       }}
                       aria-label={`Close ${t.title}`}
                       title="Close tab"
-                      className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 shrink-0 cursor-pointer"
+                      className="p-1 rounded-lg hover:bg-[#121216] text-slate-400 shrink-0 cursor-pointer"
                     >
                       <X className="w-3.5 h-3.5" />
                     </button>
@@ -205,7 +205,7 @@ export const TabsDrawer: React.FC<TabsDrawerProps> = ({
                         onClick={() => onTogglePin(t.id)}
                         title="Pin Tab"
                         aria-label="Pin tab"
-                        className={`p-1 rounded hover:bg-slate-800 cursor-pointer ${
+                        className={`p-1 rounded hover:bg-[#121216] cursor-pointer ${
                           t.isPinned ? 'text-amber-400' : 'text-slate-400'
                         }`}
                       >
@@ -215,7 +215,7 @@ export const TabsDrawer: React.FC<TabsDrawerProps> = ({
                         onClick={() => onToggleHibernate(t.id)}
                         title="Hibernate Tab to Free RAM"
                         aria-label="Hibernate tab to free RAM"
-                        className={`p-1 rounded hover:bg-slate-800 cursor-pointer ${
+                        className={`p-1 rounded hover:bg-[#121216] cursor-pointer ${
                           t.isHibernated ? 'text-emerald-400' : 'text-slate-400'
                         }`}
                       >
@@ -232,7 +232,7 @@ export const TabsDrawer: React.FC<TabsDrawerProps> = ({
                           className={`inline-flex items-center gap-1 px-2 py-0.5 rounded font-semibold cursor-pointer ${
                             isSplit
                               ? 'bg-purple-500 text-white'
-                              : 'bg-slate-800 text-cyan-300 hover:bg-slate-700'
+                              : 'bg-[#121216] text-cyan-300 hover:bg-[#1a1a1f]'
                           }`}
                         >
                           <Columns2 className="w-3 h-3" />
@@ -248,7 +248,7 @@ export const TabsDrawer: React.FC<TabsDrawerProps> = ({
         )}
 
         {/* Footer New Tab Actions */}
-        <div className="p-3 border-t border-slate-800 bg-slate-900/60 flex items-center justify-between gap-2">
+        <div className="p-3 border-t border-slate-800 bg-[#060608] flex items-center justify-between gap-2">
           <button
             onClick={() => {
               onNewTab(mode === 'incognito', groupFilter === 'all' ? 'main' : groupFilter);

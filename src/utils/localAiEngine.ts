@@ -4,6 +4,8 @@ import {
   type PageAiContext,
 } from './pageTextExtractor';
 
+import { getCachedAnswer, rememberAnswer, singleFlight } from './aiCache';
+
 export { sanitizeExtractedPageContent };
 export type { PageAiContext };
 
@@ -14,6 +16,8 @@ export interface LocalAiInput {
   content?: string;
   query?: string;
   history?: Array<{ role: 'user' | 'assistant'; content: string }>;
+  /** Human-readable name of the engine selected in the address bar. */
+  searchEngineName?: string;
 }
 
 export interface LocalAiOutput {
@@ -172,6 +176,64 @@ function handleNonFactualQuery(
   return null;
 }
 
+/**
+ * Offline query understanding. Classifies what is being asked so the fallback
+ * can say something specific ("this is a who-is question about a person")
+ * instead of a generic apology. No network, no invented facts.
+ */
+function describeQuery(query: string): string | null {
+  const q = query.trim().replace(/[?!.]+$/, '');
+  if (!q) return null;
+
+  const isWho = /^who\s+(is|was|are|were)\b/i.test(q);
+  const isWhat = /^what\s+(is|was|are|were)\b/i.test(q);
+  const isWhere = /^where\s+(is|was|are)\b/i.test(q);
+  const isWhen = /^when\s+(did|was|is|were)\b/i.test(q);
+  const isHowTo = /^how\s+(do|does|can|to|should)\b/i.test(q);
+  const isWhy = /^why\s+(is|does|do|did|are)\b/i.test(q);
+  const isDefinition = /\b(meaning|definition|stand for|acronym)\b/i.test(q);
+
+  // Extract the subject after the interrogative so we can echo it precisely.
+  const subject = q
+    .replace(/^(who|what|where|when|how|why)\s+(is|was|are|were|do|does|did|can|should|to)\s+/i, '')
+    .replace(/^(who|what|where|when|how|why)\s+/i, '')
+    .trim();
+
+  // "goat" and friends are ambiguous acronyms; naming that is more useful than
+  // a wrong answer, and it is honest about the ambiguity.
+  if (/^(goat|sick|fire|lit|cap|drip|ratio|bet)$/i.test(subject)) {
+    const expansions: Record<string, string> = {
+      goat: 'greatest of all time',
+      sick: 'extremely good',
+      fire: 'excellent',
+      lit: 'exciting',
+      cap: 'a lie (as in "no cap")',
+      drip: 'style / outfit',
+      ratio: 'a reply with more likes than the original post',
+      bet: 'agreement ("you bet")',
+    };
+    const full = expansions[subject.toLowerCase()];
+    if (full) {
+      return `"${subject}" is internet slang for "${full}". If you meant the animal, say "the animal ${subject}" and I'll take it that way.`;
+    }
+  }
+
+  if (isDefinition && subject) {
+    return `This is a definition question about "${subject}" — that needs a live model or a source page, so I won't guess.`;
+  }
+  if (isWho && subject) {
+    return `This is a who-is question about "${subject}" — the kind of thing a live model or a Wikipedia page answers accurately, and the kind of thing I refuse to invent.`;
+  }
+  if (isWhat && subject) {
+    return `This is a what-is question about "${subject}".`;
+  }
+  if (isWhere && subject) return `This is a where-is question about "${subject}".`;
+  if (isWhen) return 'This is a when question about dates or events.';
+  if (isHowTo) return 'This is a how-to question — a result page usually has the steps.';
+  if (isWhy) return 'This is a why question that needs reasoning over sources.';
+  return null;
+}
+
 function noPageMessage(requestLabel: string, ctx: PageAiContext): string {
   if (ctx.kind === 'home') {
     return `I can't ${requestLabel} yet — you're on the **BrowserHub Home screen**, so no website is open.\n\nUse the search bar to open any article, docs page or wiki entry, then ask again and I'll read the real page text.`;
@@ -260,14 +322,18 @@ export function runLocalAiClient(input: LocalAiInput): LocalAiOutput {
         bullets = [];
       }
     } else {
-      // No live model, no page context. Be explicit instead of inventing an answer.
+      // No live model, no page context. Never invent an answer — but still do
+      // something genuinely useful with what the browser already knows.
+      const hint = describeQuery(query);
       responseText =
-        `I couldn't reach a live AI model just now, so I can't reliably answer **"${query}"** from general knowledge offline.\n\n` +
-        `What works right now:\n` +
-        `- **Search it** — type the question in the address bar; BrowserHub opens it with the engine you selected.\n` +
-        `- **Open a result**, then tap **Summarize** — I'll extract the real answer from that page on-device.\n` +
-        `- **Math and drafting** still work offline (e.g. **"18% of 2450"** or **"draft an email about a late delivery"**).`;
-      bullets = ['Retry once you are online for full conversational answers'];
+        `I couldn't reach a live AI model just now, so I won't guess at **"${query}"**.\n\n` +
+        (hint ? `**${hint}**\n\n` : '') +
+        `Three things that work right now:\n` +
+        `1. **Search it** — type it in the address bar and BrowserHub opens it with **${input.searchEngineName || 'the engine in your address bar'}**.\n` +
+        `2. **Open any result and tap Summarize** — I read the real page text on-device and answer from it.\n` +
+        `3. **Ask again in a moment** — the live model is usually back within a few seconds, and I now retry automatically.\n\n` +
+        `Offline, I can still do: exact math (**"18% of 2450"**), email and message drafts, page summaries, page Q&A, and a privacy check of the URL you're on.`;
+      bullets = ['Tap Summarize after opening a page for an on-device answer from its real text'];
     }
   } else {
     responseText = hasPageText
@@ -351,6 +417,9 @@ async function fetchLive(
   }
 }
 
+/** Free, key-less models tried in order until one answers. */
+const LIVE_MODELS = ['openai', 'mistral', 'llama', 'openai-fast'];
+
 const SYSTEM_PROMPT = `You are BrowserHub AI, the assistant built into the BrowserHub Android browser.
 Rules:
 - Reply in clean Markdown: short paragraphs, "### " headings, "- " bullets, **bold** for key terms. Never output raw HTML.
@@ -390,6 +459,23 @@ export async function runSmartHybridAi(input: LocalAiInput): Promise<LocalAiOutp
     return runLocalAiClient(input);
   }
 
+  // Same question, same page → reuse a real previous answer instead of asking
+  // the network again. This is what makes re-tapping a prompt instant.
+  const cacheKey = [mode, query, ctx.kind, ctx.text.slice(0, 160)].join('|');
+  const cached = getCachedAnswer(cacheKey);
+  if (cached) {
+    return {
+      ok: true,
+      model: cached.model,
+      engineLabel: `${cached.engineLabel} (saved)`,
+      zeroApiKey: true,
+      zeroTelemetry: true,
+      inferenceMs: 1,
+      responseText: cached.text,
+      bullets: ['Answered from a saved reply — no new request was made'],
+    };
+  }
+
   const hasPageText = ctx.text.length >= 60;
   const pageBlock = hasPageText
     ? `\n\n--- OPEN WEBPAGE ---\nTitle: ${pageTitle}\nURL: ${input.url}\nContext: ${ctx.contextNote}\nVisible text:\n"""${ctx.text.slice(0, 3500)}"""\n--- END WEBPAGE ---`
@@ -424,30 +510,55 @@ export async function runSmartHybridAi(input: LocalAiInput): Promise<LocalAiOutp
   });
 
   // Live attempts run with a shared budget so the drawer never looks frozen.
-  // Native worker thread (APK, no CORS, off the JS thread) gets first refusal.
-  const nativeReply = await askViaNativeBridge(userPrompt, 15000);
-  if (nativeReply) return liveReply(nativeReply);
+  const persist = (out: LocalAiOutput): LocalAiOutput => {
+    if (out.responseText.trim()) {
+      rememberAnswer(cacheKey, {
+        text: out.responseText,
+        engineLabel: out.engineLabel,
+        model: out.model,
+        savedAt: Date.now(),
+      });
+    }
+    return out;
+  };
 
-  // Direct public endpoint (works wherever CORS allows).
+  // Native worker thread (APK, no CORS, off the JS thread) gets first refusal.
+  const nativeReply = await singleFlight(`native:${cacheKey}`, () =>
+    askViaNativeBridge(userPrompt, 15000)
+  );
+  if (nativeReply) return persist(liveReply(nativeReply));
+
+  // Direct public endpoints. Several models are tried in order because a
+  // single free endpoint can be rate-limited or briefly down — that is exactly
+  // how "Who is Ronaldo?" answered and "Who is goat?" failed seconds later.
   const directReply = await fetchLive(async (signal) => {
-    const res = await fetch('https://text.pollinations.ai/openai', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      signal,
-      body: JSON.stringify({
-        model: 'openai',
-        messages: [
-          { role: 'system', content: SYSTEM_PROMPT },
-          ...priorMsgs,
-          { role: 'user', content: userPrompt },
-        ],
-      }),
-    });
-    if (!res.ok) return null;
-    const data: any = await res.json();
-    return data?.choices?.[0]?.message?.content ?? null;
-  }, 6000);
-  if (directReply) return liveReply(directReply);
+    for (const model of LIVE_MODELS) {
+      try {
+        const res = await fetch('https://text.pollinations.ai/openai', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          signal,
+          body: JSON.stringify({
+            model,
+            messages: [
+              { role: 'system', content: SYSTEM_PROMPT },
+              ...priorMsgs,
+              { role: 'user', content: userPrompt },
+            ],
+          }),
+        });
+        if (!res.ok) continue;
+        const data: any = await res.json();
+        const text = data?.choices?.[0]?.message?.content;
+        if (typeof text === 'string' && text.trim().length > 2) return text.trim();
+      } catch (err) {
+        // Abort means the budget is gone — stop trying further models.
+        if ((err as Error)?.name === 'AbortError') break;
+      }
+    }
+    return null;
+  }, 12000);
+  if (directReply) return persist(liveReply(directReply));
 
   // Same-origin proxy (Android shell asset build & web preview, and CORS fallback).
   const proxyReply = await fetchLive(async (signal) => {
@@ -469,7 +580,7 @@ export async function runSmartHybridAi(input: LocalAiInput): Promise<LocalAiOutp
     const data: any = await res.json();
     return data?.ok ? data.responseText ?? null : null;
   }, 9000);
-  if (proxyReply) return liveReply(proxyReply);
+  if (proxyReply) return persist(liveReply(proxyReply));
 
   return runLocalAiClient(input);
 }

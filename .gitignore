@@ -15,6 +15,11 @@ android-native/app/build/
 *.idsig
 *.aab
 *.jks
+# Exception: the standalone release key must be versioned so every rebuild of
+# release/BrowserHub-v1.0.0-release.apk carries the SAME signer identity.
+# Its password already lives in scripts/build-standalone-apk.sh, so the key
+# file itself adds no secret that is not already public in this repo.
+!android/browserhub-release.jks
 *.keystore
 android/keystore.properties
 android/local.properties

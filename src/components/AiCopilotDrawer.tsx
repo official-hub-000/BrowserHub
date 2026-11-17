@@ -15,12 +15,17 @@ import {
 } from 'lucide-react';
 import type { AiChatMessage, BrowserTab } from '../types/browser';
 import { getPageContextForAi } from '../utils/pageTextExtractor';
+import { copyText } from '../utils/aiCache';
+import { getSearchEngineOption } from '../data/presets';
+import type { SearchEngineId } from '../types/browser';
 import { AiThinkingState } from './AiThinkingState';
 import { runSmartHybridAi } from '../utils/localAiEngine';
 
 interface AiCopilotDrawerProps {
   tab: BrowserTab;
   livePageText?: string;
+  /** Engine chosen in the address bar, used in offline guidance. */
+  searchEngineId?: SearchEngineId;
   initialMode?: string;
   initialQuery?: string;
   onClose: () => void;
@@ -61,7 +66,7 @@ function renderInline(line: string): React.ReactNode[] {
       parts.push(
         <code
           key={`c${k++}`}
-          className="px-1.5 py-0.5 rounded bg-slate-800 text-cyan-300 font-mono text-[11px]"
+          className="px-1.5 py-0.5 rounded bg-[#121216] text-cyan-300 font-mono text-[11px]"
         >
           {token.slice(1, -1)}
         </code>
@@ -84,7 +89,7 @@ function FormattedAiMessage({ content }: { content: string }) {
           return (
             <pre
               key={bIdx}
-              className="p-3 rounded-xl bg-slate-950 border border-slate-800 text-xs font-mono text-emerald-300 overflow-x-auto"
+              className="p-3 rounded-xl bg-black border border-slate-800 text-xs font-mono text-emerald-300 overflow-x-auto"
             >
               {body}
             </pre>
@@ -144,6 +149,7 @@ const QUICK_ACTIONS = [
 export const AiCopilotDrawer: React.FC<AiCopilotDrawerProps> = ({
   tab,
   livePageText,
+  searchEngineId = 'google',
   initialMode,
   initialQuery,
   onClose,
@@ -197,6 +203,7 @@ export const AiCopilotDrawer: React.FC<AiCopilotDrawerProps> = ({
       content: ctx.text,
       query: customQuery || '',
       history: messages.map((m) => ({ role: m.role, content: m.content })),
+      searchEngineName: getSearchEngineOption(searchEngineId).name,
     });
 
     setMessages((prev) => [
@@ -239,11 +246,16 @@ export const AiCopilotDrawer: React.FC<AiCopilotDrawerProps> = ({
     execute('chat', q);
   };
 
-  const copyMsg = (id: string, text: string) => {
-    const plain = text.replace(/[*`#]/g, '');
-    navigator.clipboard?.writeText(plain).catch(() => {});
-    setCopiedId(id);
-    setTimeout(() => setCopiedId(null), 1500);
+  const copyMsg = async (id: string, text: string) => {
+    const plain = text
+      .replace(/\*\*/g, '')
+      .replace(/`/g, '')
+      .replace(/^#{1,4}\s*/gm, '')
+      .replace(/^[-•*]\s+/gm, '')
+      .trim();
+    const ok = await copyText(plain);
+    setCopiedId(ok ? id : `fail-${id}`);
+    setTimeout(() => setCopiedId(null), 1600);
   };
 
   const ctx = getPageContextForAi(tab.url, livePageText);
@@ -257,16 +269,16 @@ export const AiCopilotDrawer: React.FC<AiCopilotDrawerProps> = ({
       : { text: 'Waiting for page text', tone: 'text-amber-300' };
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end" style={{ backgroundColor: 'rgba(2, 6, 23, 0.8)' }} onClick={onClose}>
+    <div className="bh-overlay fixed inset-0 z-50 flex justify-end" style={{ backgroundColor: 'rgba(0, 0, 0, 0.86)' }} onClick={onClose}>
       <div
-        className="w-full max-w-md h-full border-l border-slate-800 flex flex-col shadow-2xl"
-        style={{ backgroundColor: '#090e1a' }}
+        className="bh-drawer-right w-full max-w-md h-full border-l border-slate-800 flex flex-col shadow-2xl"
+        style={{ backgroundColor: '#000000' }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div
           className="px-4 py-3 border-b border-slate-800 flex items-center justify-between shrink-0"
-          style={{ backgroundColor: '#0f172a' }}
+          style={{ backgroundColor: '#000000' }}
         >
           <div className="flex items-center gap-2.5 min-w-0">
             <div
@@ -291,7 +303,7 @@ export const AiCopilotDrawer: React.FC<AiCopilotDrawerProps> = ({
                 onClick={() => setMessages([])}
                 title="Clear chat"
                 aria-label="Clear chat"
-                className="p-2 rounded-xl hover:bg-slate-800 text-slate-400 hover:text-white cursor-pointer"
+                className="p-2 rounded-xl hover:bg-[#121216] text-slate-400 hover:text-white cursor-pointer"
               >
                 <Trash2 size={16} />
               </button>
@@ -300,7 +312,7 @@ export const AiCopilotDrawer: React.FC<AiCopilotDrawerProps> = ({
               onClick={onClose}
               title="Close assistant"
               aria-label="Close assistant"
-              className="p-2 rounded-xl hover:bg-slate-800 text-slate-300 hover:text-white cursor-pointer"
+              className="p-2 rounded-xl hover:bg-[#121216] text-slate-300 hover:text-white cursor-pointer"
             >
               <X size={18} />
             </button>
@@ -310,7 +322,7 @@ export const AiCopilotDrawer: React.FC<AiCopilotDrawerProps> = ({
         {/* Quick actions */}
         <div
           className="px-3 py-2 border-b border-slate-800 grid grid-cols-4 gap-1.5 shrink-0"
-          style={{ backgroundColor: '#0b1220' }}
+          style={{ backgroundColor: '#050506' }}
         >
           {QUICK_ACTIONS.map(({ mode, label, icon: Icon, tone, prompt }) => (
             <button
@@ -324,7 +336,7 @@ export const AiCopilotDrawer: React.FC<AiCopilotDrawerProps> = ({
                 }
               }}
               disabled={loading}
-              className="px-1 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-[11px] font-semibold flex flex-col items-center gap-1 cursor-pointer disabled:opacity-50"
+              className="px-1 py-2 rounded-xl bg-black hover:bg-[#121216] border border-slate-800 text-[11px] font-semibold flex flex-col items-center gap-1 cursor-pointer disabled:opacity-50"
             >
               <Icon size={15} className={tone} />
               <span className="text-slate-200">{label}</span>
@@ -336,7 +348,7 @@ export const AiCopilotDrawer: React.FC<AiCopilotDrawerProps> = ({
         <div ref={scrollRef} className="flex-1 overflow-y-auto p-3.5 space-y-3">
           {messages.length === 0 && !loading && (
             <div className="space-y-3">
-              <div className="rounded-2xl border border-slate-800 p-4 space-y-2" style={{ backgroundColor: '#111827' }}>
+              <div className="rounded-2xl border border-slate-800 p-4 space-y-2" style={{ backgroundColor: '#0b0b0e' }}>
                 <div className="text-sm font-bold text-white">Ask me anything</div>
                 <p className="text-xs text-slate-300 leading-relaxed">
                   General questions, page summaries, math, and writing help — with no API key and no
@@ -358,7 +370,7 @@ export const AiCopilotDrawer: React.FC<AiCopilotDrawerProps> = ({
                   <button
                     key={sample}
                     onClick={() => execute('chat', sample)}
-                    className="w-full text-left px-3 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs text-slate-200 cursor-pointer"
+                    className="w-full text-left px-3 py-2.5 rounded-xl bg-black hover:bg-[#121216] border border-slate-800 text-xs text-slate-200 cursor-pointer"
                   >
                     {sample}
                   </button>
@@ -375,7 +387,7 @@ export const AiCopilotDrawer: React.FC<AiCopilotDrawerProps> = ({
                   ? 'ml-8 border border-cyan-500/40 text-white'
                   : 'border border-slate-800 text-slate-200'
               }`}
-              style={{ backgroundColor: msg.role === 'user' ? '#0e3a4c' : '#111827' }}
+              style={{ backgroundColor: msg.role === 'user' ? '#0c0c0f' : '#0b0b0e' }}
             >
               {msg.role === 'user' ? (
                 <div className="text-[13px] font-medium leading-relaxed break-words">{msg.content}</div>
@@ -402,10 +414,20 @@ export const AiCopilotDrawer: React.FC<AiCopilotDrawerProps> = ({
                   </span>
                   <button
                     onClick={() => copyMsg(msg.id, msg.content)}
-                    className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 cursor-pointer shrink-0"
+                    className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-[#121216] hover:bg-[#1a1a1f] text-slate-200 cursor-pointer shrink-0"
                   >
-                    {copiedId === msg.id ? <Check size={11} className="text-emerald-400" /> : <Copy size={11} />}
-                    <span>{copiedId === msg.id ? 'Copied' : 'Copy'}</span>
+                    {copiedId === msg.id ? (
+                      <Check size={11} className="text-emerald-400" />
+                    ) : (
+                      <Copy size={11} />
+                    )}
+                    <span>
+                      {copiedId === msg.id
+                        ? 'Copied'
+                        : copiedId === `fail-${msg.id}`
+                          ? 'Copy failed'
+                          : 'Copy'}
+                    </span>
                   </button>
                 </div>
               )}
@@ -419,14 +441,14 @@ export const AiCopilotDrawer: React.FC<AiCopilotDrawerProps> = ({
         <form
           onSubmit={onSubmit}
           className="p-3 border-t border-slate-800 flex items-center gap-2 shrink-0"
-          style={{ backgroundColor: '#0f172a' }}
+          style={{ backgroundColor: '#000000' }}
         >
           <input
             ref={inputRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder="Ask anything…"
-            className="flex-1 min-w-0 rounded-xl bg-slate-900 border border-slate-700 focus:border-cyan-400 px-3.5 py-2.5 text-sm text-white placeholder-slate-400 focus:outline-none"
+            className="flex-1 min-w-0 rounded-xl bg-black border border-slate-700 focus:border-cyan-400 px-3.5 py-2.5 text-sm text-white placeholder-slate-400 focus:outline-none"
           />
           <button
             type="submit"

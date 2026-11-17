@@ -51,9 +51,9 @@ export const DevToolsPanel: React.FC<DevToolsPanelProps> = ({
   };
 
   return (
-    <div className="h-64 bg-slate-950 border-t border-cyan-500/40 flex flex-col shrink-0 z-30">
+    <div className="bh-sheet h-64 bg-black border-t border-cyan-500/40 flex flex-col shrink-0 z-30">
       {/* Header */}
-      <div className="px-3 py-1.5 bg-slate-900 border-b border-slate-800 flex items-center justify-between text-xs">
+      <div className="px-3 py-1.5 bg-black border-b border-slate-800 flex items-center justify-between text-xs">
         <div className="flex items-center gap-2">
           <span className="font-bold text-cyan-300 inline-flex items-center gap-1">
             <Terminal className="w-3.5 h-3.5" /> DevTools
@@ -70,7 +70,7 @@ export const DevToolsPanel: React.FC<DevToolsPanelProps> = ({
             </button>
           ))}
         </div>
-        <button aria-label="Close" title="Close" onClick={onClose} className="p-1 rounded hover:bg-slate-800 text-slate-400 cursor-pointer">
+        <button aria-label="Close" title="Close" onClick={onClose} className="p-1 rounded hover:bg-[#121216] text-slate-400 cursor-pointer">
           <X className="w-3.5 h-3.5" />
         </button>
       </div>

@@ -8,7 +8,7 @@ import { Sparkles, WifiOff } from 'lucide-react';
 export const AiThinkingState: React.FC<{ slow: boolean }> = ({ slow }) => (
   <div
     className="rounded-2xl p-3.5 border border-slate-800 space-y-1.5"
-    style={{ backgroundColor: '#111827' }}
+    style={{ backgroundColor: '#0b0b0e' }}
   >
     <div className="flex items-center gap-2 text-xs font-semibold text-cyan-300">
       <Sparkles size={14} className="animate-spin shrink-0" />
