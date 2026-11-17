@@ -78,6 +78,9 @@ public class MainActivity extends Activity {
     /** Script/CSS-injected shields that the shell toggles independently. */
     private volatile boolean antiFingerprintEnabled = true;
     private volatile boolean httpsUpgradeEnabled = true;
+    /** Background Play extension: never pause or suspend the page's media. */
+    private volatile boolean keepMediaAlive = false;
+    private volatile boolean customCssActive = false;
     private volatile String extractedPageText = "";
 
     private String lastLoadedUrl = "";
@@ -271,10 +274,33 @@ public class MainActivity extends Activity {
                     dataUrl, 0f, 76f, 800f, false,
                     adblockEnabled, darkReaderEnabled, cookieKillerEnabled,
                     activeCustomCss, 100, "", true,
-                    trackerBlockEnabled, antiFingerprintEnabled, httpsUpgradeEnabled
+                    trackerBlockEnabled, antiFingerprintEnabled, httpsUpgradeEnabled,
+                    keepMediaAlive, customCssActive
             );
             notifyShellUrlChanged(dataUrl, dataUrl);
         }
+    }
+
+    /** Emits a JS string literal for arbitrary text (custom CSS/JS payloads). */
+    private String jsString(String value) {
+        StringBuilder out = new StringBuilder("\"");
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            switch (c) {
+                case '\\': out.append("\\\\"); break;
+                case '"': out.append("\\\""); break;
+                case '\n': out.append("\\n"); break;
+                case '\r': out.append("\\r"); break;
+                case '\t': out.append("\\t"); break;
+                case '<': out.append("\\u003c"); break;
+                case '>': out.append("\\u003e"); break;
+                default:
+                    if (c < 0x20) out.append(" ");
+                    else out.append(c);
+            }
+        }
+        out.append("\"");
+        return out.toString();
     }
 
     /** Returns the matched list name ("ads" / "trackers") or null when allowed. */
@@ -337,6 +363,37 @@ public class MainActivity extends Activity {
             );
         }
 
+        if (keepMediaAlive) {
+            // Background Play extension: tell the page to keep media running and
+            // never let the shell's visibility changes pause it.
+            css.append("video, audio { visibility: visible !important; } ");
+            view.evaluateJavascript(
+                    "(function(){try{"
+                            + "if(window.__bhBgPlayOn){return;}window.__bhBgPlayOn=true;"
+                            + "if(navigator.mediaSession){try{navigator.mediaSession.setActionHandler('pause',null);}catch(e){}}"
+                            + "document.addEventListener('visibilitychange',function(){"
+                            + "  if(document.visibilityState==='hidden'){"
+                            + "    var v=document.querySelectorAll('video,audio');"
+                            + "    for(var i=0;i<v.length;i++){try{if(!v[i].paused){window.__bhBgResume=v[i];}}catch(e){}}"
+                            + "  }else if(window.__bhBgResume){"
+                            + "    try{if(window.__bhBgResume.paused){window.__bhBgResume.play();}}catch(e){}"
+                            + "    window.__bhBgResume=null;"
+                            + "  }"
+                            + "});"
+                            + "}catch(e){}})();",
+                    null
+            );
+        }
+
+        if (customCssActive && activeCustomCss != null && !activeCustomCss.isEmpty()) {
+            view.evaluateJavascript(
+                    "(function(){try{var el=document.getElementById('__bh_user_css');"
+                            + "if(!el){el=document.createElement('style');el.id='__bh_user_css';document.head.appendChild(el);}"
+                            + "el.textContent=" + jsString(activeCustomCss) + ";}catch(e){}})();",
+                    null
+            );
+        }
+
         if (css.length() > 0) {
             String safeCss = css.toString()
                     .replace("\\", "\\\\")
@@ -382,6 +439,21 @@ public class MainActivity extends Activity {
 
     public String getExtractedPageText() {
         return extractedPageText;
+    }
+
+    /** Runs the user's enabled Userscript inside the page (re-run on change). */
+    public void applyUserScripts(final String code) {
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                if (browserWebView == null || browserWebView.getVisibility() != View.VISIBLE) return;
+                if (code == null || code.trim().isEmpty()) return;
+                browserWebView.evaluateJavascript(
+                        "try{\n" + code + "\n}catch(__bhUserScriptError){}",
+                        null
+                );
+            }
+        });
     }
 
     /**
@@ -509,12 +581,16 @@ public class MainActivity extends Activity {
             final boolean visible,
             final boolean trackerBlockOn,
             final boolean antiFingerprintOn,
-            final boolean httpsUpgradeOn
+            final boolean httpsUpgradeOn,
+            final boolean keepMediaAlive,
+            final boolean customCssActive
     ) {
         this.adblockEnabled = adblockOn;
         this.trackerBlockEnabled = trackerBlockOn;
         this.antiFingerprintEnabled = antiFingerprintOn;
         this.httpsUpgradeEnabled = httpsUpgradeOn;
+        this.keepMediaAlive = keepMediaAlive;
+        this.customCssActive = customCssActive;
         this.darkReaderEnabled = darkReaderOn;
         this.cookieKillerEnabled = cookieKillerOn;
         this.activeCustomCss = customCss != null ? customCss : "";

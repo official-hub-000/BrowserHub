@@ -64,6 +64,8 @@ class MainActivity : AppCompatActivity() {
     @Volatile private var trackerBlockEnabled: Boolean = true
     @Volatile private var antiFingerprintEnabled: Boolean = true
     @Volatile private var httpsUpgradeEnabled: Boolean = true
+    @Volatile private var keepMediaAlive: Boolean = false
+    @Volatile private var customCssActive: Boolean = false
     @Volatile var extractedPageText: String = ""
 
     private val vpnPermissionLauncher = registerForActivityResult(
@@ -253,6 +255,35 @@ class MainActivity : AppCompatActivity() {
             )
         }
 
+        if (keepMediaAlive) {
+            view.evaluateJavascript(
+                "(function(){try{" +
+                    "if(window.__bhBgPlayOn){return;}window.__bhBgPlayOn=true;" +
+                    "if(navigator.mediaSession){try{navigator.mediaSession.setActionHandler('pause',null);}catch(e){}}" +
+                    "document.addEventListener('visibilitychange',function(){" +
+                    "  if(document.visibilityState==='hidden'){" +
+                    "    var v=document.querySelectorAll('video,audio');" +
+                    "    for(var i=0;i<v.length;i++){try{if(!v[i].paused){window.__bhBgResume=v[i];}}catch(e){}}" +
+                    "  }else if(window.__bhBgResume){" +
+                    "    try{if(window.__bhBgResume.paused){window.__bhBgResume.play();}}catch(e){}" +
+                    "    window.__bhBgResume=null;" +
+                    "  }" +
+                    "});" +
+                    "}catch(e){}})();",
+                null
+            )
+        }
+
+        if (customCssActive && activeCustomCss.isNotEmpty()) {
+            val payload = org.json.JSONObject.quote(activeCustomCss)
+            view.evaluateJavascript(
+                "(function(){try{var el=document.getElementById('__bh_user_css');" +
+                    "if(!el){el=document.createElement('style');el.id='__bh_user_css';document.head.appendChild(el);}" +
+                    "el.textContent=" + payload + ";}catch(e){}})();",
+                null
+            )
+        }
+
         if (httpsUpgradeEnabled) {
             view.evaluateJavascript(
                 "(function(){try{" +
@@ -306,6 +337,15 @@ class MainActivity : AppCompatActivity() {
                     extractedPageText = cleaned
                 }
             }
+        }
+    }
+
+    /** Runs the user's enabled Userscript inside the page (re-run on change). */
+    fun applyUserScripts(code: String) {
+        runOnUiThread {
+            if (browserWebView.visibility != View.VISIBLE) return@runOnUiThread
+            if (code.isBlank()) return@runOnUiThread
+            browserWebView.evaluateJavascript("try{\n" + code + "\n}catch(__bhUserScriptError){}", null)
         }
     }
 
@@ -421,13 +461,17 @@ class MainActivity : AppCompatActivity() {
         visible: Boolean,
         trackerBlockOn: Boolean,
         antiFingerprintOn: Boolean,
-        httpsUpgradeOn: Boolean
+        httpsUpgradeOn: Boolean,
+        keepMediaAlive: Boolean,
+        customCssActive: Boolean
     ) {
         shieldEngine.adblockEnabled = adblockOn
         shieldEngine.trackerBlockEnabled = trackerBlockOn
         this.trackerBlockEnabled = trackerBlockOn
         this.antiFingerprintEnabled = antiFingerprintOn
         this.httpsUpgradeEnabled = httpsUpgradeOn
+        this.keepMediaAlive = keepMediaAlive
+        this.customCssActive = customCssActive
         this.darkReaderEnabled = darkReaderOn
         this.cookieKillerEnabled = cookieKillerOn
         this.activeCustomCss = customCss

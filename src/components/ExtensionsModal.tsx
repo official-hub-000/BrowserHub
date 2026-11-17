@@ -14,6 +14,7 @@ import type { BrowserExtension } from '../types/browser';
 import { DISCOVER_WORLD_EXTENSIONS } from '../data/presets';
 import { parseGlobalStoreUrl, unpackExtensionFile } from '../utils/extensionUnpacker';
 import { SiteIcon } from './VectorIcons';
+import { isExtensionEnforced } from '../utils/extensionEffects';
 
 interface ExtensionsModalProps {
   extensions: BrowserExtension[];
@@ -217,6 +218,14 @@ export const ExtensionsModal: React.FC<ExtensionsModalProps> = ({
             ))}
 
           {activeTab === 'store' && (
+            <>
+            <div className="rounded-xl border border-slate-800 bg-slate-900/60 px-3 py-2 text-[10px] leading-relaxed text-slate-400">
+              <strong className="text-slate-200">RUNS HERE</strong> extensions change
+              real pages in this build (request filtering, injected CSS/JS, URL
+              cleanup). <strong className="text-slate-200">PREVIEW</strong> entries are
+              store listings: this build cannot execute full Chrome/Firefox extension
+              sandboxes inside Android WebView, and it will not pretend to.
+            </div>
             <div className="space-y-2.5">
               <div className="text-xs text-slate-400">
                 Verified desktop extensions pre-configured for 1-tap installation on Android:
@@ -231,10 +240,19 @@ export const ExtensionsModal: React.FC<ExtensionsModalProps> = ({
                     <div className="flex items-start gap-3">
                       <div className="w-10 h-10 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center"><SiteIcon id={item.icon} size={22} /></div>
                       <div>
-                        <div className="text-xs font-bold text-white flex items-center gap-2">
-                          {item.name}
+                        <div className="text-xs font-bold text-white flex items-center gap-2 flex-wrap">
+                          <span>{item.name}</span>
                           <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-purple-300">
                             {item.format}
+                          </span>
+                          <span
+                            className={`text-[9px] px-1.5 py-0.5 rounded font-bold ${
+                              isExtensionEnforced(item)
+                                ? 'bg-emerald-500/20 text-emerald-300'
+                                : 'bg-amber-500/20 text-amber-300'
+                            }`}
+                          >
+                            {isExtensionEnforced(item) ? 'RUNS HERE' : 'PREVIEW'}
                           </span>
                         </div>
                         <p className="text-[11px] text-slate-400 mt-0.5">{item.description}</p>
@@ -265,6 +283,7 @@ export const ExtensionsModal: React.FC<ExtensionsModalProps> = ({
                 );
               })}
             </div>
+            </>
           )}
 
           {activeTab === 'import' && (

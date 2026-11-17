@@ -68,6 +68,11 @@ class BrowserHubJavascriptBridge(
     fun getActivePageText(): String = activity.extractedPageText
 
     @JavascriptInterface
+    fun setUserScripts(code: String) {
+        activity.applyUserScripts(code)
+    }
+
+    @JavascriptInterface
     fun setPageTranslation(langCode: String, dictionaryJson: String) {
         activity.applyPageTranslation(langCode, dictionaryJson)
     }
@@ -88,13 +93,16 @@ class BrowserHubJavascriptBridge(
         visible: Boolean,
         trackerBlockOn: Boolean,
         antiFingerprintOn: Boolean,
-        httpsUpgradeOn: Boolean
+        httpsUpgradeOn: Boolean,
+        keepMediaAlive: Boolean,
+        customCssActive: Boolean
     ) {
         activity.syncNativeBrowserViewport(
             url, topCssPx, bottomCssPx, winHeightCss,
             isDesktop, adblockOn, darkReaderOn, cookieKillerOn,
             customCss, zoomPct, findQuery, visible,
-            trackerBlockOn, antiFingerprintOn, httpsUpgradeOn
+            trackerBlockOn, antiFingerprintOn, httpsUpgradeOn,
+            keepMediaAlive, customCssActive
         )
     }
 

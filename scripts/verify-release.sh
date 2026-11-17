@@ -64,6 +64,9 @@ if (bad.length) { bad.forEach((b) => console.error("  FAIL " + b)); process.exit
 console.log("  native viewport sync + touch handoff guards OK");
 '
 
+echo "== Extensions: enforced or labelled preview =="
+node scripts/extension-enforcement-check.mjs | tail -1
+
 echo "== Real search URLs, no mock pages =="
 node scripts/search-url-check.mjs | tail -1
 

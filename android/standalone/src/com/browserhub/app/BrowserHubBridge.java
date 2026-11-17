@@ -60,14 +60,22 @@ public class BrowserHubBridge {
             boolean visible,
             boolean trackerBlockOn,
             boolean antiFingerprintOn,
-            boolean httpsUpgradeOn
+            boolean httpsUpgradeOn,
+            boolean keepMediaAlive,
+            boolean customCssActive
     ) {
         activity.syncNativeBrowserViewport(
                 url, topCssPx, bottomCssPx, winHeightCss,
                 isDesktop, adblockOn, darkReaderOn, cookieKillerOn,
                 customCss, zoomPct, findQuery, visible,
-                trackerBlockOn, antiFingerprintOn, httpsUpgradeOn
+                trackerBlockOn, antiFingerprintOn, httpsUpgradeOn,
+                keepMediaAlive, customCssActive
         );
+    }
+
+    @JavascriptInterface
+    public void setUserScripts(String code) {
+        activity.applyUserScripts(code);
     }
 
     @JavascriptInterface

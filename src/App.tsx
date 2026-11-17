@@ -50,6 +50,12 @@ import { TranslateModal } from './components/TranslateModal';
 import { AndroidHybridBridge } from './bridge/androidHybridBridge';
 import { SearchEngineIcon } from './components/VectorIcons';
 import { getPhraseDictionary } from './utils/translator';
+import {
+  collectInjectedAssets,
+  hasCustomCss,
+  hasUserScript,
+  isBackgroundPlayEnabled,
+} from './utils/extensionEffects';
 
 function deriveTitleFromUrl(url: string): string {
   if (url === 'browserhub://start') return 'New Tab';
@@ -372,6 +378,7 @@ export function App() {
     translateLang: activeTab.translatedLang,
   };
   const lastSentTranslateLang = useRef<string | null>(null);
+  const lastSentUserScript = useRef<string>('');
   const nativeSyncRef = useRef(nativeSyncInputs);
   nativeSyncRef.current = nativeSyncInputs;
 
@@ -400,11 +407,22 @@ export function App() {
       inputs.extensions.some((e) => e.enabled && e.effectKey === 'cookie-killer');
     const adblockOn =
       (inputs.shields.enabled && inputs.shields.blockAds) ||
-      inputs.extensions.some((e) => e.enabled && e.effectKey === 'ublock');
-    const customCss = inputs.extensions
-      .filter((e) => e.enabled && e.customCss)
-      .map((e) => e.customCss)
-      .join('\n');
+      inputs.extensions.some(
+        (e) => e.enabled && (e.effectKey === 'ublock' || e.effectKey === 'privacy-badger')
+      );
+    const { css: customCss, js: customJs } = collectInjectedAssets(inputs.extensions);
+
+    // User scripts are sent once per change; the native side injects them into
+    // the real page so "Userscript" actually runs instead of just being stored.
+    if (
+      hasUserScript(inputs.extensions) &&
+      customJs !== lastSentUserScript.current
+    ) {
+      lastSentUserScript.current = customJs;
+      window.BrowserHubNative.setUserScripts?.(customJs);
+    } else if (!hasUserScript(inputs.extensions) && lastSentUserScript.current) {
+      lastSentUserScript.current = '';
+    }
 
     // Offline page translation runs inside the real page. Re-sending the same
     // language is a no-op in the page script's own restore-then-apply logic.
@@ -431,7 +449,9 @@ export function App() {
       shouldShowNativeWeb,
       inputs.shields.enabled && inputs.shields.blockTrackers,
       inputs.shields.enabled && inputs.shields.antiFingerprinting,
-      inputs.shields.enabled && inputs.shields.httpsEverywhere
+      inputs.shields.enabled && inputs.shields.httpsEverywhere,
+      isBackgroundPlayEnabled(inputs.extensions),
+      hasCustomCss(inputs.extensions)
     );
   };
 
@@ -630,10 +650,11 @@ export function App() {
       }
     }
 
-    const cleaned = cleanTrackingUrl(
-      targetUrl,
-      shields.enabled && shields.stripTrackingParams
-    );
+    // Both the shield toggle and the ClearURLs extension strip parameters.
+    const clearUrlsOn =
+      (shields.enabled && shields.stripTrackingParams) ||
+      extensions.some((e) => e.enabled && e.effectKey === 'clear-urls');
+    const cleaned = cleanTrackingUrl(targetUrl, clearUrlsOn);
     targetUrl = cleaned.url;
 
     const newTitle = deriveTitleFromUrl(targetUrl);
