@@ -14,6 +14,9 @@ node scripts/css-compat-check.mjs
 echo "== AI behaviour =="
 npx tsx scripts/ai-guard-test.mts
 
+echo "== AI answers as the user sees them =="
+npx tsx scripts/ai-live-smoke.mts | tail -1
+
 echo "== Surfaces render, every button labelled =="
 npx tsx scripts/render-preview.tsx >/dev/null
 node -e '

@@ -29,13 +29,27 @@ interface AiCopilotDrawerProps {
 /** Renders **bold** and `code` inline without ever showing raw asterisks. */
 function renderInline(line: string): React.ReactNode[] {
   const parts: React.ReactNode[] = [];
+  // Odd number of ** markers means the model produced unbalanced emphasis.
+  // Dropping the stragglers here is what stops literal asterisks reaching the
+  // user, which was reported from device testing.
+  let safeLine = line;
+  if ((safeLine.match(/\*\*/g) || []).length % 2 === 1) {
+    safeLine = safeLine.replace(/\*\*/g, '');
+  }
+  // Single-asterisk emphasis is rendered as plain text, but only when it really
+  // looks like emphasis (no spaces inside, e.g. not "2 * 3 * 4").
+  safeLine = safeLine.replace(/(^|[^*])\*([^\s*][^*\n]*[^\s*])\*(?!\*)/g, '$1$2');
+
+  // Second pass handles leftovers such as "*a* **b** *c*".
+  safeLine = safeLine.replace(/(^|[^*])\*([^\s*][^*\n]*[^\s*])\*(?!\*)/g, '$1$2');
+
   const tokenRegex = /(\*\*[^*]+\*\*|`[^`]+`)/g;
   let lastIndex = 0;
   let match: RegExpExecArray | null;
   let k = 0;
 
-  while ((match = tokenRegex.exec(line)) !== null) {
-    if (match.index > lastIndex) parts.push(line.slice(lastIndex, match.index));
+  while ((match = tokenRegex.exec(safeLine)) !== null) {
+    if (match.index > lastIndex) parts.push(safeLine.slice(lastIndex, match.index));
     const token = match[0];
     if (token.startsWith('**')) {
       parts.push(
@@ -55,7 +69,7 @@ function renderInline(line: string): React.ReactNode[] {
     }
     lastIndex = match.index + token.length;
   }
-  if (lastIndex < line.length) parts.push(line.slice(lastIndex));
+  if (lastIndex < safeLine.length) parts.push(safeLine.slice(lastIndex));
   return parts;
 }
 
