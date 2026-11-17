@@ -37,7 +37,7 @@ export const CustomizeDrawer: React.FC<CustomizeDrawerProps> = ({
   onClose,
 }) => {
   return (
-    <div className="bh-overlay fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex justify-end" onClick={onClose}>
+    <div className="bh-overlay fixed inset-0 z-50 bg-black/75 flex justify-end" onClick={onClose}>
       <div className="bh-drawer-right w-full max-w-md h-full bg-black border-l border-slate-800 flex flex-col shadow-2xl" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-[#08080b]">

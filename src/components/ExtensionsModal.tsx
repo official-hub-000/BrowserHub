@@ -19,6 +19,7 @@ import {
   CATALOGUE_GROUPS,
   SUPPORT_BADGE,
   STORE_FRONTS,
+  RUNS_HERE,
 } from '../data/extensionCatalogue';
 
 import { parseGlobalStoreUrl, unpackExtensionFile } from '../utils/extensionUnpacker';
@@ -140,7 +141,7 @@ export const ExtensionsModal: React.FC<ExtensionsModalProps> = ({
   };
 
   return (
-    <div className="bh-overlay fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-3" onClick={onClose}>
+    <div className="bh-overlay fixed inset-0 z-50 bg-black/75 flex items-center justify-center p-3" onClick={onClose}>
       <div className="bh-dialog w-full max-w-2xl rounded-3xl bg-black border border-slate-800 shadow-2xl flex flex-col max-h-[90vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-gradient-to-r from-[#0b0713] to-black">
@@ -421,6 +422,30 @@ export const ExtensionsModal: React.FC<ExtensionsModalProps> = ({
 
           {activeTab === 'browse' && (
             <div className="space-y-3">
+              {/*
+                The complaint was "I can't add Firefox, edge chrome and others
+                extension". That is a hard platform limit, not a missing button,
+                so the answer has to be the first thing on this screen rather
+                than a footnote at the bottom that gets scrolled past.
+              */}
+              <div className="rounded-xl border border-rose-500/40 bg-[#140a0a] px-3 py-2.5 space-y-1">
+                <div className="text-[11px] font-bold text-rose-200 flex items-center gap-1.5">
+                  <AlertTriangle size={11} className="text-rose-400 shrink-0" />
+                  <span>You cannot install these into any browser app on Android</span>
+                </div>
+                <p className="text-[10px] leading-relaxed text-rose-100/85">
+                  Chrome, Edge and Firefox extensions need an extension engine. Android
+                  WebView — the component every browser app on this phone is built on — does
+                  not have one, and Chrome for Android itself has never supported extensions
+                  either. This is not a missing feature in BrowserHub.
+                  <br />
+                  <strong className="text-white">What you can do:</strong> browse the real
+                  stores below to read listings, or use the <strong className="text-white">Working</strong>{' '}
+                  tab, which has {RUNS_HERE.length} extensions that genuinely run here because
+                  this app implements them itself.
+                </p>
+              </div>
+
               <div className="rounded-xl border border-slate-800 bg-[#060608] px-3 py-2 text-[10px] leading-relaxed text-slate-400">
                 These open the <strong className="text-slate-200">real</strong> extension stores in a
                 tab, so you can search them like on a desktop. You can read listings, reviews and
@@ -443,6 +468,9 @@ export const ExtensionsModal: React.FC<ExtensionsModalProps> = ({
                         <span>{store.name}</span>
                         <span className="text-[9px] px-1.5 py-0.5 rounded bg-[#121216] text-slate-400">
                           {store.count}
+                        </span>
+                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-bold">
+                          BROWSE ONLY
                         </span>
                       </div>
                       <p className="text-[10px] text-slate-400 mt-0.5 leading-relaxed">

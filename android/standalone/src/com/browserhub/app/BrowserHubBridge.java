@@ -85,6 +85,18 @@ public class BrowserHubBridge {
         return activity.openExternalUrl(url);
     }
 
+    /**
+     * Real haptic feedback.
+     *
+     * This is the single biggest reason a WebView-based browser feels like a web
+     * page instead of a native app: every tap is silent and still. `strength`:
+     * 0 = light tick (selection), 1 = keyboard tap (buttons), 2 = confirm.
+     */
+    @JavascriptInterface
+    public void haptic(int strength) {
+        activity.performHaptic(strength);
+    }
+
     /** Reliable clipboard write for Android WebView (execCommand often fails). */
     @JavascriptInterface
     public void copyToClipboard(final String text) {

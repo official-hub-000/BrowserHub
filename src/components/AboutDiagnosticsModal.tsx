@@ -79,7 +79,7 @@ export const AboutDiagnosticsModal: React.FC<AboutDiagnosticsModalProps> = ({ on
 
   return (
     <div
-      className="bh-overlay fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3"
+      className="bh-overlay fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-3"
       onClick={onClose}
     >
       <div

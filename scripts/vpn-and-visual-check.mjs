@@ -77,6 +77,38 @@ if (!/prefers-reduced-motion: reduce[\s\S]{0,400}bh-aurora/.test(css)) {
   problems.push('index.css: the new motion is not disabled under prefers-reduced-motion');
 }
 
+/* ------------------------------ performance ------------------------------- */
+
+/*
+ * The "too laggy" report. Two things cause it on Android WebView and both were
+ * introduced by the round-5 visual work:
+ *   - `filter: blur()` on a large continuously animated element: the GPU
+ *     re-blurs the whole layer every frame.
+ *   - full-screen `backdrop-filter` on every overlay: re-composites the page
+ *     behind each dialog, on open and while it animates.
+ * Neither is acceptable on a phone for decoration.
+ */
+const cssNoComments = css.replace(/\/\*[\s\S]*?\*\//g, '');
+const auroraBlock = cssNoComments.slice(
+  cssNoComments.indexOf('.bh-aurora'),
+  cssNoComments.indexOf('}', cssNoComments.indexOf('.bh-aurora'))
+);
+if (/filter:\s*blur/.test(auroraBlock)) {
+  problems.push('index.css: the animated aurora uses filter: blur() — re-blurred every frame on GPU');
+}
+if (/filter:\s*blur/.test(cssNoComments)) {
+  problems.push('index.css: a blur filter is active in CSS (per-frame GPU cost on Android WebView)');
+}
+
+const compDir = path.join(ROOT, 'src/components');
+for (const name of fs.readdirSync(compDir)) {
+  if (!name.endsWith('.tsx')) continue;
+  const text = fs.readFileSync(path.join(compDir, name), 'utf8');
+  if (/backdrop-blur/.test(text)) {
+    problems.push(`src/components/${name}: full-screen backdrop-blur on an overlay (GPU cost on open)`);
+  }
+}
+
 // The AMOLED rule still wins: no light panel may be introduced for depth.
 if (/bg-white|#ffffff|#f8fafc/i.test(viewport)) {
   problems.push('WebViewport.tsx: a light surface was added — depth must come from light, not a white panel');

@@ -323,8 +323,16 @@ button:not(:disabled):active,
   }
 }
 
-/* A slow, wide wash of light behind the start page. Purely decorative, pointer
-   transparent, and cheap: one composited layer, no layout work per frame. */
+/* A slow wash of light behind the start page.
+ *
+ * PERF NOTE (this caused the reported "too laggy"):
+ * the first version used `filter: blur(38px)` on a large element that was also
+ * continuously animated. On Android WebView that forces the GPU to re-blur the
+ * whole layer every single frame — a permanent frame-rate tax on a decorative
+ * background. A soft radial gradient is already visually blurred, so the filter
+ * was pure waste. Removed, and the animation now runs on a background-only
+ * layer with no filter, no layout work and no per-frame paint.
+ */
 .bh-aurora {
   position: absolute;
   inset: -20% -10% auto -10%;
@@ -332,12 +340,13 @@ button:not(:disabled):active,
   pointer-events: none;
   z-index: 0;
   background:
-    radial-gradient(38% 55% at 22% 18%, rgba(34, 211, 238, 0.24), transparent 70%),
-    radial-gradient(42% 60% at 78% 8%, rgba(139, 92, 246, 0.22), transparent 72%),
-    radial-gradient(30% 45% at 50% 40%, rgba(236, 72, 153, 0.12), transparent 70%);
-  filter: blur(38px);
-  animation: bhAuroraDrift 22s ease-in-out infinite;
-  will-change: transform, opacity;
+    radial-gradient(38% 55% at 22% 18%, rgba(34, 211, 238, 0.22), transparent 70%),
+    radial-gradient(42% 60% at 78% 8%, rgba(139, 92, 246, 0.20), transparent 72%),
+    radial-gradient(30% 45% at 50% 40%, rgba(236, 72, 153, 0.10), transparent 70%);
+  animation: bhAuroraDrift 26s ease-in-out infinite;
+  will-change: transform;
+  transform: translateZ(0);
+  contain: strict;
 }
 
 /* Fine grid that fades out, giving the empty black somewhere to look. */

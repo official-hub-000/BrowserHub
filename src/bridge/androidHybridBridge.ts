@@ -49,6 +49,8 @@ export interface AndroidJniBridge {
    * Returns false when nothing on the device can handle it.
    */
   openExternalUrl?: (url: string) => boolean;
+  /** 0 = light tick, 1 = key tap, 2 = confirm. No-op outside the APK. */
+  haptic?: (strength: number) => void;
 }
 
 declare global {
@@ -79,6 +81,23 @@ export interface BrowserHubCapacitorPlugin {
 const CapacitorNative = registerPlugin<BrowserHubCapacitorPlugin>('BrowserHubNative');
 
 export const AndroidHybridBridge = {
+  /**
+   * Native haptic feedback.
+   *
+   * "This app is like a page, not a real native android app" was the fair
+   * result of an app where every control was silent and still — no tap ever
+   * produced a physical response. This is the cheapest, most convincing native
+   * signal there is, and it respects the device's own haptics setting because
+   * the native side uses performHapticFeedback.
+   */
+  haptic(strength: 0 | 1 | 2 = 1): void {
+    try {
+      window.BrowserHubNative?.haptic?.(strength);
+    } catch {
+      // Haptics are optional; never let one break an interaction.
+    }
+  },
+
   /**
    * Sends a deep link to Android. A WebView cannot render `tel:` or `market:`,
    * and attempting to load one produces a DNS error page, so those have to be

@@ -762,6 +762,38 @@ public class MainActivity extends Activity {
         });
     }
 
+    /**
+     * Maps a UI intent to the platform's own haptic constants. Uses
+     * performHapticFeedback so the device's system haptics setting is respected —
+     * a user who turned vibration off never feels this.
+     */
+    public void performHaptic(final int strength) {
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    int constant;
+                    if (strength <= 0) {
+                        constant = android.view.HapticFeedbackConstants.CLOCK_TICK;
+                    } else if (strength == 1) {
+                        constant = android.view.HapticFeedbackConstants.KEYBOARD_TAP;
+                    } else {
+                        constant = android.view.HapticFeedbackConstants.CONFIRM;
+                    }
+                    findFocusOrRoot().performHapticFeedback(constant);
+                } catch (Throwable ignored) {
+                    // Haptics are a nicety; never let one break a tap.
+                }
+            }
+        });
+    }
+
+    private android.view.View findFocusOrRoot() {
+        android.view.View focused = getCurrentFocus();
+        if (focused != null) return focused;
+        return rootLayout != null ? rootLayout : new android.view.View(this);
+    }
+
     /** True only for URLs a WebView can render: http(s) with a real host. */
     private static boolean isWebLoadableUrl(final String url) {
         if (url == null) return false;
@@ -985,21 +1017,52 @@ public class MainActivity extends Activity {
             return;
         }
         // 2. Otherwise let the React shell decide (modals, tab history, home).
+        //
+        // The shell installs its handler once at mount, but a Back press can
+        // arrive before that finishes on a cold start. Ask once; if the callback
+        // is not ready, ask again shortly instead of exiting under the user.
+        dispatchBackToShell(0);
+    }
+
+    /**
+     * Asks the React shell to handle Back, retrying briefly when the handler is
+     * not installed yet.
+     *
+     * `attempt` 0 runs immediately; later attempts are delayed ~120 ms. Three
+     * tries covers a cold start without ever making Back feel sluggish.
+     */
+    private void dispatchBackToShell(final int attempt) {
+        if (shellWebView == null) {
+            moveTaskToBack(true);
+            return;
+        }
         shellWebView.evaluateJavascript(
-                "(function(){try{return window.__onAndroidBackPressed ? !!window.__onAndroidBackPressed() : false;}catch(e){return false;}})()",
+                "(function(){try{return window.__onAndroidBackPressed ? !!window.__onAndroidBackPressed() : 'nohandler';}catch(e){return 'error';}})()",
                 new ValueCallback<String>() {
                     @Override
                     public void onReceiveValue(String value) {
-                        boolean handled = value != null && value.contains("true");
-                        // If the bridge never answered, still dismiss overlays
-                        // instead of killing the app under the user.
-                        if (!handled) {
-                            if (shellWebView != null && shellWebView.getVisibility() == View.VISIBLE
-                                    && shellWebView.canGoBack()) {
-                                return;
-                            }
-                            moveTaskToBack(true);
+                        String result = value == null ? "" : value.trim();
+                        boolean handled = result.contains("true");
+                        if (handled) return;
+
+                        boolean notReady = result.contains("nohandler") || result.contains("error");
+                        if (notReady && attempt < 3) {
+                            shellWebView.postDelayed(new Runnable() {
+                                @Override
+                                public void run() {
+                                    dispatchBackToShell(attempt + 1);
+                                }
+                            }, 120L);
+                            return;
                         }
+
+                        // The shell genuinely has nothing to go back to.
+                        if (shellWebView.getVisibility() == View.VISIBLE
+                                && shellWebView.canGoBack()) {
+                            shellWebView.goBack();
+                            return;
+                        }
+                        moveTaskToBack(true);
                     }
                 }
         );

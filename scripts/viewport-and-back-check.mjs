@@ -76,6 +76,53 @@ if (backIdx < 0) {
   }
 }
 
+/*
+ * The handler must be registered ONCE, outside any effect whose dependencies
+ * change during normal use. It used to sit in the bridge effect, whose cleanup
+ * set the global to undefined on every navigation and modal toggle — so Back
+ * arriving in that window found nothing. This is the third report of the same
+ * symptom, hence a structural check rather than a behavioural one.
+ */
+// Strip comments: prose describing the old bug is not the old bug.
+const appCode = app
+  .replace(/\/\*[\s\S]*?\*\//g, '')
+  .replace(/^\s*\/\/.*$/gm, '');
+const backAssignments = [...appCode.matchAll(/window\.__onAndroidBackPressed\s*=/g)].length;
+if (backAssignments > 2) {
+  problems.push(
+    `App.tsx: __onAndroidBackPressed is assigned ${backAssignments} times — churn between an unset and a re-set leaves Back dead`
+  );
+}
+// Start from the ref declaration, which sits just above the stable effect.
+const backRegion = appCode.lastIndexOf('const backHandlerRef = useRef', appCode.indexOf('window.__onAndroidBackPressed = () => backHandlerRef.current()'));
+const backEffect = appCode.slice(backRegion >= 0 ? backRegion : 0);
+if (backRegion < 0 || !/const backHandlerRef = useRef/.test(backEffect)) {
+  problems.push('App.tsx: the back handler does not read live state from a ref (it will go stale)');
+}
+const installAt = backEffect.indexOf('window.__onAndroidBackPressed = () => backHandlerRef.current()');
+const depsSlice = backEffect.slice(installAt, installAt + 400);
+const emptyDeps = /\}\s*,\s*\[\]\s*\)/.test(depsSlice);
+if (!emptyDeps) {
+  problems.push(
+    'App.tsx: the back-handler effect has dependencies — its cleanup runs on every navigation and leaves Back dead'
+  );
+}
+// A cleanup that unsets the global on a normal state change is the actual bug.
+if (/return \(\) => \{[^}]*__onAndroidBackPressed = undefined/.test(appCode)) {
+  // Allowed only in the dedicated unmount-only effect.
+  const unmountEffect = backEffect;
+  const firstReturn = unmountEffect.indexOf('return () =>');
+  const guard = unmountEffect.slice(firstReturn, firstReturn + 200);
+  if (/__onAndroidBackPressed = undefined/.test(guard) === false) {
+    problems.push('App.tsx: the back handler is never unregistered on unmount (leak)');
+  }
+}
+
+// Native must retry when the shell handler is not installed yet.
+if (!/dispatchBackToShell/.test(activity)) {
+  problems.push('MainActivity.java: Back does not retry when the shell handler is not ready yet');
+}
+
 if (!/moveTaskToBack|onBackPressed/.test(activity)) {
   problems.push('MainActivity.java: no native back handling');
 }

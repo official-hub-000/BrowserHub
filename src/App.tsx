@@ -582,39 +582,82 @@ export function App() {
       setTranslateNotice({ langCode, blocksChanged });
     };
 
-    window.__onAndroidBackPressed = () => {
-      if (anyModalOpen) {
-        setShowMenuHub(false);
-        setShowEnginePicker(false);
-        setShowTranslateModal(false);
-        setShowShields(false);
-        setShowVpn(false);
-        setShowExtensions(false);
-        setAiDrawerState({ open: false });
-        setShowTabs(false);
-        setShowCustomize(false);
-        setShowAboutModal(false);
-        return true;
-      }
-      if (activeTab.historyIndex > 0) {
-        handleGoBack();
-        return true;
-      }
-      if (activeTab.url !== 'browserhub://start') {
-        navigateTab(activeTab.id, 'browserhub://start');
-        return true;
-      }
-      return false;
-    };
-
     return () => {
       window.__onNativeUrlChanged = undefined;
       window.__onNativeAdBlocked = undefined;
-      window.__onAndroidBackPressed = undefined;
       window.__onNativeFindResult = undefined;
       window.__onNativeTranslateResult = undefined;
     };
   }, [activeTabId, activeTab.historyIndex, activeTab.url, anyModalOpen]);
+
+  /*
+   * Hardware / gesture Back — registered exactly once.
+   *
+   * BUG THIS FIXES ("the back button is not working", reported three rounds in a
+   * row): the handler used to live inside the bridge effect above, whose
+   * dependency list includes the active tab URL, history index and modal state.
+   * Every navigation and every modal open therefore ran its cleanup — which set
+   * `window.__onAndroidBackPressed = undefined` — and only then reinstalled it.
+   * A Back press arriving during that gap found no handler at all and fell
+   * through to the platform, which either did nothing or left the app.
+   *
+   * The handler is now installed once and reads current state from a ref, so it
+   * is never torn down. Logic itself lives in backHandlerRef so it always sees
+   * the latest values without re-registering.
+   */
+  /**
+   * Every dock and toolbar control gets a physical tick. Delegated from one
+   * listener rather than sprinkled through dozens of onClick handlers, so a new
+   * button inherits it automatically and cannot forget.
+   */
+  useEffect(() => {
+    if (!AndroidHybridBridge.hasJniBridge()) return undefined;
+    const onPointerUp = (event: PointerEvent) => {
+      const target = event.target as HTMLElement | null;
+      const control = target?.closest?.('button, [role="button"], nav a');
+      if (!control) return;
+      if ((control as HTMLButtonElement).disabled) return;
+      AndroidHybridBridge.haptic(1);
+    };
+    document.addEventListener('pointerup', onPointerUp, { passive: true });
+    return () => document.removeEventListener('pointerup', onPointerUp);
+  }, []);
+
+  const backHandlerRef = useRef<() => boolean>(() => false);
+  backHandlerRef.current = () => {
+    if (anyModalOpen) {
+      setShowMenuHub(false);
+      setShowEnginePicker(false);
+      setShowTranslateModal(false);
+      setShowShields(false);
+      setShowVpn(false);
+      setShowExtensions(false);
+      setAiDrawerState({ open: false });
+      setShowTabs(false);
+      setShowCustomize(false);
+      setShowAboutModal(false);
+      setShowDevTools(false);
+      setNavNotice(null);
+      return true;
+    }
+    if (activeTab.historyIndex > 0) {
+      handleGoBack();
+      return true;
+    }
+    if (activeTab.url !== 'browserhub://start') {
+      navigateTab(activeTab.id, 'browserhub://start');
+      return true;
+    }
+    return false;
+  };
+
+  useEffect(() => {
+    window.__onAndroidBackPressed = () => backHandlerRef.current();
+    return () => {
+      // Only removed on unmount, never on a state change.
+      window.__onAndroidBackPressed = undefined;
+    };
+  }, []);
 
   // Instant Omnibox Math Calculator — same parser the AI uses, so `×`, `÷`,
   // `%` and parentheses behave identically in both places.

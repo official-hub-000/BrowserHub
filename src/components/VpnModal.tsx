@@ -109,7 +109,7 @@ export const VpnModal: React.FC<VpnModalProps> = ({ vpn, onUpdateVpn, onClose })
   };
 
   return (
-    <div className="bh-overlay fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-3" onClick={onClose}>
+    <div className="bh-overlay fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-3" onClick={onClose}>
       <div className="bh-dialog w-full max-w-md rounded-3xl bg-black border border-slate-800 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-gradient-to-r from-black to-cyan-950/40">

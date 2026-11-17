@@ -76,7 +76,7 @@ export const ShieldsPanel: React.FC<ShieldsPanelProps> = ({
   ];
 
   return (
-    <div className="bh-overlay fixed inset-0 z-50 bg-black/65 backdrop-blur-sm flex items-center justify-center p-3" onClick={onClose}>
+    <div className="bh-overlay fixed inset-0 z-50 bg-black/65 flex items-center justify-center p-3" onClick={onClose}>
       <div className="bh-dialog w-full max-w-md rounded-3xl bg-black border border-slate-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className="p-4 bg-gradient-to-r from-emerald-950/70 to-black border-b border-slate-800 flex items-center justify-between">

@@ -107,7 +107,16 @@ await runSmartHybridAi({
   title: 'City Council News',
   content: PAGE,
 } as any);
-assert.ok(lastPrompt.includes('OPEN WEBPAGE'), 'a page question MUST still carry the page text');
+// A page question must carry the page text AND mark it as the subject. The old
+// "background only" label made models refuse with "I don't have the text".
+assert.ok(
+  lastPrompt.includes('Visible text:'),
+  'a page question MUST still carry the page text'
+);
+assert.ok(
+  !lastPrompt.includes('OPEN WEBPAGE (background only)'),
+  'a page the user asked about must not be labelled background-only'
+);
 
 // An explicit page reference is also enough.
 lastPrompt = '';
@@ -118,7 +127,14 @@ await runSmartHybridAi({
   title: 'City Council News',
   content: PAGE,
 } as any);
-assert.ok(lastPrompt.includes('OPEN WEBPAGE'), 'a question about "this article" must carry the page');
+assert.ok(
+  lastPrompt.includes('Visible text:'),
+  'a question about "this article" must carry the page'
+);
+assert.ok(
+  lastPrompt.includes('THE WEBPAGE THE USER IS ASKED ABOUT'),
+  'an explicit page reference must mark the page text as the subject'
+);
 
 /* ---------------------- no dynamic-code evaluation ------------------------ */
 // The old evaluator used Function(); it is both a security smell and the exact

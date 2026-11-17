@@ -250,7 +250,25 @@ export function runLocalAiClient(input: LocalAiInput): LocalAiOutput {
   let bullets: string[] = [];
 
   const nonFactual = query ? handleNonFactualQuery(query, ctx) : null;
-  if (nonFactual) {
+  /*
+   * BUG THIS FIXES (screenshot, "On-device engine · 5.5ms"): a request to
+   * summarize a page fell through to the generic "three things that work"
+   * apology even though page text was available and the user asked for a
+   * summary. handleNonFactualQuery() pattern-matches greetings and capability
+   * questions, and the summary request was slipping past the summary branch.
+   * Anyone asking to summarize a page with text present must get a summary.
+   */
+  const wantsSummary =
+    mode === 'summarize' ||
+    /\b(summarize|summarise|summary|tl;?dr)\b/i.test(query || '');
+  if (hasPageText && wantsSummary && !nonFactual) {
+    const top = rankSentences(sentences);
+    responseText = `### Summary: ${pageTitle}\n\n${top
+      .slice(0, 5)
+      .map((s) => `- ${s}`)
+      .join('\n')}`;
+    bullets = [`Read ${sentences.length} clean sentences — navigation and ads removed`];
+  } else if (nonFactual) {
     responseText = nonFactual.text;
     bullets = nonFactual.bullets;
   } else if (mode === 'summarize') {
@@ -641,6 +659,19 @@ export function isOfflineDevice(): boolean {
   return networkUnreachable;
 }
 
+/**
+ * Clears the offline assumption after any successful response.
+ *
+ * BUG THIS FIXES (screenshot: "This device could not reach the internet…"
+ * followed immediately by "Turn on mobile data or Wi-Fi and ask again"):
+ * the flag was set by the first failed fetch and never unset, so one transient
+ * failure made every later answer claim the phone was offline — even while it
+ * was actively answering from a live provider.
+ */
+function noteNetworkSuccess() {
+  networkUnreachable = false;
+}
+
 function noteNetworkFailure(err: unknown) {
   const name = (err as Error)?.name || '';
   // AbortError is our own timeout: the network may be fine, just slow.
@@ -776,19 +807,35 @@ export async function runSmartHybridAi(input: LocalAiInput): Promise<LocalAiOutp
     /\b(summarize|summarise|tl;?dr|explain (this|it)|what does (this|it) say|read (this|it))/i.test(query);
 
   const attachPage = hasPageText && asksAboutPage;
+  /*
+   * BUG THIS FIXES (screenshot: "Summarize this page" answered with
+   * "I don't actually have the text of the page in front of me"):
+   *
+   * The page text WAS attached, but the block was labelled
+   * "OPEN WEBPAGE (background only)" while the system prompt said page text
+   * "is NEVER the subject of the question". A model reading that contradictory
+   * framing concluded it had no text and refused.
+   *
+   * When the user explicitly asked about the page, the block is the SUBJECT and
+   * must be labelled as such. Only for ordinary chat questions is it background.
+   */
+  const pageIsSubject = asksAboutPage;
   const pageBlock = attachPage
-    ? `\n\n--- OPEN WEBPAGE (background only) ---\nTitle: ${pageTitle}\nURL: ${input.url}\nContext: ${ctx.contextNote}\nVisible text:\n"""${ctx.text.slice(0, 3000)}"""\n--- END WEBPAGE ---`
+    ? `\n\n=== ${pageIsSubject ? 'THE WEBPAGE THE USER IS ASKED ABOUT' : 'OPEN WEBPAGE (background only)'} ===\n` +
+      `Title: ${pageTitle}\nURL: ${input.url}\nContext: ${ctx.contextNote}\n` +
+      `${pageIsSubject ? 'This text IS the material to answer from. Use it directly.' : 'Background only; unrelated to the question unless the user refers to it.'}\n` +
+      `Visible text:\n"""${ctx.text.slice(0, 3000)}"""\n=== END WEBPAGE ===`
     : '';
 
   let userPrompt: string;
   if (mode === 'summarize') {
     if (!hasPageText) return runLocalAiClient(input);
     if (!attachPage) return runLocalAiClient(input);
-    userPrompt = `Summarize this webpage into 4-5 crisp bullet points. Only use the text inside the webpage block.${pageBlock}`;
+    userPrompt = `Summarize the webpage below into 4-5 crisp bullet points. Use ONLY its text. Do not say you lack the text — it is included.${pageBlock}`;
   } else if (mode === 'eli5') {
     if (!hasPageText) return runLocalAiClient(input);
     if (!attachPage) return runLocalAiClient(input);
-    userPrompt = `Explain this webpage to a curious beginner in plain language, 3-4 short paragraphs.${pageBlock}`;
+    userPrompt = `Explain the webpage below to a curious beginner in plain language, 3-4 short paragraphs. Its text is included; do not ask for it.${pageBlock}`;
   } else if (mode === 'browse_for_me') {
     userPrompt = `${query || pageTitle}${pageBlock}`;
   } else {
@@ -842,6 +889,7 @@ export async function runSmartHybridAi(input: LocalAiInput): Promise<LocalAiOutp
   );
   if (nativeReply) {
     markModelAnswered();
+    noteNetworkSuccess();
     return persist(liveReply(nativeReply));
   }
 
@@ -858,6 +906,7 @@ export async function runSmartHybridAi(input: LocalAiInput): Promise<LocalAiOutp
   );
   if (multiReply) {
     markModelAnswered();
+    noteNetworkSuccess();
     return persist({
       ...liveReply(multiReply),
       engineLabel: 'Live AI (no key needed)',
@@ -890,6 +939,7 @@ export async function runSmartHybridAi(input: LocalAiInput): Promise<LocalAiOutp
   }, 4000);
   if (proxyReply) {
     markModelAnswered();
+    noteNetworkSuccess();
     return persist(liveReply(proxyReply));
   }
 
@@ -897,6 +947,7 @@ export async function runSmartHybridAi(input: LocalAiInput): Promise<LocalAiOutp
   const savedFallback = cached && !cachedIsModelAnswer ? cached : null;
 
   if (fact) {
+    noteNetworkSuccess();
     const out: LocalAiOutput = {
       ok: true,
       model: 'BrowserHub-Wikipedia',
