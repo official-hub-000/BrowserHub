@@ -67,6 +67,11 @@ public class BrowserHubBridge {
     }
 
     @JavascriptInterface
+    public void setPageTranslation(String langCode, String dictionaryJson) {
+        activity.applyPageTranslation(langCode, dictionaryJson);
+    }
+
+    @JavascriptInterface
     public void setWebViewportVisible(boolean visible) {
         activity.setBrowserVisibleOnly(visible);
     }

@@ -31,6 +31,8 @@ export interface AndroidJniBridge {
   nativeReload?: () => void;
   /** Starts a zero-key AI request on a native worker thread (no CORS, no UI freeze). */
   startAiRequest?: (requestId: string, prompt: string, systemPrompt: string) => void;
+  /** Applies (or clears) offline phrase translation inside the real page. */
+  setPageTranslation?: (langCode: string, dictionaryJson: string) => void;
   /** Returns the JSON result envelope once ready, or null while pending. */
   pollAiResult?: (requestId: string) => string | null;
 }
@@ -43,6 +45,8 @@ declare global {
     __onAndroidBackPressed?: () => boolean;
     /** Real match counts coming back from the native Find-in-page engine. */
     __onNativeFindResult?: (activeOrdinal: number, totalMatches: number) => void;
+    /** How many text blocks the offline translator actually rewrote. */
+    __onNativeTranslateResult?: (langCode: string, blocksChanged: number) => void;
   }
 }
 

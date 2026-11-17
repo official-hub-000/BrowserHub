@@ -49,6 +49,7 @@ import { MenuHubModal } from './components/MenuHubModal';
 import { TranslateModal } from './components/TranslateModal';
 import { AndroidHybridBridge } from './bridge/androidHybridBridge';
 import { SearchEngineIcon } from './components/VectorIcons';
+import { getPhraseDictionary } from './utils/translator';
 
 function deriveTitleFromUrl(url: string): string {
   if (url === 'browserhub://start') return 'New Tab';
@@ -201,6 +202,10 @@ export function App() {
   const [findQuery, setFindQuery] = useState('');
   const [showFindBar, setShowFindBar] = useState(false);
   const [findResult, setFindResult] = useState<{ active: number; total: number } | null>(null);
+  const [translateNotice, setTranslateNotice] = useState<{
+    langCode: string;
+    blocksChanged: number;
+  } | null>(null);
 
   const [showMenuHub, setShowMenuHub] = useState(false);
   const [showEnginePicker, setShowEnginePicker] = useState(false);
@@ -277,6 +282,10 @@ export function App() {
   // covers the app's own chrome and swallows every tap ("covered by div...",
   // touchstart never fires, pointerdown on native page). So we re-sync after
   // EVERY render plus on resize/orientation, not just on a hand-picked dep list.
+  useEffect(() => {
+    if (!activeTab.translatedLang) setTranslateNotice(null);
+  }, [activeTab.translatedLang]);
+
   const nativeSyncInputs = {
     url: activeTab.url,
     isDesktop: activeTab.isDesktopMode,
@@ -295,7 +304,9 @@ export function App() {
     // always underneath the native WebView, so the native view must yield.
     pipOpen: pipTitle !== null,
     fireSweep: fireSweepAnim,
+    translateLang: activeTab.translatedLang,
   };
+  const lastSentTranslateLang = useRef<string | null>(null);
   const nativeSyncRef = useRef(nativeSyncInputs);
   nativeSyncRef.current = nativeSyncInputs;
 
@@ -329,6 +340,16 @@ export function App() {
       .filter((e) => e.enabled && e.customCss)
       .map((e) => e.customCss)
       .join('\n');
+
+    // Offline page translation runs inside the real page. Re-sending the same
+    // language is a no-op in the page script's own restore-then-apply logic.
+    if (inputs.translateLang !== lastSentTranslateLang.current) {
+      lastSentTranslateLang.current = inputs.translateLang;
+      window.BrowserHubNative.setPageTranslation?.(
+        inputs.translateLang || '',
+        inputs.translateLang ? JSON.stringify(getPhraseDictionary(inputs.translateLang)) : '{}'
+      );
+    }
 
     window.BrowserHubNative.syncWebViewport?.(
       inputs.url,
@@ -438,6 +459,10 @@ export function App() {
       setFindResult({ active: activeOrdinal, total: totalMatches });
     };
 
+    window.__onNativeTranslateResult = (langCode: string, blocksChanged: number) => {
+      setTranslateNotice({ langCode, blocksChanged });
+    };
+
     window.__onAndroidBackPressed = () => {
       if (anyModalOpen) {
         setShowMenuHub(false);
@@ -468,6 +493,7 @@ export function App() {
       window.__onNativeAdBlocked = undefined;
       window.__onAndroidBackPressed = undefined;
       window.__onNativeFindResult = undefined;
+      window.__onNativeTranslateResult = undefined;
     };
   }, [activeTabId, activeTab.historyIndex, activeTab.url, anyModalOpen]);
 
@@ -496,6 +522,11 @@ export function App() {
   const navigateTab = (targetTabId: string, rawInput: string) => {
     const trimmed = rawInput.trim();
     if (!trimmed) return;
+    // A new page starts untranslated: the native layer restores the previous
+    // DOM on its own, and the tab-level flag must not claim otherwise.
+    updateTab(targetTabId, (t) =>
+      t.translatedLang ? { ...t, translatedLang: null, bilingualTranslate: false } : t
+    );
 
     let targetUrl = trimmed;
     const isProtocol =
@@ -1086,6 +1117,29 @@ export function App() {
       {/* Top Address Bar Placement */}
       {customization.addressBarPosition === 'top' && SearchAddressBar}
       {PageToolStrip}
+
+      {/* Real feedback from the native offline translator */}
+      {translateNotice && activeTab.translatedLang && (
+        <div className="px-2.5 py-1 bg-indigo-950/80 border-b border-indigo-500/40 text-[10px] text-indigo-200 flex items-center justify-between shrink-0">
+          <span className="inline-flex items-center gap-1.5">
+            <Languages size={11} className="shrink-0" />
+            <span>
+              {translateNotice.blocksChanged > 0
+                ? `Translated ${translateNotice.blocksChanged} text block${
+                    translateNotice.blocksChanged === 1 ? '' : 's'
+                  } in this page (offline lexicon).`
+                : 'No known phrases on this page matched the offline lexicon — nothing was changed.'}
+            </span>
+          </span>
+          <button
+            type="button"
+            onClick={() => updateTab(activeTab.id, (t) => ({ ...t, translatedLang: null }))}
+            className="px-1.5 py-0.5 rounded-md bg-indigo-500/25 font-bold cursor-pointer shrink-0 ml-2"
+          >
+            Undo
+          </button>
+        </div>
+      )}
 
       {/* Optional Find-in-Page Bar */}
       {showFindBar && (

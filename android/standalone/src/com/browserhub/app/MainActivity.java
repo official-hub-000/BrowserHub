@@ -334,6 +334,77 @@ public class MainActivity extends Activity {
         return extractedPageText;
     }
 
+    /**
+     * Applies offline phrase translation to the real page DOM. The shell sends
+     * the lexicon it already ships, so this stays zero-key and zero-network.
+     * Passing an empty language restores the pristine page.
+     *
+     * The injected script deliberately uses no backslash escapes (no RegExp
+     * literals) so it survives Java string escaping unchanged.
+     */
+    public void applyPageTranslation(final String langCode, final String dictionaryJson) {
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                if (browserWebView == null || browserWebView.getVisibility() != View.VISIBLE) return;
+                if (langCode == null || langCode.isEmpty()) {
+                    browserWebView.evaluateJavascript(
+                            "(function(){if(window.__bhTranslateOff){window.__bhTranslateOff();}})();",
+                            null
+                    );
+                    return;
+                }
+                String safeDict = dictionaryJson != null && !dictionaryJson.isEmpty()
+                        ? dictionaryJson
+                        : "{}";
+                String safeLang = langCode.replace("'", "");
+                String js = "(function(){try{"
+                        + "var dict=" + safeDict + ";"
+                        + "if(window.__bhTranslateOff){window.__bhTranslateOff();}"
+                        + "var keys=[];for(var kk in dict){if(Object.prototype.hasOwnProperty.call(dict,kk)&&dict[kk]){keys.push(kk);}}"
+                        + "keys.sort(function(a,b){return b.length-a.length;});"
+                        + "var isWordChar=function(ch){return ch.length>0&&'abcdefghijklmnopqrstuvwxyz0123456789'.indexOf(ch)>=0;};"
+                        + "var convert=function(text){"
+                        + "  var lower=text.toLowerCase();var out='';var i=0;"
+                        + "  while(i<text.length){"
+                        + "    var hit=null;"
+                        + "    for(var k=0;k<keys.length;k++){"
+                        + "      var key=keys[k];"
+                        + "      if(lower.indexOf(key,i)===i){"
+                        + "        var before=i===0?' ':lower.charAt(i-1);"
+                        + "        var after=i+key.length>=lower.length?' ':lower.charAt(i+key.length);"
+                        + "        if(!isWordChar(before)&&!isWordChar(after)){hit=key;break;}"
+                        + "      }"
+                        + "    }"
+                        + "    if(hit){out+=dict[hit];i+=hit.length;}else{out+=text.charAt(i);i++;}"
+                        + "  }"
+                        + "  return out;"
+                        + "};"
+                        + "var changed=0;"
+                        + "var walker=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT,null,false);"
+                        + "var nodes=[];var n;"
+                        + "while((n=walker.nextNode())){"
+                        + "  var p=n.parentNode;if(!p)continue;"
+                        + "  var tag=p.nodeName;"
+                        + "  if(tag==='SCRIPT'||tag==='STYLE'||tag==='NOSCRIPT'||tag==='TEXTAREA'||tag==='CODE'||tag==='PRE'){continue;}"
+                        + "  var t=n.nodeValue;if(!t||!t.trim()||t.length>800){continue;}"
+                        + "  nodes.push(n);"
+                        + "}"
+                        + "for(var i2=0;i2<nodes.length;i2++){"
+                        + "  var node=nodes[i2];var original=node.nodeValue;var next=convert(original);"
+                        + "  if(next!==original){node.__bhOrig=original;node.nodeValue=next;changed++;}"
+                        + "}"
+                        + "window.__bhTranslateOff=function(){"
+                        + "  var w=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT,null,false);"
+                        + "  var m;while((m=w.nextNode())){if(m.__bhOrig!==undefined){m.nodeValue=m.__bhOrig;m.__bhOrig=undefined;}}"
+                        + "};"
+                        + "if(window.__onNativeTranslateResult){window.__onNativeTranslateResult('" + safeLang + "',changed);}"
+                        + "}catch(err){}})();";
+                browserWebView.evaluateJavascript(js, null);
+            }
+        });
+    }
+
     private void notifyShellFindResult(final int activeOrdinal, final int totalMatches) {
         runOnUiThread(new Runnable() {
             @Override

@@ -262,6 +262,15 @@ const LANG_PREFIX_LABEL: Record<string, string> = {
 };
 
 /**
+ * Returns the offline phrase dictionary for a language so the same lexicon can
+ * be applied inside the real page (native WebView), not just in React views.
+ */
+export function getPhraseDictionary(langCode: string | null): Record<string, string> {
+  if (!langCode) return {};
+  return PHRASE_LEXICON[langCode] || {};
+}
+
+/**
  * Performs zero-API-key, zero-telemetry local neural lexical translation on text blocks.
  */
 export function translateTextLocal(text: string, langCode: string | null): string {

@@ -55,6 +55,9 @@ if (bad.length) { bad.forEach((b) => console.error("  FAIL " + b)); process.exit
 console.log("  native viewport sync + touch handoff guards OK");
 '
 
+echo "== Offline page translator injection =="
+node scripts/translate-injection-test.mjs | tail -1
+
 echo "== Vector icons (no emoji in UI) =="
 node -e '
 const fs = require("fs");
