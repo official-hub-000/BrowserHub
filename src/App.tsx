@@ -607,10 +607,18 @@ export function App() {
     );
 
     let targetUrl = trimmed;
+
+    // "gh-search:react hooks" is a typing accelerator, not a page of its own:
+    // resolve it to a real github.com search URL so nothing mock is ever shown.
+    if (/^gh-search:/i.test(targetUrl)) {
+      const q = targetUrl.replace(/^gh-search:/i, '').trim();
+      targetUrl = q
+        ? `https://github.com/search?q=${encodeURIComponent(q)}&type=repositories`
+        : 'https://github.com/explore';
+    }
+
     const isProtocol =
-      /^https?:\/\//i.test(targetUrl) ||
-      targetUrl.startsWith('browserhub://') ||
-      targetUrl.startsWith('gh-search:');
+      /^https?:\/\//i.test(targetUrl) || targetUrl.startsWith('browserhub://');
     const looksLikeDomain =
       !targetUrl.includes(' ') && /\.[a-z]{2,}(\/|$)/i.test(targetUrl);
 

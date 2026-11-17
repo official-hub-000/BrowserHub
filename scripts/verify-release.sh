@@ -61,6 +61,9 @@ if (bad.length) { bad.forEach((b) => console.error("  FAIL " + b)); process.exit
 console.log("  native viewport sync + touch handoff guards OK");
 '
 
+echo "== Real search URLs, no mock pages =="
+node scripts/search-url-check.mjs | tail -1
+
 echo "== Every shield toggle is enforced =="
 node scripts/shield-enforcement-check.mjs | tail -1
 
