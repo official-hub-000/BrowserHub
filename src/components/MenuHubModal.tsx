@@ -221,7 +221,7 @@ export const MenuHubModal: React.FC<MenuHubModalProps> = ({
               2. Page &amp; Reading Tools
             </div>
 
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 gap-2 items-stretch">
               <button
                 onClick={() => runAndClose(onToggleDesktop)}
                 className={`p-3 rounded-xl border text-left flex items-center justify-between cursor-pointer ${
@@ -230,7 +230,7 @@ export const MenuHubModal: React.FC<MenuHubModalProps> = ({
                     : 'bg-slate-900 hover:bg-slate-800 border-slate-800 text-slate-200'
                 }`}
               >
-                <span className="flex items-center gap-2.5 text-xs font-semibold">
+                <span className="flex items-center gap-2 min-w-0 text-[11px] font-semibold">
                   <Monitor size={16} className="text-cyan-400" />
                   <span>Desktop Site</span>
                 </span>
@@ -251,7 +251,7 @@ export const MenuHubModal: React.FC<MenuHubModalProps> = ({
                     : 'bg-slate-900 hover:bg-slate-800 border-slate-800 text-slate-200'
                 }`}
               >
-                <span className="flex items-center gap-2.5 text-xs font-semibold">
+                <span className="flex items-center gap-2 min-w-0 text-[11px] font-semibold">
                   <BookOpen size={16} className="text-emerald-400" />
                   <span>Reader Mode</span>
                 </span>
@@ -268,7 +268,7 @@ export const MenuHubModal: React.FC<MenuHubModalProps> = ({
                 onClick={() => runAndClose(onOpenTranslate)}
                 className="p-3 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-left flex items-center justify-between cursor-pointer"
               >
-                <span className="flex items-center gap-2.5 text-xs font-semibold text-slate-200">
+                <span className="flex items-center gap-2 min-w-0 text-[11px] font-semibold text-slate-200">
                   <Languages size={16} className="text-indigo-400" />
                   <span>Translate Page</span>
                 </span>
@@ -303,7 +303,7 @@ export const MenuHubModal: React.FC<MenuHubModalProps> = ({
                     : 'bg-slate-900 hover:bg-slate-800 border-slate-800 text-slate-200'
                 }`}
               >
-                <span className="flex items-center gap-2.5 text-xs font-semibold">
+                <span className="flex items-center gap-2 min-w-0 text-[11px] font-semibold">
                   <Columns2 size={16} className="text-purple-400" />
                   <span>Split Screen</span>
                 </span>
@@ -322,6 +322,8 @@ export const MenuHubModal: React.FC<MenuHubModalProps> = ({
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => onChangeZoom(Math.max(75, tab.zoomLevel - 10))}
+                  aria-label="Decrease page text zoom"
+                  title="Decrease text size"
                   className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-white cursor-pointer"
                 >
                   <ZoomOut size={15} />
@@ -331,6 +333,8 @@ export const MenuHubModal: React.FC<MenuHubModalProps> = ({
                 </span>
                 <button
                   onClick={() => onChangeZoom(Math.min(150, tab.zoomLevel + 10))}
+                  aria-label="Increase page text zoom"
+                  title="Increase text size"
                   className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-white cursor-pointer"
                 >
                   <ZoomIn size={15} />
@@ -353,12 +357,12 @@ export const MenuHubModal: React.FC<MenuHubModalProps> = ({
               3. Privacy, AdBlock &amp; Security
             </div>
 
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 gap-2 items-stretch">
               <button
                 onClick={() => runAndClose(onOpenShields)}
                 className="p-3 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-left flex items-center justify-between cursor-pointer"
               >
-                <span className="flex items-center gap-2.5 text-xs font-semibold text-white">
+                <span className="flex items-center gap-2 min-w-0 text-[11px] font-semibold text-white">
                   <ShieldCheck size={16} className="text-emerald-400" />
                   <span>AdBlock Shields</span>
                 </span>
@@ -375,7 +379,7 @@ export const MenuHubModal: React.FC<MenuHubModalProps> = ({
                 onClick={() => runAndClose(onOpenVpn)}
                 className="p-3 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-left flex items-center justify-between cursor-pointer"
               >
-                <span className="flex items-center gap-2.5 text-xs font-semibold text-white">
+                <span className="flex items-center gap-2 min-w-0 text-[11px] font-semibold text-white">
                   <Lock size={16} className="text-cyan-400" />
                   <span>Built-in VPN</span>
                 </span>
@@ -396,7 +400,7 @@ export const MenuHubModal: React.FC<MenuHubModalProps> = ({
                     : 'bg-slate-900 hover:bg-slate-800 border-slate-800 text-slate-200'
                 }`}
               >
-                <span className="flex items-center gap-2.5 text-xs font-semibold">
+                <span className="flex items-center gap-2 min-w-0 text-[11px] font-semibold">
                   <Crosshair size={16} className="text-rose-400" />
                   <span>Element Zapper</span>
                 </span>
@@ -421,12 +425,12 @@ export const MenuHubModal: React.FC<MenuHubModalProps> = ({
               4. Extensions &amp; Advanced Tools
             </div>
 
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 gap-2 items-stretch">
               <button
                 onClick={() => runAndClose(onOpenExtensions)}
                 className="p-3 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-left flex items-center justify-between cursor-pointer"
               >
-                <span className="flex items-center gap-2.5 text-xs font-semibold text-white">
+                <span className="flex items-center gap-2 min-w-0 text-[11px] font-semibold text-white">
                   <Puzzle size={16} className="text-purple-400" />
                   <span>Extensions Hub</span>
                 </span>
@@ -439,7 +443,7 @@ export const MenuHubModal: React.FC<MenuHubModalProps> = ({
                 onClick={() => runAndClose(onToggleDevTools)}
                 className="p-3 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-left flex items-center justify-between cursor-pointer"
               >
-                <span className="flex items-center gap-2.5 text-xs font-semibold text-slate-200">
+                <span className="flex items-center gap-2 min-w-0 text-[11px] font-semibold text-slate-200">
                   <Terminal size={16} className="text-sky-400" />
                   <span>Web DevTools</span>
                 </span>
@@ -472,12 +476,12 @@ export const MenuHubModal: React.FC<MenuHubModalProps> = ({
               5. Appearance &amp; Layout
             </div>
 
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 gap-2 items-stretch">
               <button
                 onClick={onToggleToolbarPosition}
                 className="p-3 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-left flex items-center justify-between cursor-pointer"
               >
-                <span className="flex items-center gap-2.5 text-xs font-semibold text-slate-200">
+                <span className="flex items-center gap-2 min-w-0 text-[11px] font-semibold text-slate-200">
                   {customization.addressBarPosition === 'bottom' ? (
                     <PanelBottom size={16} className="text-cyan-400" />
                   ) : (
