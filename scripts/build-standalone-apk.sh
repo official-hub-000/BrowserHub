@@ -35,6 +35,7 @@ echo "⚡ 1/6 Building web bundle..."
 cd "$ROOT"
 npm run build
 node scripts/css-compat-check.mjs
+npx tsx scripts/ai-guard-test.mts
 
 echo "📦 2/6 Copying web assets into the standalone Android asset tree..."
 ASSETS="$WORK/assets/public"
