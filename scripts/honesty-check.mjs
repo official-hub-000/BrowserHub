@@ -12,6 +12,8 @@ const walk = (dir) => {
   }
 };
 walk('src');
+// The README is user-facing documentation and must stay honest too.
+const readme = fs.readFileSync('README.md', 'utf8');
 
 // claim -> why it is not true in this build
 const FORBIDDEN = [
@@ -29,6 +31,9 @@ for (const file of files) {
   for (const rule of FORBIDDEN) {
     if (rule.re.test(src)) hits.push(`${file}: ${rule.re} — ${rule.why}`);
   }
+}
+for (const rule of FORBIDDEN) {
+  if (rule.re.test(readme)) hits.push(`README.md: ${rule.re} — ${rule.why}`);
 }
 if (hits.length) {
   hits.forEach((h) => console.error(`  FAIL ${h}`));

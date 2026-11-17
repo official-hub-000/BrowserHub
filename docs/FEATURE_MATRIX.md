@@ -13,7 +13,7 @@ BrowserHub synthesizes the signature superpowers of every leading open-source an
 | **"Browse for Me" Instant Multi-Source Synthesis** | Arc Search | ✅ Built into Omnibox |
 | **Ask Page Grounded RAG Copilot + CodeGen** | Edge / Leo AI | ✅ Local Zero-Cloud RAG |
 | **1-Tap Local Page Translate (incl. বাংলা, ES, HI, JA, AR)** | Firefox Bergamot / Chrome | ✅ In-DOM Instant Translate |
-| **Built-in Free No-Log VPN + WireGuard + Tor Onion** | Opera VPN + Tor Browser | ✅ 10 Global Nodes + Tor |
+| **On-device privacy shield + DoH** | Opera VPN + Tor Browser | ✅ Local filtering; remote exit nodes planned (labelled in-app) |
 | **Encrypted DNS (Quad9, Mullvad, AdGuard, NextDNS)** | Mullvad / RethinkDNS | ✅ Built-in DoH Selector |
 | **Multi-Account Isolated Storage Containers** | Firefox Containers | ✅ Personal/Work/Bank/Vault |
 | **1-Tap Fire / Burn Data & Session Incinerator** | DuckDuckGo Browser | ✅ Animated Data Shredder |

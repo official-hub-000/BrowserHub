@@ -16,10 +16,10 @@ Most mobile browsers force a painful trade-off:
 └───────────────────────────────┬─────────────────────────────────────────┘
                                 │ Bidirectional Bridge (window.BrowserHubNative)
 ┌───────────────────────────────▼─────────────────────────────────────────┐
-│ LAYER 2: Android Native Runtime (Kotlin 2.1 • SDK 35 • GeckoView+WebKit)│
+│ LAYER 2: Android Native Runtime (Kotlin 2.1 • SDK 35 • System WebView) │
 │ • HybridBrowserEngine.kt      → Desktop 1280p Viewport + Container Jars │
 │ • UniversalExtensionManager   → CRX3 Header Unpacker + AMO .xpi + GM_* │
-│ • HubVpnService.kt            → Android VpnService (WireGuard/Tor/DoH)  │
+│ • HubVpnService.kt            → Android VpnService local shield + DoH   │
 └───────────────────────────────┬─────────────────────────────────────────┘
                                 │ JNI / Local Zero-Cloud Memory Bus
 ┌───────────────────────────────▼─────────────────────────────────────────┐
@@ -34,7 +34,7 @@ Most mobile browsers force a painful trade-off:
 ## 2. How Universal Extensions ("Add Any Extension in the World") Work
 Standard Android `WebView` cannot execute desktop browser extensions. BrowserHub solves this with a **4-Path Universal Extension Pipeline**:
 
-1. **Firefox Add-ons (`.xpi` / AMO)**: Executed natively through Mozilla **GeckoView's `WebExtensionController`**, supporting `webRequestBlocking` (critical for full **uBlock Origin**!), `storage`, `tabs`, and `scripting`.
+1. **Firefox Add-ons (`.xpi` / AMO)**: Archived, inspected and unpacked by BrowserHub so you can see what a package contains. The behaviours BrowserHub can actually execute today (request filtering, injected CSS/JS, URL cleanup, background media) run natively; full third-party extension sandboxes are not available inside Android System WebView, and the store marks those entries **PREVIEW** rather than pretending.
 2. **Chrome Web Store (`.crx` / Unpacked `.zip`)**: `UniversalExtensionManager.kt` parses Google's binary **CRX2 / CRX3** container (`Cr24` magic header + protobuf signature block), extracts the clean WebExtension archive, injects the `chrome.*` ↔ `browser.*` namespace shim, and mounts content & background scripts.
 3. **Userscripts (`.user.js` — Tampermonkey / Violentmonkey / GreasyFork)**: Built-in `GM_addStyle`, `GM_notification`, `GM_setValue`, and `GM_xmlhttpRequest` runtime plus an in-browser live Userscript IDE.
 4. **1-Tap Native Mods**: Pre-verified zero-overhead versions of uBlock Origin, Dark Reader, SponsorBlock, Return YouTube Dislike, and Cookie Auto-Rejector.
@@ -54,5 +54,5 @@ Standard Android `WebView` cannot execute desktop browser extensions. BrowserHub
 - **Direct Native AdBlock**: Evaluates EasyList, EasyPrivacy, uBlock Filters, Peter Lowe, and Fanboy Annoyances prior to TLS socket handshake, saving 40–65% RAM and mobile data.
 - **Interactive Element Zapper**: Point-and-tap cosmetic DOM eliminator.
 - **URL Tracking Stripper**: Automatically strips `utm_*`, `fbclid`, `gclid`, `msclkid`, `mc_eid`, `igshid`, and `si`.
-- **Android `VpnService` Tunnel**: Supports userspace WireGuard UDP, Stealth Obfs4 (anti-DPI censorship bypass), and 3-Hop Tor Onion routing alongside Encrypted DoH (Quad9, Mullvad, AdGuard, Cloudflare, NextDNS).
+- **Android `VpnService` shield**: establishes a local tunnel interface for on-device filtering and records an Encrypted-DoH resolver preference (Quad9, Mullvad, AdGuard, Cloudflare, NextDNS). **Remote exit-node routing (WireGuard handshake, Obfs4, multi-hop Tor) is not implemented** — the node list is presented as planned locations and labelled as such in the app.
 - **Anti-Fingerprinting**: Per-origin deterministic Canvas 2D bit-flipping, WebGL renderer masking, WebRTC non-proxied UDP block, Dynamic First-Party Cookie Isolation (dFPI) across 5 Containers (`Personal`, `Work`, `Banking`, `Research`, `Incognito Vault`), and a 1-tap **DuckDuckGo-style Fire Shredder**.

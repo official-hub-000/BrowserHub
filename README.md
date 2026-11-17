@@ -4,10 +4,10 @@
 
 | Pillar | Score | Peak Capabilities Included |
 | :--- | :---: | :--- |
-| 🚀 **Super Speed** | **100/100** | 120Hz/144Hz LTPO Android frame pacing, Dual Engine (`GeckoView 136` + `Chromium Blink 134`), Instant Omnibox Calculator, Tab RAM Hibernation, 16-Thread Parallel Download Accelerator |
+| 🚀 **Super Speed** | **100/100** | Hardware-accelerated Android System WebView (Chromium/Blink), Instant Omnibox Calculator, Tab RAM Hibernation, parallel download manager |
 | 👆 **Ease of Use** | **100/100** | Switchable **Bottom One-Handed Bar / Classic Top Bar**, **Dual-Tab Split-Screen Multitasking**, Distilled Reader Mode with Text-to-Speech (TTS), Floating Background Video PiP, 1-Tap Page Translate |
-| 🎨 **Customizability** | **100/100** | 7 Flagship Themes (incl. **True 0-Watt AMOLED Pitch Black**), Android Bezel Frame vs Fullscreen toggle, Reader Typography (`Sans`/`Serif`/`Mono`, `AMOLED`/`Sepia`/`Slate`), Per-Tab Zoom (`75%–150%`) |
-| 🛡️ **Privacy & Built-in VPN** | **100/100** | Direct Native Ad & Tracker Blocker (348,920+ rules), **uBlock Element Zapper**, `ClearURLs` parameter stripper (`utm_*`, `fbclid`, `gclid`), Biometric-Locked Incognito Vault, 1-Tap **Fire Wipe Button**, Built-in Free Zero-Log **WireGuard + Multi-Hop + Tor Onion v3 VPN** & Encrypted DoH |
+| 🎨 **Customizability** | **100/100** | 7 Flagship Themes (incl. **True 0-Watt AMOLED Pitch Black**), custom accent colour, Compact/Comfortable UI density, Reader Typography (`Sans`/`Serif`/`Mono`, `AMOLED`/`Sepia`/`Slate`), Per-Tab Zoom (`75%–150%`) — all persisted across restarts |
+| 🛡️ **Privacy & On-Device Shield** | **100/100** | Native Ad-Network & Analytics Blocker (two independent lists), https-only upgrade, Canvas/hardware spoofing, **uBlock-style Element Zapper**, `ClearURLs` parameter stripper (`utm_*`, `fbclid`, `gclid`), Biometric-Locked Incognito Vault, 1-Tap **Fire Wipe Button**, Android `VpnService` local shield with DoH resolver preference. *Remote exit-node tunnelling is not implemented yet and the UI says so.* |
 | 🧩 **Universal Extensions** | **100/100** | Install **any extension in the world**: **Chrome Web Store (`.crx` CRX2/CRX3 binary unpacker)** + **Firefox Add-ons (`.xpi`)** + **Local `.zip`/`.user.js` Sideloading** + **Live Userscript & UserCSS Studio** + 1-Tap Global Hub (*uBlock Origin, SponsorBlock, Return YouTube Dislike, Dark Reader, Bitwarden, Violentmonkey*) |
 | 🧠 **Custom Zero-Key AI** | **100/100** | **BrowserHub Neural Core** — **100% Free, Zero API Keys, Zero Subscriptions, Zero Cloud Telemetry**. Includes *TL;DR Executive Summarizer*, *ELI5 Plain Breakdown*, *Arc-style "Browse for Me" Synthesis*, *Page Security Audit*, *Contextual Page Q&A*, and *14-Language Offline-Style Neural Translation* (বাংলা, हिन्दी, Español, Français, Deutsch, 日本語, 简体中文, العربية, Русский & more) |
 
@@ -28,11 +28,11 @@ BrowserHub/
 │   ├── components/
 │   │   ├── WebViewport.tsx               # Live GitHub/NPM/PyPI renderer + AdBlock/SponsorBlock/Reader/Translate
 │   │   ├── ShieldsPanel.tsx              # Direct AdBlock, Anti-Fingerprinting & Interactive Element Zapper
-│   │   ├── VpnModal.tsx                  # Built-in Zero-Log WireGuard, Multi-Hop, Tor & DoH Control Center
+│   │   ├── VpnModal.tsx                  # On-device shield, DoH resolver choice, planned exit nodes
 │   │   ├── ExtensionsModal.tsx           # Global Hub, Store URL Importer, Binary CRX3/XPI Unpacker & Studio
 │   │   ├── AiCopilotDrawer.tsx           # Zero-API-Key, Zero-Subscription Private Local AI Copilot
 │   │   ├── TabsDrawer.tsx                # Workspaces, Pinned Tabs, Hibernation, Biometric Incognito & Split View
-│   │   ├── CustomizeDrawer.tsx           # Theme Studio, Engine Switcher, Reader Styles & 16-Thread Downloads
+│   │   ├── CustomizeDrawer.tsx           # Theme Studio, accent/density, Reader Styles & downloads
 │   │   └── DevToolsPanel.tsx             # Live Network/Shields Monitor, JS REPL Console & DOM Inspector
 │   └── utils/
 │       ├── extensionUnpacker.ts          # Real Cr24 binary CRX2/CRX3 + JSZip manifest.json & Userscript parser
@@ -40,14 +40,14 @@ BrowserHub/
 ├── server/
 │   ├── apiMiddleware.ts                  # Hybrid backend: live GitHub/NPM/PyPI fetcher & Zero-Key Local NLP AI
 │   └── index.ts                          # Single-port production hybrid server (0.0.0.0:5173)
-├── android/                              # Android-Exclusive Native Hybrid Core (Kotlin 2.1 + SDK 35 + GeckoView)
+├── android/                              # Android-Exclusive Native Hybrid Core (Kotlin 2.1 + SDK 35 + System WebView)
 │   └── app/src/main/java/com/browserhub/app/
 │       ├── MainActivity.kt               # 120Hz LTPO display unlock + FLAG_SECURE Incognito + Hybrid Host
 │       ├── bridge/BrowserHubJavascriptBridge.kt
 │       ├── engine/HybridBrowserEngine.kt
 │       ├── extensions/UniversalExtensionManager.kt
 │       ├── privacy/HubShieldEngine.kt
-│       ├── vpn/HubVpnService.kt          # Android VpnService (WireGuard + Tor + Encrypted DoH)
+│       ├── vpn/HubVpnService.kt          # Android VpnService local shield + Encrypted DoH preference
 │       └── ai/LocalNeuralEngine.kt       # On-device zero-key GGUF / local NLP & translation engine
 ├── docs/
 │   ├── ARCHITECTURE.md                   # Complete 3-layer hybrid Android engineering blueprint
