@@ -6,6 +6,8 @@ import {
   Download,
   Terminal,
   Smartphone,
+  Monitor,
+  CheckCircle2,
   BookOpen,
   Search,
 } from 'lucide-react';
@@ -16,6 +18,7 @@ import type {
   ThemePresetId,
 } from '../types/browser';
 import { SEARCH_ENGINE_OPTIONS, THEME_PRESETS } from '../data/presets';
+import { SearchEngineIcon } from './VectorIcons';
 import { AndroidHybridBridge } from '../bridge/androidHybridBridge';
 
 interface CustomizeDrawerProps {
@@ -95,7 +98,14 @@ export const CustomizeDrawer: React.FC<CustomizeDrawerProps> = ({
                     : 'bg-slate-900 border-slate-800 text-slate-300'
                 }`}
               >
-                {customization.phoneFrameMode ? '📱 Android Bezel Frame' : '🖥️ Full Viewport'}
+                <span className="inline-flex items-center gap-1.5">
+                  {customization.phoneFrameMode ? (
+                    <Smartphone size={12} className="shrink-0" />
+                  ) : (
+                    <Monitor size={12} className="shrink-0" />
+                  )}
+                  <span>{customization.phoneFrameMode ? 'Android Bezel Frame' : 'Full Viewport'}</span>
+                </span>
               </button>
               <button
                 onClick={() => {
@@ -194,7 +204,7 @@ export const CustomizeDrawer: React.FC<CustomizeDrawerProps> = ({
                       : 'bg-slate-900 border-slate-800 text-slate-300'
                   }`}
                 >
-                  <span>{eng.icon}</span>
+                  <SearchEngineIcon id={eng.id} size={13} />
                   <span className="truncate">{eng.shortLabel}</span>
                 </button>
               ))}
@@ -265,7 +275,14 @@ export const CustomizeDrawer: React.FC<CustomizeDrawerProps> = ({
                       {dl.downloadedMb.toFixed(1)} / {dl.sizeMb} MB • {dl.threads} Threads
                     </span>
                     <span>
-                      {dl.status === 'completed' ? '✓ Verified' : `${dl.speedMbps} MB/s`}
+                      {dl.status === 'completed' ? (
+                        <span className="inline-flex items-center gap-1">
+                          <CheckCircle2 size={10} className="shrink-0" />
+                          <span>Verified</span>
+                        </span>
+                      ) : (
+                        `${dl.speedMbps} MB/s`
+                      )}
                     </span>
                   </div>
                 </div>

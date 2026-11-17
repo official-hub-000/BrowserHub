@@ -33,6 +33,48 @@ if (bad > 0) { console.error(`  ${bad} unlabelled button(s)`); process.exit(1); 
 console.log("  all buttons labelled");
 '
 
+echo "== Device input regression guards =="
+node -e '
+const fs = require("fs");
+const app = fs.readFileSync("src/App.tsx", "utf8");
+const java = fs.readFileSync("android/standalone/src/com/browserhub/app/MainActivity.java", "utf8");
+let bad = [];
+// 1. The native browser view is stacked ABOVE the React shell, so the shell
+//    must re-sync its rect continuously and yield while shell UI floats on top.
+if (!/setInterval\(schedule, \d+\)/.test(app)) bad.push("App.tsx: no continuous native viewport re-sync");
+if (!/pipOpen:\s*pipTitle !== null/.test(app)) bad.push("App.tsx: mini player does not hide the native page");
+if (!/fireSweep:\s*fireSweepAnim/.test(app)) bad.push("App.tsx: shutdown sweep does not hide the native page");
+if (/className="absolute bottom-3 right-3 z-30/.test(app)) bad.push("App.tsx: PiP card still inside the native viewport");
+// 2. A GONE WebView can keep a cached touch target on OEM skins.
+if (!/setFocusableInTouchMode\(false\)/.test(java)) bad.push("MainActivity.java: hidden browser view stays focusable");
+if (!/setTranslationY\(browserWebView\.getHeight\(\)/.test(java)) bad.push("MainActivity.java: hidden browser view not moved off-screen");
+if (!/bringToFront\(\)/.test(java)) bad.push("MainActivity.java: browser view not raised when shown");
+if (!/onFindResultReceived/.test(java)) bad.push("MainActivity.java: find-in-page never reports match counts");
+if (!/__onNativeFindResult/.test(app)) bad.push("App.tsx: find bar cannot show real match counts");
+if (bad.length) { bad.forEach((b) => console.error("  FAIL " + b)); process.exit(1); }
+console.log("  native viewport sync + touch handoff guards OK");
+'
+
+echo "== Vector icons (no emoji in UI) =="
+node -e '
+const fs = require("fs");
+const path = require("path");
+const files = ["src/App.tsx"].concat(
+  fs.readdirSync("src/components").map((f) => "src/components/" + f)
+);
+const pat = /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u;
+let bad = [];
+for (const f of files) {
+  if (f.endsWith("VectorIcons.tsx")) continue;
+  const src = fs.readFileSync(f, "utf8");
+  src.split("\n").forEach((line, i) => {
+    if (pat.test(line) && !/^\s*\/\//.test(line)) bad.push(f + ":" + (i + 1) + " " + line.trim().slice(0, 70));
+  });
+}
+if (bad.length) { bad.slice(0, 10).forEach((b) => console.error("  FAIL emoji icon " + b)); process.exit(1); }
+console.log("  no emoji icons left in any UI surface");
+'
+
 echo "== APK signature =="
 "$JAVA" -jar build-tools/apksigner.jar verify -v release/BrowserHub-v1.0.0-release.apk 2>/dev/null \
   | grep -E "^Verifies|v2 scheme|v3 scheme|Number of signers"

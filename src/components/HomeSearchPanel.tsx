@@ -2,6 +2,7 @@ import React, { useMemo, useRef, useState } from 'react';
 import { Search, ArrowRight, X } from 'lucide-react';
 import type { BrowserCustomization, SearchEngineId } from '../types/browser';
 import { SEARCH_ENGINE_OPTIONS, getSearchEngineOption } from '../data/presets';
+import { SearchEngineIcon } from './VectorIcons';
 
 interface HomeSearchPanelProps {
   customization: BrowserCustomization;
@@ -84,7 +85,7 @@ export const HomeSearchPanel: React.FC<HomeSearchPanelProps> = ({
                     : 'bg-slate-900 border-slate-800 text-slate-300'
                 }`}
               >
-                <span className="leading-none">{e.icon}</span>
+                <SearchEngineIcon id={e.id} size={14} />
                 <span>{e.shortLabel}</span>
               </button>
             );
@@ -166,7 +167,7 @@ export const HomeSearchPanel: React.FC<HomeSearchPanelProps> = ({
                 onClick={() => submit(text, e.id)}
                 className="w-full px-3 py-1.5 flex items-center gap-2 text-left hover:bg-slate-800 cursor-pointer"
               >
-                <span className="text-[13px] leading-none">{e.icon}</span>
+                <SearchEngineIcon id={e.id} size={13} />
                 <span className="text-[11px] text-slate-400 truncate">instead on {e.name}</span>
               </button>
             ))}

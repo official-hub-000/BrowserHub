@@ -74,6 +74,8 @@ public class MainActivity extends Activity {
     private int lastTopPx = -1;
     private int lastBottomPx = -1;
     private String lastFindQuery = "";
+    private String lastInjectedCss = "";
+    private long lastInjectAtMs = 0L;
     private String pendingVpnNode = "ch-zurich";
 
     @SuppressLint({"SetJavaScriptEnabled", "AddJavascriptInterface"})
@@ -140,6 +142,7 @@ public class MainActivity extends Activity {
         // 2. Native Real-Web Browser WebView
         browserWebView = new WebView(this);
         browserWebView.setVisibility(View.GONE);
+        browserWebView.setClickable(true);
         WebSettings bwSettings = browserWebView.getSettings();
         mobileDefaultUa = bwSettings.getUserAgentString() + " BrowserHub/1.0";
         bwSettings.setUserAgentString(mobileDefaultUa);
@@ -331,6 +334,18 @@ public class MainActivity extends Activity {
         return extractedPageText;
     }
 
+    private void notifyShellFindResult(final int activeOrdinal, final int totalMatches) {
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                shellWebView.evaluateJavascript(
+                        "if(window.__onNativeFindResult){window.__onNativeFindResult(" + activeOrdinal + "," + totalMatches + ");}",
+                        null
+                );
+            }
+        });
+    }
+
     private void notifyShellUrlChanged(final String url, final String title) {
         runOnUiThread(new Runnable() {
             @Override
@@ -380,7 +395,16 @@ public class MainActivity extends Activity {
             @Override
             public void run() {
                 if (!visible || url == null || (!url.startsWith("http://") && !url.startsWith("https://"))) {
+                    // Hiding is not enough on some OEM skins (MIUI/ColorOS): a
+                    // GONE-then-VISIBLE WebView can keep a cached touch target
+                    // and swallow taps meant for the React shell. Drop focus,
+                    // stop input, and detach it from the shell's hit testing.
+                    browserWebView.clearFocus();
+                    browserWebView.stopLoading();
+                    browserWebView.setFocusable(false);
+                    browserWebView.setFocusableInTouchMode(false);
                     browserWebView.setVisibility(View.GONE);
+                    browserWebView.setTranslationY(browserWebView.getHeight() + 2 * (int) getResources().getDisplayMetrics().density);
                     return;
                 }
 
@@ -415,12 +439,27 @@ public class MainActivity extends Activity {
                     lastFindQuery = q;
                     if (q.isEmpty()) {
                         browserWebView.clearMatches();
+                        notifyShellFindResult(0, 0);
                     } else {
+                        browserWebView.setFindListener(new WebView.FindListener() {
+                            @Override
+                            public void onFindResultReceived(int activeMatchOrdinal, int numberOfMatches, boolean isDoneCounting) {
+                                if (isDoneCounting) {
+                                    notifyShellFindResult(activeMatchOrdinal, numberOfMatches);
+                                }
+                            }
+                        });
                         browserWebView.findAllAsync(q);
                     }
                 }
 
+                browserWebView.setFocusable(true);
+                browserWebView.setFocusableInTouchMode(true);
+                browserWebView.setTranslationY(0f);
                 browserWebView.setVisibility(View.VISIBLE);
+                if (browserWebView.getParent() != null) {
+                    browserWebView.bringToFront();
+                }
 
                 if (!url.equals(lastLoadedUrl)) {
                     lastLoadedUrl = url;
@@ -428,7 +467,18 @@ public class MainActivity extends Activity {
                 } else if (uaChanged) {
                     browserWebView.reload();
                 } else {
-                    injectExtensionsAndExtractText(browserWebView);
+                    // The shell re-syncs on every layout pass, so only re-inject
+                    // when the injected payload actually changed (or every 4s at
+                    // most) instead of hammering evaluateJavascript each frame.
+                    String cssNow = activeCustomCss
+                            + "|dr=" + darkReaderEnabled
+                            + "|ck=" + cookieKillerEnabled;
+                    long now = System.currentTimeMillis();
+                    if (!cssNow.equals(lastInjectedCss) || now - lastInjectAtMs > 4000L) {
+                        lastInjectedCss = cssNow;
+                        lastInjectAtMs = now;
+                        injectExtensionsAndExtractText(browserWebView);
+                    }
                 }
             }
         });
@@ -438,7 +488,18 @@ public class MainActivity extends Activity {
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
-                browserWebView.setVisibility(visible ? View.VISIBLE : View.GONE);
+                if (visible) {
+                    browserWebView.setFocusable(true);
+                    browserWebView.setFocusableInTouchMode(true);
+                    browserWebView.setTranslationY(0f);
+                    browserWebView.setVisibility(View.VISIBLE);
+                } else {
+                    browserWebView.clearFocus();
+                    browserWebView.setFocusable(false);
+                    browserWebView.setFocusableInTouchMode(false);
+                    browserWebView.setTranslationY(browserWebView.getHeight() + 2 * (int) getResources().getDisplayMetrics().density);
+                    browserWebView.setVisibility(View.GONE);
+                }
             }
         });
     }

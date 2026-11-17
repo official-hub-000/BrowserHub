@@ -95,7 +95,8 @@ export const PlayStoreDownloadModal: React.FC<PlayStoreDownloadModalProps> = ({
           >
             <div className="space-y-1">
               <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-black/15 text-[10px] font-black uppercase">
-                📲 Physical Phone Release • RSA-4096 Signed (v1+v2+v3)
+                <Smartphone size={11} className="shrink-0" />
+                <span>Physical Phone Release • RSA-4096 Signed (v1+v2+v3)</span>
               </div>
               <div className="text-base sm:text-lg font-black">
                 Download BrowserHub-v1.0.0-release.apk

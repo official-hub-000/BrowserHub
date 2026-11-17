@@ -1,6 +1,7 @@
 import React from 'react';
 import { Languages, X, Check } from 'lucide-react';
 import { SUPPORTED_LANGUAGES } from '../utils/translator';
+import { LangBadge } from './VectorIcons';
 
 interface TranslateModalProps {
   activeLang: string | null;
@@ -95,7 +96,7 @@ export const TranslateModal: React.FC<TranslateModalProps> = ({
                   }`}
                 >
                   <span className="flex items-center gap-2 min-w-0">
-                    <span className="text-base">{lang.flag}</span>
+                    <LangBadge code={lang.code} size={22} />
                     <span className="truncate">{lang.nativeName}</span>
                   </span>
                   {selected && <Check size={14} className="shrink-0" />}

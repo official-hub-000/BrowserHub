@@ -123,7 +123,8 @@ export const TabsDrawer: React.FC<TabsDrawerProps> = ({
           </div>
           {savedRamMb > 0 && (
             <span className="text-emerald-400 font-medium">
-              💤 {savedRamMb} MB RAM freed by Tab Hibernation
+              <Moon size={11} className="inline-block shrink-0" /> {savedRamMb} MB RAM freed by Tab
+              Hibernation
             </span>
           )}
         </div>
@@ -190,7 +191,14 @@ export const TabsDrawer: React.FC<TabsDrawerProps> = ({
                     className="flex items-center justify-between pt-2 border-t border-slate-800/80 text-[10px]"
                   >
                     <span className="text-slate-400">
-                      {t.isHibernated ? '💤 Sleeping (4 MB)' : `${t.memoryMb} MB RAM`}
+                      {t.isHibernated ? (
+                        <span className="inline-flex items-center gap-1">
+                          <Moon size={10} className="shrink-0" />
+                          <span>Sleeping (4 MB)</span>
+                        </span>
+                      ) : (
+                        `${t.memoryMb} MB RAM`
+                      )}
                     </span>
                     <div className="flex items-center gap-1">
                       <button

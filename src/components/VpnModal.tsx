@@ -12,6 +12,7 @@ import {
 import type { VpnState } from '../types/browser';
 import { GLOBAL_VPN_NODES } from '../data/presets';
 import { AndroidHybridBridge } from '../bridge/androidHybridBridge';
+import { FlagIcon } from './VectorIcons';
 
 interface VpnModalProps {
   vpn: VpnState;
@@ -69,19 +70,31 @@ export const VpnModal: React.FC<VpnModalProps> = ({ vpn, onUpdateVpn, onClose })
             </div>
             <div>
               <div className="text-sm font-bold text-white flex items-center gap-2">
-                Built-In Zero-Log VPN
+                Private Network Shield
                 <span className="text-[10px] px-2 py-0.5 rounded-full bg-cyan-500/15 text-cyan-300">
-                  Free • Unlimited
+                  Android VpnService
                 </span>
               </div>
               <div className="text-[11px] text-slate-400">
-                Android VpnService • WireGuard • Multi-Hop • Tor
+                On-device filtering • DoH resolver • Zero logs
               </div>
             </div>
           </div>
           <button aria-label="Close" title="Close" onClick={onClose} className="p-1.5 rounded-xl hover:bg-slate-800 text-slate-400 cursor-pointer">
             <X className="w-4 h-4" />
           </button>
+        </div>
+
+        {/* Honest capability notice — this build filters locally; it does not
+            tunnel your traffic through a remote exit node yet. */}
+        <div className="px-4 py-2 bg-amber-500/10 border-b border-amber-500/30 flex items-start gap-2">
+          <AlertTriangle size={13} className="text-amber-400 mt-0.5 shrink-0" />
+          <p className="text-[10px] leading-relaxed text-amber-200/90">
+            This build runs the shield on your device (ad &amp; tracker blocking, tracker-parameter
+            stripping, DoH resolver preference). Remote exit-node routing — the &quot;change my IP&quot;
+            part — is <strong>not active yet</strong>, so the node list below shows planned
+            locations and is clearly marked.
+          </p>
         </div>
 
         {/* Big Power Ring & Tunnel Telemetry */}
@@ -98,17 +111,17 @@ export const VpnModal: React.FC<VpnModalProps> = ({ vpn, onUpdateVpn, onClose })
               }`}
             >
               {vpn.connecting
-                ? 'Handshaking Keys...'
+                ? 'Starting shield...'
                 : vpn.connected
-                  ? 'ENCRYPTED & MASKED'
-                  : 'Direct Connection'}
+                  ? 'Shield active'
+                  : 'Direct connection'}
             </div>
             <div className="text-[11px] font-mono text-slate-400">
-              IP: {vpn.connected ? activeNode.ipMask : 'Exposed Carrier IP'} •{' '}
+              Resolver: {vpn.connected ? vpn.dohProvider : 'system DNS'} •{' '}
               {activeNode.baseLatencyMs}ms
             </div>
             <div className="text-[10px] text-cyan-300">
-              ChaCha20-Poly1305 • {vpn.encryptedMb.toFixed(1)} MB Shielded
+              {vpn.encryptedMb.toFixed(1)} MB filtered on this device
             </div>
           </div>
 
@@ -152,7 +165,7 @@ export const VpnModal: React.FC<VpnModalProps> = ({ vpn, onUpdateVpn, onClose })
                     }`}
                   >
                     <div className="flex items-center gap-2.5 min-w-0">
-                      <span className="text-lg">{node.flag}</span>
+                      <FlagIcon code={node.flag} size={20} />
                       <div className="min-w-0">
                         <div className="text-xs font-bold truncate">{node.city}</div>
                         <div className="text-[10px] text-slate-400">
@@ -163,6 +176,9 @@ export const VpnModal: React.FC<VpnModalProps> = ({ vpn, onUpdateVpn, onClose })
                     <div className="flex items-center gap-2 shrink-0">
                       <span className="text-[11px] font-mono text-emerald-400">
                         {node.baseLatencyMs}ms
+                      </span>
+                      <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-slate-800 text-slate-400 font-semibold">
+                        planned
                       </span>
                       {selected && <Check className="w-4 h-4 text-cyan-400" />}
                     </div>

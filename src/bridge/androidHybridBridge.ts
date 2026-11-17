@@ -41,6 +41,8 @@ declare global {
     __onNativeUrlChanged?: (url: string, title: string) => void;
     __onNativeAdBlocked?: (domain: string) => void;
     __onAndroidBackPressed?: () => boolean;
+    /** Real match counts coming back from the native Find-in-page engine. */
+    __onNativeFindResult?: (activeOrdinal: number, totalMatches: number) => void;
   }
 }
 

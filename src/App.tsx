@@ -48,6 +48,7 @@ import { PlayStoreDownloadModal } from './components/PlayStoreDownloadModal';
 import { MenuHubModal } from './components/MenuHubModal';
 import { TranslateModal } from './components/TranslateModal';
 import { AndroidHybridBridge } from './bridge/androidHybridBridge';
+import { SearchEngineIcon } from './components/VectorIcons';
 
 function deriveTitleFromUrl(url: string): string {
   if (url === 'browserhub://start') return 'New Tab';
@@ -199,6 +200,7 @@ export function App() {
   const [zapperMode, setZapperMode] = useState(false);
   const [findQuery, setFindQuery] = useState('');
   const [showFindBar, setShowFindBar] = useState(false);
+  const [findResult, setFindResult] = useState<{ active: number; total: number } | null>(null);
 
   const [showMenuHub, setShowMenuHub] = useState(false);
   const [showEnginePicker, setShowEnginePicker] = useState(false);
@@ -268,69 +270,128 @@ export function App() {
     return u.startsWith('http://') || u.startsWith('https://');
   };
 
-  // Sync real Android Native WebView viewport & live callbacks when installed as APK
-  useEffect(() => {
-    if (!AndroidHybridBridge.hasJniBridge() || !window.BrowserHubNative) return;
+  // Sync real Android Native WebView viewport & live callbacks when installed as APK.
+  //
+  // IMPORTANT (real-device input bug): the native browser is a SEPARATE Android
+  // WebView stacked ABOVE this React shell. If its rect is ever stale it silently
+  // covers the app's own chrome and swallows every tap ("covered by div...",
+  // touchstart never fires, pointerdown on native page). So we re-sync after
+  // EVERY render plus on resize/orientation, not just on a hand-picked dep list.
+  const nativeSyncInputs = {
+    url: activeTab.url,
+    isDesktop: activeTab.isDesktopMode,
+    zoom: activeTab.zoomLevel,
+    isIncognito: activeTab.isIncognito,
+    reader: activeTab.isReaderMode,
+    incognito: activeTab.isIncognito,
+    shields,
+    extensions,
+    findQuery: showFindBar ? findQuery : '',
+    anyModalOpen,
+    split: splitTab,
+    devtools: showDevTools,
+    bottomBar: customization.addressBarPosition,
+    // Shell UI that floats ABOVE the page (mini player, shutdown sweep) is
+    // always underneath the native WebView, so the native view must yield.
+    pipOpen: pipTitle !== null,
+    fireSweep: fireSweepAnim,
+  };
+  const nativeSyncRef = useRef(nativeSyncInputs);
+  nativeSyncRef.current = nativeSyncInputs;
 
-    window.BrowserHubNative.setIncognitoLock?.(activeTab.isIncognito);
+  const syncNativeViewport = () => {
+    if (!AndroidHybridBridge.hasJniBridge() || !window.BrowserHubNative) return;
+    const inputs = nativeSyncRef.current;
+
+    window.BrowserHubNative.setIncognitoLock?.(inputs.isIncognito);
 
     const shouldShowNativeWeb =
-      isNativeRealWebUrl(activeTab.url) &&
-      !anyModalOpen &&
-      !activeTab.isReaderMode &&
-      !splitTab;
+      (inputs.url.startsWith('http://') || inputs.url.startsWith('https://')) &&
+      !inputs.anyModalOpen &&
+      !inputs.reader &&
+      !inputs.split &&
+      !inputs.pipOpen &&
+      !inputs.fireSweep;
 
     const el = viewportContainerRef.current;
     const rect = el ? el.getBoundingClientRect() : { top: 60, bottom: window.innerHeight - 60 };
     const topCss = Math.max(0, Math.round(rect.top));
     const bottomCss = Math.max(0, Math.round(window.innerHeight - rect.bottom));
 
-    const darkReaderOn = extensions.some((e) => e.enabled && e.effectKey === 'dark-reader');
+    const darkReaderOn = inputs.extensions.some((e) => e.enabled && e.effectKey === 'dark-reader');
     const cookieKillerOn =
-      (shields.enabled && shields.blockCookieBanners) ||
-      extensions.some((e) => e.enabled && e.effectKey === 'cookie-killer');
+      (inputs.shields.enabled && inputs.shields.blockCookieBanners) ||
+      inputs.extensions.some((e) => e.enabled && e.effectKey === 'cookie-killer');
     const adblockOn =
-      (shields.enabled && shields.blockAds) ||
-      extensions.some((e) => e.enabled && e.effectKey === 'ublock');
-    const customCss = extensions
+      (inputs.shields.enabled && inputs.shields.blockAds) ||
+      inputs.extensions.some((e) => e.enabled && e.effectKey === 'ublock');
+    const customCss = inputs.extensions
       .filter((e) => e.enabled && e.customCss)
       .map((e) => e.customCss)
       .join('\n');
 
     window.BrowserHubNative.syncWebViewport?.(
-      activeTab.url,
+      inputs.url,
       topCss,
       bottomCss,
       Math.max(1, window.innerHeight),
-      activeTab.isDesktopMode,
+      inputs.isDesktop,
       adblockOn,
       darkReaderOn,
       cookieKillerOn,
       customCss,
-      activeTab.zoomLevel,
-      showFindBar ? findQuery : '',
+      inputs.zoom,
+      inputs.findQuery,
       shouldShowNativeWeb
     );
-  }, [
-    activeTab.url,
-    activeTab.isDesktopMode,
-    activeTab.isIncognito,
-    activeTab.isReaderMode,
-    activeTab.zoomLevel,
-    anyModalOpen,
-    splitTab,
-    shields.enabled,
-    shields.blockAds,
-    shields.blockCookieBanners,
-    extensions,
-    showFindBar,
-    findQuery,
-    showDevTools,
-    customization.addressBarPosition,
-  ]);
+  };
+
+  // Keep a stable handle so listeners/intervals are registered exactly once.
+  const syncViewportRef = useRef(syncNativeViewport);
+  syncViewportRef.current = syncNativeViewport;
 
   useEffect(() => {
     if (!AndroidHybridBridge.hasJniBridge()) return;
+    let frame = 0;
+    const schedule = () => {
+      if (frame) return;
+      frame = requestAnimationFrame(() => {
+        frame = 0;
+        syncViewportRef.current();
+      });
+    };
+
+    schedule();
+
+    const el = viewportContainerRef.current;
+    const ro = typeof ResizeObserver !== 'undefined' && el ? new ResizeObserver(schedule) : null;
+    if (ro && el) ro.observe(el);
+    window.addEventListener('resize', schedule);
+    window.addEventListener('orientationchange', schedule);
+    // Safety net: even if a layout shift happens without a resize event
+    // (soft keyboard, OEM gesture bar), the native rect can never stay stale
+    // for more than a second and steal taps from the app chrome.
+    const safety = window.setInterval(schedule, 900);
+
+    return () => {
+      if (frame) cancelAnimationFrame(frame);
+      if (ro) ro.disconnect();
+      window.removeEventListener('resize', schedule);
+      window.removeEventListener('orientationchange', schedule);
+      clearInterval(safety);
+    };
+  }, []);
+
+  // Re-sync after every render: any state change (suggestion list, find bar,
+  // dev tools, sheets) may move the viewport out from under the native view.
+  useEffect(() => {
+    if (!AndroidHybridBridge.hasJniBridge()) return;
+    syncViewportRef.current();
+  });
+
+  // Live callbacks from the native page (URL / title / ad-blocked counters)
+  useEffect(() => {
+    if (!AndroidHybridBridge.hasJniBridge() || !window.BrowserHubNative) return;
 
     window.__onNativeUrlChanged = (newUrl: string, newTitle: string) => {
       if (!newUrl || newUrl.startsWith('about:')) return;
@@ -373,6 +434,10 @@ export function App() {
       ]);
     };
 
+    window.__onNativeFindResult = (activeOrdinal: number, totalMatches: number) => {
+      setFindResult({ active: activeOrdinal, total: totalMatches });
+    };
+
     window.__onAndroidBackPressed = () => {
       if (anyModalOpen) {
         setShowMenuHub(false);
@@ -396,6 +461,13 @@ export function App() {
         return true;
       }
       return false;
+    };
+
+    return () => {
+      window.__onNativeUrlChanged = undefined;
+      window.__onNativeAdBlocked = undefined;
+      window.__onAndroidBackPressed = undefined;
+      window.__onNativeFindResult = undefined;
     };
   }, [activeTabId, activeTab.historyIndex, activeTab.url, anyModalOpen]);
 
@@ -677,7 +749,7 @@ export function App() {
           className="h-11 px-2.5 rounded-xl border border-slate-700 hover:border-cyan-400 text-xs font-semibold text-white flex items-center gap-1.5 shrink-0 cursor-pointer max-w-[104px]"
           style={{ backgroundColor: '#0f172a' }}
         >
-          <span className="text-sm leading-none">{activeSearchEngine.icon}</span>
+          <SearchEngineIcon id={activeSearchEngine.id} size={17} />
           <span className="truncate text-slate-200">{activeSearchEngine.shortLabel}</span>
           <ChevronDown size={12} className="text-slate-400" />
         </button>
@@ -825,7 +897,7 @@ export function App() {
                     }}
                     className="w-full px-3 py-2 flex items-center gap-2.5 text-left hover:bg-slate-800 cursor-pointer"
                   >
-                    <span className="text-sm shrink-0">{eng.icon}</span>
+                    <SearchEngineIcon id={eng.id} size={15} />
                     <span className="text-[12px] text-slate-300 truncate">
                       instead search on {eng.name}
                     </span>
@@ -855,7 +927,7 @@ export function App() {
                           : 'bg-slate-900 border-slate-700 text-slate-300'
                       }`}
                     >
-                      <span>{eng.icon}</span>
+                      <SearchEngineIcon id={eng.id} size={13} />
                       <span>{eng.shortLabel}</span>
                     </button>
                   );
@@ -1029,9 +1101,25 @@ export function App() {
             placeholder="Find text on page..."
             className="flex-1 bg-transparent text-xs text-white focus:outline-none"
           />
+          {findResult && findQuery.trim() !== '' && (
+            <span
+              className={`text-[10px] font-mono px-1.5 py-0.5 rounded-md shrink-0 ${
+                findResult.total > 0
+                  ? 'bg-emerald-500/15 text-emerald-300'
+                  : 'bg-rose-500/15 text-rose-300'
+              }`}
+            >
+              {findResult.total > 0
+                ? `${findResult.active}/${findResult.total}`
+                : 'no matches'}
+            </span>
+          )}
           <button
+            aria-label="Close find in page"
+            title="Close find in page"
             onClick={() => {
               setFindQuery('');
+              setFindResult(null);
               setShowFindBar(false);
             }}
             className="p-1 text-slate-400 hover:text-white cursor-pointer"
@@ -1128,11 +1216,18 @@ export function App() {
           </div>
         )}
 
-        {pipTitle && (
-          <div
-            className="absolute bottom-3 right-3 z-30 w-56 rounded-2xl border border-cyan-400/50 shadow-2xl p-2.5 space-y-1.5"
-            style={{ backgroundColor: '#090e1a' }}
-          >
+        {fireSweepAnim && (
+          <div className="absolute inset-0 z-50 bg-orange-600/90 flex flex-col items-center justify-center text-white animate-fire-sweep pointer-events-none">
+            <Flame size={48} className="text-amber-200 mb-2" />
+            <div className="text-base font-extrabold tracking-wide">
+              CLEARING COOKIES, CACHE &amp; SESSION...
+            </div>
+          </div>
+        )}
+      </div>
+
+      {pipTitle && (
+        <div className="fixed bottom-24 right-3 z-40 w-56 rounded-2xl border border-cyan-400/50 shadow-2xl p-2.5 space-y-1.5" style={{ backgroundColor: '#090e1a' }}>
             <div className="flex items-center justify-between text-[10px] text-cyan-300 font-bold">
               <span className="inline-flex items-center gap-1">
                 <PictureInPicture2 size={12} /> PiP Player
@@ -1144,21 +1239,11 @@ export function App() {
                 <X size={12} />
               </button>
             </div>
-            <div className="h-16 rounded-xl bg-slate-900 flex items-center justify-center p-2 text-center text-[11px] font-semibold text-white">
-              ▶ {pipTitle}
-            </div>
+          <div className="h-16 rounded-xl bg-slate-900 flex items-center justify-center p-2 text-center text-[11px] font-semibold text-white">
+            ▶ {pipTitle}
           </div>
-        )}
-
-        {fireSweepAnim && (
-          <div className="absolute inset-0 z-50 bg-orange-600/90 flex flex-col items-center justify-center text-white animate-fire-sweep pointer-events-none">
-            <Flame size={48} className="text-amber-200 mb-2" />
-            <div className="text-base font-extrabold tracking-wide">
-              CLEARING COOKIES, CACHE &amp; SESSION...
-            </div>
-          </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {showDevTools && (
         <DevToolsPanel
@@ -1224,7 +1309,7 @@ export function App() {
                     }`}
                   >
                     <span className="flex items-center gap-3">
-                      <span className="text-lg">{eng.icon}</span>
+                      <SearchEngineIcon id={eng.id} size={20} />
                       <span>
                         <span className="block text-xs font-semibold">{eng.name}</span>
                         <span className="block text-[10px] text-slate-400">{eng.homeUrl}</span>

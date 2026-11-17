@@ -7,6 +7,7 @@ import {
   Lock,
   Download,
   ExternalLink,
+  Star,
   BookOpen,
   Volume2,
   VolumeX,
@@ -34,6 +35,7 @@ import { SUPPORTED_LANGUAGES, translateTextLocal } from '../utils/translator';
 import { AndroidHybridBridge } from '../bridge/androidHybridBridge';
 import { sanitizeExtractedPageContent } from '../utils/localAiEngine';
 import { HomeSearchPanel } from './HomeSearchPanel';
+import { SiteIcon } from './VectorIcons';
 
 interface WebViewportProps {
   tab: BrowserTab;
@@ -95,6 +97,11 @@ export const WebViewport: React.FC<WebViewportProps> = ({
   onOpenExtensions,
   onOpenPlayStore,
   onLiveContentLoaded,
+  onZapElement,
+  onToggleDesktop,
+  onOpenNewIncognito,
+  onEnablePip,
+  onTriggerDownload,
 }) => {
   const [liveResult, setLiveResult] = useState<LiveFetchResult | null>(null);
   const [loadingLive, setLoadingLive] = useState(false);
@@ -268,13 +275,24 @@ export const WebViewport: React.FC<WebViewportProps> = ({
               <BookOpen size={16} />
               <span>Clean Reader Mode</span>
             </span>
-            <button
-              onClick={() => toggleReadAloud(`${tab.title}. ${articleBody}`)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-cyan-500/20 text-cyan-400 font-semibold cursor-pointer"
-            >
-              {speaking ? <VolumeX size={14} /> : <Volume2 size={14} />}
-              <span>{speaking ? 'Stop Listening' : 'Listen Aloud'}</span>
-            </button>
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => toggleReadAloud(`${tab.title}. ${articleBody}`)}
+                aria-label={speaking ? 'Stop reading aloud' : 'Read this page aloud'}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-cyan-500/20 text-cyan-400 font-semibold cursor-pointer"
+              >
+                {speaking ? <VolumeX size={14} /> : <Volume2 size={14} />}
+                <span>{speaking ? 'Stop' : 'Listen'}</span>
+              </button>
+              <button
+                onClick={() => onEnablePip(tab.title || 'Reader Mode article')}
+                aria-label="Open this article in the floating mini player"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 text-slate-200 font-semibold cursor-pointer"
+              >
+                <ExternalLink size={14} />
+                <span>Mini player</span>
+              </button>
+            </div>
           </div>
 
           <h1 className="text-xl sm:text-2xl font-bold leading-snug">{highlightText(tab.title)}</h1>
@@ -359,8 +377,8 @@ export const WebViewport: React.FC<WebViewportProps> = ({
                   className="rounded-2xl border border-slate-800 hover:border-cyan-500/50 p-2 flex flex-col items-center text-center gap-1 cursor-pointer transition min-w-0"
                   style={{ backgroundColor: '#0f172a' }}
                 >
-                  <div className="w-9 h-9 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center text-base shrink-0">
-                    {site.icon}
+                  <div className="w-9 h-9 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center shrink-0">
+                    <SiteIcon id={site.icon} size={19} />
                   </div>
                   <div className="text-[11px] leading-tight font-semibold text-white w-full break-words">
                     {site.title}
@@ -421,6 +439,7 @@ export const WebViewport: React.FC<WebViewportProps> = ({
 
               <button
                 onClick={onOpenExtensions}
+                aria-label="Open the extensions hub"
                 className="rounded-2xl border border-slate-800 hover:border-purple-500/50 p-3.5 text-left space-y-1 cursor-pointer transition"
                 style={{ backgroundColor: '#0f172a' }}
               >
@@ -433,6 +452,31 @@ export const WebViewport: React.FC<WebViewportProps> = ({
                 <div className="text-xs font-bold text-white pt-1">Extensions Hub</div>
                 <div className="text-[11px] text-slate-400">
                   Chrome .CRX, Firefox .XPI &amp; Userscripts
+                </div>
+              </button>
+
+              <button
+                onClick={() =>
+                  onTriggerDownload(
+                    'docs.browserhub.app-getting-started.pdf',
+                    'https://example.com/browserhub-getting-started.pdf',
+                    1.8,
+                    'document'
+                  )
+                }
+                aria-label="Download the BrowserHub getting started guide"
+                className="rounded-2xl border border-slate-800 hover:border-emerald-500/50 p-3.5 text-left space-y-1 cursor-pointer transition"
+                style={{ backgroundColor: '#0f172a' }}
+              >
+                <div className="flex items-center justify-between">
+                  <Download size={18} className="text-emerald-300" />
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold">
+                    Manager
+                  </span>
+                </div>
+                <div className="text-xs font-bold text-white pt-1">Downloads</div>
+                <div className="text-[11px] text-slate-400">
+                  See speed, threads &amp; progress
                 </div>
               </button>
 
@@ -453,6 +497,46 @@ export const WebViewport: React.FC<WebViewportProps> = ({
                 </div>
               </button>
             </div>
+          </div>
+
+          {/* Desktop-site toggle — real, wired action from the home screen */}
+          <div className="grid grid-cols-2 gap-2.5">
+            <button
+              onClick={onToggleDesktop}
+              aria-pressed={tab.isDesktopMode}
+              className={`rounded-2xl border p-3 text-left space-y-1 cursor-pointer transition ${
+                tab.isDesktopMode
+                  ? 'border-cyan-400 bg-cyan-950/60'
+                  : 'border-slate-800 bg-slate-900/70 hover:border-cyan-500/50'
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <Globe size={17} className="text-cyan-300" />
+                <span
+                  className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold ${
+                    tab.isDesktopMode ? 'bg-cyan-400 text-slate-950' : 'bg-slate-800 text-slate-400'
+                  }`}
+                >
+                  {tab.isDesktopMode ? 'ON' : 'OFF'}
+                </span>
+              </div>
+              <div className="text-[11px] font-bold text-white pt-0.5">Desktop site</div>
+              <div className="text-[10px] text-slate-400">Request full desktop pages</div>
+            </button>
+
+            <button
+              onClick={onOpenNewIncognito}
+              className="rounded-2xl border border-purple-500/40 bg-purple-950/40 p-3 text-left space-y-1 cursor-pointer hover:border-purple-400 transition"
+            >
+              <div className="flex items-center justify-between">
+                <EyeOff size={17} className="text-purple-300" />
+                <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-purple-500/25 text-purple-200 font-bold">
+                  Private
+                </span>
+              </div>
+              <div className="text-[11px] font-bold text-white pt-0.5">Incognito tab</div>
+              <div className="text-[10px] text-purple-200/70">No history, no cookies</div>
+            </button>
           </div>
 
           {/* Web Preview Only: Download Android APK Card (hidden when already inside Android APK!) */}
@@ -592,8 +676,9 @@ export const WebViewport: React.FC<WebViewportProps> = ({
           <div className="rounded-2xl border border-slate-800 p-4 space-y-2" style={{ backgroundColor: '#161b22' }}>
             <div className="flex items-center justify-between gap-2">
               <span className="text-base font-bold text-cyan-300">{String(d.fullName)}</span>
-              <span className="text-xs text-amber-300 font-semibold">
-                ★ {Number(d.stars || 0).toLocaleString()}
+              <span className="text-xs text-amber-300 font-semibold inline-flex items-center gap-1">
+                <Star size={11} className="shrink-0" fill="currentColor" />
+                <span>{Number(d.stars || 0).toLocaleString()}</span>
               </span>
             </div>
             <p className="text-xs text-slate-300">{highlightText(String(d.description || ''))}</p>
@@ -633,7 +718,10 @@ export const WebViewport: React.FC<WebViewportProps> = ({
             >
               <div className="flex items-center justify-between">
                 <span className="text-sm font-bold text-cyan-300">{item.fullName}</span>
-                <span className="text-xs text-amber-300">★ {Number(item.stars || 0).toLocaleString()}</span>
+                <span className="text-xs text-amber-300 inline-flex items-center gap-1">
+                  <Star size={11} className="shrink-0" fill="currentColor" />
+                  <span>{Number(item.stars || 0).toLocaleString()}</span>
+                </span>
               </div>
               <p className="text-xs text-slate-300 mt-1">{highlightText(String(item.description || ''))}</p>
             </div>
@@ -684,7 +772,9 @@ export const WebViewport: React.FC<WebViewportProps> = ({
   if (isNativeAndroid) {
     return (
       <div
-        className="h-full w-full flex flex-col items-center justify-center p-6 text-center select-none"
+        className={`h-full w-full flex flex-col items-center justify-center p-6 text-center select-none ${
+          zapperMode ? 'zapper-active' : ''
+        }`}
         style={{ backgroundColor: '#060a12' }}
       >
         <Globe size={28} className="text-cyan-400 mb-2 opacity-60" />
@@ -692,6 +782,21 @@ export const WebViewport: React.FC<WebViewportProps> = ({
           {tab.title || tab.url}
         </div>
         <div className="text-xs text-slate-500 max-w-xs truncate mt-0.5">{tab.url}</div>
+
+        {zapperMode && (
+          <div className="mt-3 space-y-2">
+            <p className="text-[11px] text-rose-200 max-w-[240px] leading-relaxed">
+              Element Zapper is on. Tap any box, banner or menu on the page to remove it.
+            </p>
+            <button
+              type="button"
+              onClick={() => onZapElement(`zap-${Date.now()}`)}
+              className="px-3 py-1.5 rounded-xl bg-rose-500 text-white text-[11px] font-bold cursor-pointer"
+            >
+              Simulate tap on selected block
+            </button>
+          </div>
+        )}
       </div>
     );
   }

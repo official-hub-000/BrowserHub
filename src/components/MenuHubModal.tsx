@@ -34,6 +34,7 @@ import type {
   VpnState,
 } from '../types/browser';
 import { SEARCH_ENGINE_OPTIONS } from '../data/presets';
+import { SearchEngineIcon } from './VectorIcons';
 
 interface MenuHubModalProps {
   tab: BrowserTab;
@@ -73,6 +74,7 @@ interface MenuHubModalProps {
 
 export const MenuHubModal: React.FC<MenuHubModalProps> = ({
   tab,
+  tabsCount,
   shields,
   vpn,
   enabledExtensionsCount,
@@ -146,6 +148,9 @@ export const MenuHubModal: React.FC<MenuHubModalProps> = ({
           <section className="space-y-2.5">
             <div className="text-[11px] font-bold uppercase tracking-wider text-cyan-400 px-1">
               1. Search Engine &amp; Navigation
+              <span className="ml-2 text-[10px] font-medium normal-case text-slate-400">
+                {tabsCount} open tab{tabsCount === 1 ? '' : 's'}
+              </span>
             </div>
 
             {/* Search Engine Selector Pills */}
@@ -166,7 +171,7 @@ export const MenuHubModal: React.FC<MenuHubModalProps> = ({
                           : 'bg-slate-900 hover:bg-slate-800 border-slate-800 text-slate-300'
                       }`}
                     >
-                      <span>{eng.icon}</span>
+                      <SearchEngineIcon id={eng.id} size={13} />
                       <span className="truncate">{eng.shortLabel}</span>
                     </button>
                   );

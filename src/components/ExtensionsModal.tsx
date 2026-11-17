@@ -13,6 +13,7 @@ import {
 import type { BrowserExtension } from '../types/browser';
 import { DISCOVER_WORLD_EXTENSIONS } from '../data/presets';
 import { parseGlobalStoreUrl, unpackExtensionFile } from '../utils/extensionUnpacker';
+import { SiteIcon } from './VectorIcons';
 
 interface ExtensionsModalProps {
   extensions: BrowserExtension[];
@@ -96,7 +97,7 @@ export const ExtensionsModal: React.FC<ExtensionsModalProps> = ({
         studioType === 'css'
           ? 'Live UserCSS stylesheet injected across tabs.'
           : 'Custom Userscript running in BrowserHub GM_* sandbox.',
-      icon: studioType === 'css' ? '🎨' : '⚡',
+      icon: studioType === 'css' ? 'css' : 'userscript',
       enabled: true,
       allowIncognito: true,
       permissions: ['<all_urls>', 'scripting'],
@@ -170,7 +171,7 @@ export const ExtensionsModal: React.FC<ExtensionsModalProps> = ({
                 className="rounded-2xl bg-slate-900/80 border border-slate-800 p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
               >
                 <div className="flex items-start gap-3 min-w-0">
-                  <div className="text-2xl shrink-0 mt-0.5">{ext.icon}</div>
+                  <div className="w-8 h-8 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center shrink-0 mt-0.5"><SiteIcon id={ext.icon} size={18} /></div>
                   <div className="min-w-0 space-y-1">
                     <div className="flex flex-wrap items-center gap-1.5">
                       <span className="text-xs font-bold text-white">{ext.name}</span>
@@ -228,7 +229,7 @@ export const ExtensionsModal: React.FC<ExtensionsModalProps> = ({
                     className="rounded-2xl bg-slate-900/80 border border-slate-800 p-3.5 flex items-center justify-between gap-3"
                   >
                     <div className="flex items-start gap-3">
-                      <div className="text-2xl">{item.icon}</div>
+                      <div className="w-10 h-10 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center"><SiteIcon id={item.icon} size={22} /></div>
                       <div>
                         <div className="text-xs font-bold text-white flex items-center gap-2">
                           {item.name}
