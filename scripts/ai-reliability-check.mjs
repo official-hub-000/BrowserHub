@@ -116,6 +116,33 @@ for (const [file, label] of Object.entries(shells)) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// The Wikipedia fallback must stay reachable from a browser context.
+//
+// Wikimedia's REST API echoes CORS headers, but its preflight allow-list does
+// NOT include `user-agent`. A custom header such as an explicit Accept can turn
+// the call into a preflighted request that is rejected before it is sent, which
+// would silently disable the only fallback that works when the model is
+// throttled. This exact failure has already cost one round of debugging.
+const wikiPath = path.join(ROOT, 'src/utils/wikipediaAnswer.ts');
+if (!fs.existsSync(wikiPath)) {
+  problems.push('src/utils/wikipediaAnswer.ts: missing (no unthrottled fallback)');
+} else {
+  const wiki = fs.readFileSync(wikiPath, 'utf8');
+  if (/headers\s*:\s*\{/.test(wiki)) {
+    problems.push(
+      'src/utils/wikipediaAnswer.ts: custom request headers can trigger a CORS preflight, ' +
+        'which Wikimedia rejects — the fallback would fail silently'
+    );
+  }
+  if (!/origin=\*/.test(wiki)) {
+    problems.push('src/utils/wikipediaAnswer.ts: Action API search must send origin=* for CORS');
+  }
+  if (!/rest_v1\/page\/summary/.test(wiki)) {
+    problems.push('src/utils/wikipediaAnswer.ts: no article-summary endpoint');
+  }
+}
+
 if (problems.length) {
   console.error('❌ AI reliability regression:\n');
   for (const p of problems) console.error(`  ${p}`);

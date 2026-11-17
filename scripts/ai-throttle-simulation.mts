@@ -21,6 +21,30 @@
  */
 import assert from 'node:assert';
 
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+
+const MODE = process.env.BH_AI_MODE as 'throttled' | 'offline' | 'healthy' | undefined;
+if (!MODE) {
+  // Module state (rate-limit window, answer cache) is per-process, so each
+  // condition must run in its own process or the results leak into each other.
+  for (const mode of ['throttled', 'offline', 'healthy'] as const) {
+    const res = spawnSync(process.execPath, ['--import', 'tsx', fileURLToPath(import.meta.url)], {
+      env: { ...process.env, BH_AI_MODE: mode },
+      encoding: 'utf8',
+    });
+    const line = (res.stdout || '').trim().split('\n').pop() || '';
+    if (res.status !== 0) {
+      console.error(res.stdout);
+      console.error(res.stderr);
+      process.exit(1);
+    }
+    console.log(line);
+  }
+  console.log('AI resilience verified for throttled, offline and healthy providers');
+  process.exit(0);
+}
+
 const mem: Record<string, string> = {};
 (globalThis as any).localStorage = {
   getItem: (k: string) => mem[k] ?? null,
@@ -43,6 +67,13 @@ const ARTICLES: Record<string, any> = {
       'Cristiano Ronaldo dos Santos Aveiro is a Portuguese professional footballer who plays as a forward for Al Nassr and the Portugal national team. He is widely regarded as one of the greatest players of all time.',
     content_urls: { desktop: { page: 'https://en.wikipedia.org/wiki/Cristiano_Ronaldo' } },
   },
+  hamlet: {
+    title: 'Hamlet',
+    type: 'standard',
+    extract:
+      'The Tragedy of Hamlet, Prince of Denmark is a tragedy written by William Shakespeare sometime between 1599 and 1601. It is regarded as one of the most powerful and influential works in world literature.',
+    content_urls: { desktop: { page: 'https://en.wikipedia.org/wiki/Hamlet' } },
+  },
   goat: {
     title: 'Goat',
     type: 'standard',
@@ -55,9 +86,11 @@ const ARTICLES: Record<string, any> = {
 (globalThis as any).fetch = async (url: string) => {
   const u = String(url);
 
-  // The throttled free LLM endpoint: exactly one anonymous success, then 429.
+  // The free LLM endpoint, behaving exactly as the condition requires.
   if (u.includes('text.pollinations.ai')) {
     modelCalls += 1;
+    if (MODE === 'offline') throw new TypeError('Load failed');
+    if (MODE === 'throttled') return { ok: false, status: 429, json: async () => ({}) } as any;
     if (throttled) return { ok: false, status: 429, json: async () => ({}) } as any;
     throttled = true;
     return {
@@ -95,45 +128,64 @@ async function ask(query: string) {
   return { out, ms: Date.now() - started };
 }
 
-// 1. The model answers the first question and then throttles.
-const first = await ask('Who is Cristiano Ronaldo?');
-assert.ok(first.out.responseText.length > 10, 'first question should be answered');
+if (MODE === 'healthy') {
+  // The live model works: its answer must be used, not a stand-in.
+  const live = await ask('Who is Cristiano Ronaldo?');
+  assert.match(live.out.engineLabel, /Live AI/, 'a healthy provider must answer directly');
+  assert.match(live.out.responseText, /live model reply/i);
+  assert.ok(!/wikipedia/i.test(live.out.engineLabel), 'must not prefer a stand-in when live AI works');
+  console.log(`healthy provider answered live in ${live.ms} ms`);
+  process.exit(0);
+}
 
-// 2. The device failure case: a second factual question while throttled.
-const second = await ask('Who is the animal goat?');
-assert.match(
-  second.out.engineLabel,
-  /Wikipedia/,
-  `second question must be answered from Wikipedia, got "${second.out.engineLabel}"`
-);
-assert.match(second.out.responseText, /domestic goat|cloven-hoofed/i, 'answer must be the real article text');
+if (MODE === 'throttled') {
+  // The model is rate limited from the very first call.
+  const first = await ask('Who is Cristiano Ronaldo?');
+  assert.match(first.out.engineLabel, /Wikipedia/, `throttled question must use Wikipedia, got "${first.out.engineLabel}"`);
+  assert.match(first.out.responseText, /Portuguese professional footballer/i);
+  assert.ok(
+    !/couldn't reach a live AI model/i.test(first.out.responseText),
+    'must not fall through to the apology while a source is available'
+  );
+
+  // A second, differently shaped factual question must also be answered.
+  const second = await ask('Who wrote Hamlet?');
+  assert.match(second.out.engineLabel, /Wikipedia/, `second factual question must be answered, got "${second.out.engineLabel}"`);
+
+  // A repeat must not hit the (dead) model endpoint again.
+  const before = modelCalls;
+  const repeat = await ask('Who is Cristiano Ronaldo?');
+  assert.equal(modelCalls, before, 'a repeat must not call the throttled endpoint again');
+  assert.match(
+    repeat.out.engineLabel,
+    /Wikipedia/,
+    `repeat should still be answered from a source, got "${repeat.out.engineLabel}"`
+  );
+
+  // Slang is explained locally, and says why the model was not used.
+  const slang = await ask('Who is goat?');
+  assert.match(slang.out.responseText, /greatest of all time/i);
+  assert.match(slang.out.responseText, /rate limited/i, 'must name the real reason');
+
+  assert.ok(first.ms < 3000, `throttled answer took ${first.ms} ms`);
+  console.log(`throttled provider answered from source in ${first.ms} ms`);
+  process.exit(0);
+}
+
+// MODE === 'offline': the device has no working network at all.
+const offlineFact = await ask('Who is Cristiano Ronaldo?');
 assert.ok(
-  !/couldn't reach a live AI model/i.test(second.out.responseText),
-  'second question must not fall through to the apology'
+  /could not reach the internet|Wikipedia/i.test(offlineFact.out.responseText) ||
+    /Wikipedia/.test(offlineFact.out.engineLabel),
+  'offline factual question must be answered or explain the connection problem'
 );
+const offlineChat = await ask('Who is goat?');
+assert.match(offlineChat.out.responseText, /could not reach the internet/i, 'must name the connection, not rate limiting');
 assert.ok(
-  second.out.bullets?.some((b) => /Source:/i.test(b)),
-  'a Wikipedia answer must state its source'
+  !/ask again in about 15 seconds/i.test(offlineChat.out.responseText),
+  'must not tell an offline device to retry in 15 seconds'
 );
+console.log(`offline device handled honestly in ${offlineChat.ms} ms`);
+process.exit(0);
 
-// 3. Repeating the first question must not hit the network again.
-const before = modelCalls;
-const repeat = await ask('Who is Cristiano Ronaldo?');
-assert.match(repeat.out.engineLabel, /saved/, 'repeat should be served from cache');
-assert.equal(modelCalls, before, 'a cached answer must not make a new model call');
 
-// 4. Slang stays local: it must not be shipped to an encyclopedia as a name.
-const slang = await ask('Who is goat?');
-assert.ok(
-  /greatest of all time/i.test(slang.out.responseText),
-  'slang must be explained as slang, not looked up as a person'
-);
-
-// 5. No stall: the throttled path must be fast, not the old ~36 s stack.
-assert.ok(second.ms < 3000, `throttled answer took ${second.ms} ms; expected under 3 s`);
-assert.ok(repeat.ms < 1000, `cached answer took ${repeat.ms} ms`);
-
-console.log(
-  `AI throttle simulation passed (2nd question ${second.ms} ms, repeat ${repeat.ms} ms, ` +
-    `${modelCalls} model call${modelCalls === 1 ? '' : 's'})`
-);

@@ -21,6 +21,15 @@ export interface FactAnswer {
   sourceLabel: string;
 }
 
+/**
+ * CORS note (this matters — it is why a Wikipedia lookup can fail silently):
+ *
+ * Wikimedia's REST API echoes CORS headers for browser callers, but its
+ * preflight allow-list does not include `user-agent`. Any request that triggers
+ * a preflight can therefore be rejected before it is even sent. The safe form
+ * is a "simple request": GET, no custom headers, no explicit Accept. We
+ * deliberately pass no headers and let the browser supply defaults.
+ */
 const WIKI_SUMMARY = 'https://en.wikipedia.org/api/rest_v1/page/summary/';
 const WIKI_SEARCH = 'https://en.wikipedia.org/w/api.php';
 
@@ -47,17 +56,34 @@ export function extractFactSubject(query: string): string | null {
   if (!q) return null;
 
   // Only factual interrogatives — greetings, drafts and how-to steps are
-  // handled by the local engine instead.
-  const factual =
-    /^(who|what|where)\s+(is|was|are|were)\b/i.test(q) ||
-    /^tell\s+me\s+about\b/i.test(q) ||
-    /^(define|definition\s+of)\b/i.test(q);
-  if (!factual) return null;
+  // handled by the local engine instead. Every shape below is a question that
+  // has a single authoritative encyclopedia answer, so a missing live model
+  // does not have to mean "no answer".
+  const shapes: Array<{ re: RegExp; to: string }> = [
+    // who is / what is / where is
+    { re: /^(who|what|where)\s+(is|was|are|were)\s*/i, to: '' },
+    // who won / who wrote / who invented / who discovered / who built
+    { re: /^who\s+(won|wrote|invented|discovered|founded|built|created|painted|directed|composed|killed|signed)\s*/i, to: '' },
+    // when did / when was / when is   (keeps the event words as the subject)
+    { re: /^when\s+(did|was|is|were)\s*/i, to: '' },
+    // how tall is / how old is / how long is / how far is
+    { re: /^how\s+(tall|old|long|big|heavy|far|hot|cold|deep|high)\s+(is|was|are|were)\s*/i, to: '' },
+    // what causes / what makes
+    { re: /^(what|which)\s+(causes|makes|caused|created)\s*/i, to: '' },
+    { re: /^tell\s+me\s+about\s*/i, to: '' },
+    { re: /^(define|definition\s+of)\s*/i, to: '' },
+  ];
 
-  let subject = q
-    .replace(/^(who|what|where)\s+(is|was|are|were)\s*/i, '')
-    .replace(/^tell\s+me\s+about\s*/i, '')
-    .replace(/^(define|definition\s+of)\s*/i, '')
+  let subject = '';
+  for (const shape of shapes) {
+    if (shape.re.test(q)) {
+      subject = q.replace(shape.re, shape.to);
+      break;
+    }
+  }
+  if (!subject) return null;
+
+  subject = subject
     .replace(/\b(the\s+)?(meaning|definition)\s+of\s+(life|everything)\b.*$/i, '')
     .trim();
 
@@ -120,7 +146,7 @@ async function fetchSummary(title: string, signal: AbortSignal): Promise<FactAns
   try {
     const res = await fetch(
       `${WIKI_SUMMARY}${encodeURIComponent(title.replace(/\s+/g, '_'))}?redirect=true`,
-      { signal, headers: { Accept: 'application/json' } }
+      { signal }
     );
     if (!res.ok) return null;
     const data: WikiSummary = await res.json();
@@ -142,10 +168,11 @@ async function fetchSummary(title: string, signal: AbortSignal): Promise<FactAns
 /** Uses Wikipedia's own search when the literal title does not resolve. */
 async function searchTitle(query: string, signal: AbortSignal): Promise<string | null> {
   try {
+    // `origin=*` is mandatory for the Action API to return CORS headers.
     const url =
       `${WIKI_SEARCH}?action=query&format=json&origin=*&list=search&srlimit=1&srsearch=` +
       encodeURIComponent(query);
-    const res = await fetch(url, { signal, headers: { Accept: 'application/json' } });
+    const res = await fetch(url, { signal });
     if (!res.ok) return null;
     const data: any = await res.json();
     const hit = data?.query?.search?.[0]?.title;

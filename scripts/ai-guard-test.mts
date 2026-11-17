@@ -33,7 +33,18 @@ check('search page never quoted', !/37signals/.test(summarizeOnSearch.responseTe
 const offlineQuestion = runLocalAiClient({
   mode: 'chat', query: 'What is quantum computing?', url: 'browserhub://start', content: '',
 });
-check('offline admits it cannot answer', /couldn't reach a live AI model/i.test(offlineQuestion.responseText));
+// The fallback must always state plainly that no live model answered, and it
+// must say which kind of failure it was rather than a vague apology.
+check(
+  'offline admits it cannot answer',
+  /(couldn't reach a live AI model|could not reach the internet|rate limited)/i.test(
+    offlineQuestion.responseText
+  )
+);
+check(
+  'offline names the specific reason',
+  /(could not reach the internet|rate limited)/i.test(offlineQuestion.responseText)
+);
 check('offline offers next steps', /search/i.test(offlineQuestion.responseText));
 
 const math = runLocalAiClient({ mode: 'chat', query: '18% of 2450', url: 'browserhub://start' });

@@ -11,6 +11,7 @@ import {
   FileText,
   PenLine,
   WifiOff,
+  Info,
   Lightbulb,
 } from 'lucide-react';
 import type { AiChatMessage, BrowserTab } from '../types/browser';
@@ -419,12 +420,26 @@ export const AiCopilotDrawer: React.FC<AiCopilotDrawerProps> = ({
 
               {msg.role === 'assistant' && msg.bullets && msg.bullets.length > 0 && (
                 <div className="mt-2 pt-2 border-t border-slate-800 space-y-1">
-                  {msg.bullets.map((b, i) => (
-                    <div key={i} className="text-[11px] text-emerald-300 flex items-start gap-1.5">
-                      <WifiOff size={10} className="mt-0.5 shrink-0 opacity-70" />
-                      <span>{b}</span>
-                    </div>
-                  ))}
+                  {msg.bullets.map((b, i) => {
+                    // Diagnostics start with "Why:" and describe a failure, so
+                    // they must not borrow the green "it worked" styling.
+                    const isDiagnostic = /^Why:/i.test(b);
+                    return (
+                      <div
+                        key={i}
+                        className={`text-[11px] flex items-start gap-1.5 ${
+                          isDiagnostic ? 'text-slate-500' : 'text-emerald-300'
+                        }`}
+                      >
+                        {isDiagnostic ? (
+                          <Info size={10} className="mt-0.5 shrink-0 opacity-70" />
+                        ) : (
+                          <WifiOff size={10} className="mt-0.5 shrink-0 opacity-70" />
+                        )}
+                        <span>{b}</span>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
 

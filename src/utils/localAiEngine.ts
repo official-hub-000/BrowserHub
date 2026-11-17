@@ -250,6 +250,7 @@ function noPageMessage(requestLabel: string, ctx: PageAiContext): string {
  */
 export function runLocalAiClient(input: LocalAiInput): LocalAiOutput {
   const start = performance.now();
+  lastAttempts = [];
   const mode = input.mode || 'chat';
   const query = (input.query || '').trim();
   const ctx = getPageContextForAi(input.url || 'browserhub://start', input.content);
@@ -326,15 +327,31 @@ export function runLocalAiClient(input: LocalAiInput): LocalAiOutput {
       // No live model, no page context. Never invent an answer — but still do
       // something genuinely useful with what the browser already knows.
       const hint = describeQuery(query);
+      // Prefer this request's own evidence; fall back to the session-level
+      // signal only when nothing here said anything useful.
+      const sawNetworkError = lastAttempts.some((a) => /network error|Load failed|Failed to fetch|HTTP 5\d\d/i.test(a));
+      const sawThrottle = lastAttempts.some((a) => /rate limited|HTTP 429/i.test(a));
+      const offline = sawNetworkError || (!sawThrottle && isOfflineDevice());
+      // Say which failure this is. Telling someone to "ask again in a moment"
+      // when their phone plainly has no connection is the kind of dishonest
+      // advice this app is not allowed to give.
+      const reason = offline
+        ? 'This device could not reach the internet, so no live model was available.'
+        : 'The free live model is busy or rate limited right now.';
       responseText =
-        `I couldn't reach a live AI model just now, so I won't guess at **"${query}"**.\n\n` +
+        `${reason} I won't guess at **"${query}"**.\n\n` +
         (hint ? `**${hint}**\n\n` : '') +
         `Three things that work right now:\n` +
         `1. **Search it** — type it in the address bar and BrowserHub opens it with **${input.searchEngineName || 'the engine in your address bar'}**.\n` +
         `2. **Open any result and tap Summarize** — I read the real page text on-device and answer from it.\n` +
-        `3. **Ask again in a moment** — the live model is usually back within a few seconds, and I now retry automatically.\n\n` +
-        `Offline, I can still do: exact math (**"18% of 2450"**), email and message drafts, page summaries, page Q&A, and a privacy check of the URL you're on.`;
-      bullets = ['Tap Summarize after opening a page for an on-device answer from its real text'];
+        (offline
+          ? `3. **Turn on mobile data or Wi-Fi and ask again** — the search and page-reading above already work without it.\n\n`
+          : `3. **Ask again in about 15 seconds** — the free model accepts roughly one question per 15 seconds.\n\n`) +
+        `What I can always do on-device: exact math (**"18% of 2450"**), email and message drafts, page summaries, page Q&A, and a privacy check of the URL you're on.`;
+      bullets = [
+        'Tap Summarize after opening a page for an on-device answer from its real text',
+        ...(lastAttempts.length ? [`Why: ${lastAttempts.slice(-2).join(' · ')}`] : []),
+      ];
     }
   } else {
     responseText = hasPageText
@@ -362,12 +379,18 @@ export function runLocalAiClient(input: LocalAiInput): LocalAiOutput {
  */
 async function askViaNativeBridge(prompt: string, timeoutMs: number): Promise<string | null> {
   const bridge = typeof window !== 'undefined' ? window.BrowserHubNative : undefined;
-  if (!bridge?.startAiRequest || !bridge?.pollAiResult) return null;
+  // No bridge at all is normal in the browser preview; say so only in the
+  // diagnostic channel, never in the chat.
+  if (!bridge?.startAiRequest || !bridge?.pollAiResult) {
+    noteAiAttempt('native', 'no native bridge (web build)');
+    return null;
+  }
 
   const requestId = `ai-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   try {
     bridge.startAiRequest(requestId, prompt, SYSTEM_PROMPT);
-  } catch {
+  } catch (err) {
+    noteAiAttempt('native', `start threw: ${(err as Error)?.message || 'unknown'}`);
     return null;
   }
 
@@ -386,11 +409,14 @@ async function askViaNativeBridge(prompt: string, timeoutMs: number): Promise<st
       if (parsed?.ok && typeof parsed.text === 'string' && parsed.text.trim().length > 2) {
         return parsed.text.trim();
       }
+      noteAiAttempt('native', `failed: ${parsed?.error || 'empty reply'}`);
       return null;
-    } catch {
+    } catch (err) {
+      noteAiAttempt('native', `bad envelope: ${(err as Error)?.message || 'unknown'}`);
       return null;
     }
   }
+  noteAiAttempt('native', `timed out after ${timeoutMs} ms`);
   return null;
 }
 
@@ -425,6 +451,39 @@ async function fetchLive(
  * Without this guard the next question spends its whole budget re-learning
  * that, which is why asking twice quickly produced "answered, then apologised".
  */
+/**
+ * Why the last live attempt failed, in plain words.
+ *
+ * The user could not tell "the model is rate limited" from "this phone cannot
+ * reach the internet", and they all looked identical: an apology. Recording the
+ * reason lets the UI say which one it is, and lets the fallback stop offering
+ * "ask again in a moment" when the device is genuinely offline.
+ */
+export type AiAttemptKind = 'native' | 'direct' | 'proxy' | 'wiki';
+let lastAttempts: string[] = [];
+let networkUnreachable = false;
+
+function noteAiAttempt(kind: AiAttemptKind, reason: string) {
+  lastAttempts.push(`${kind}: ${reason}`);
+  if (lastAttempts.length > 6) lastAttempts = lastAttempts.slice(-6);
+}
+
+export function getLastAiAttempts(): string[] {
+  return [...lastAttempts];
+}
+
+/** True when the device could not reach the network at all (not throttling). */
+export function isOfflineDevice(): boolean {
+  return networkUnreachable;
+}
+
+function noteNetworkFailure(err: unknown) {
+  const name = (err as Error)?.name || '';
+  // AbortError is our own timeout: the network may be fine, just slow.
+  if (name === 'AbortError') return;
+  networkUnreachable = true;
+}
+
 const RATE_LIMIT_WINDOW_MS = 15000;
 let rateLimitedUntil = 0;
 
@@ -464,6 +523,7 @@ Rules:
  */
 export async function runSmartHybridAi(input: LocalAiInput): Promise<LocalAiOutput> {
   const start = performance.now();
+  lastAttempts = [];
   const mode = input.mode || 'chat';
   const query = (input.query || '').trim();
   const ctx = getPageContextForAi(input.url || 'browserhub://start', input.content);
@@ -491,7 +551,11 @@ export async function runSmartHybridAi(input: LocalAiInput): Promise<LocalAiOutp
   // the network again. This is what makes re-tapping a prompt instant.
   const cacheKey = [mode, query, ctx.kind, ctx.text.slice(0, 160)].join('|');
   const cached = getCachedAnswer(cacheKey);
-  if (cached) {
+  // A saved *model* answer is authoritative — reuse it immediately. A saved
+  // encyclopedia answer is only a stand-in, so it must not stop us asking the
+  // live model that has since come back online.
+  const cachedIsModelAnswer = !!cached && !/wikipedia/i.test(cached.engineLabel || '');
+  if (cached && cachedIsModelAnswer) {
     return {
       ok: true,
       model: cached.model,
@@ -592,15 +656,24 @@ export async function runSmartHybridAi(input: LocalAiInput): Promise<LocalAiOutp
         });
         if (res.status === 429) {
           markModelRateLimited();
+          noteAiAttempt('direct', 'rate limited (HTTP 429)');
           return null;
         }
-        if (!res.ok) continue;
+        if (!res.ok) {
+          noteAiAttempt('direct', `${model}: HTTP ${res.status}`);
+          continue;
+        }
         const data: any = await res.json();
         const text = data?.choices?.[0]?.message?.content;
         if (typeof text === 'string' && text.trim().length > 2) return text.trim();
       } catch (err) {
+        noteNetworkFailure(err);
         // Abort means the budget is gone — stop trying further models.
-        if ((err as Error)?.name === 'AbortError') break;
+        if ((err as Error)?.name === 'AbortError') {
+          noteAiAttempt('direct', 'timed out');
+          break;
+        }
+        noteAiAttempt('direct', `${model}: ${(err as Error)?.message || 'network error'}`);
       }
     }
     return null;
@@ -614,6 +687,7 @@ export async function runSmartHybridAi(input: LocalAiInput): Promise<LocalAiOutp
   // it would fail too — waiting 3.5 s to confirm that is pure latency for the
   // user. A hard overall deadline also stops stacked timeouts.
   const outOfBudget = performance.now() - start > 14000;
+  if (rateLimited) noteAiAttempt('proxy', 'skipped (model rate limited)');
   const proxyReply = rateLimited || outOfBudget ? null : await fetchLive(async (signal) => {
     const res = await fetch('./api/ai/chat', {
       method: 'POST',
@@ -629,8 +703,12 @@ export async function runSmartHybridAi(input: LocalAiInput): Promise<LocalAiOutp
         pageText: hasPageText ? ctx.text : '',
       }),
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      noteAiAttempt('proxy', `HTTP ${res.status}`);
+      return null;
+    }
     const data: any = await res.json();
+    if (!data?.ok) noteAiAttempt('proxy', data?.error || 'no answer in response');
     return data?.ok ? data.responseText ?? null : null;
   }, 3500);
   if (proxyReply) {
@@ -639,6 +717,8 @@ export async function runSmartHybridAi(input: LocalAiInput): Promise<LocalAiOutp
   }
 
   const fact = await factPromise;
+  const savedFallback = cached && !cachedIsModelAnswer ? cached : null;
+
   if (fact) {
     const out: LocalAiOutput = {
       ok: true,
@@ -654,6 +734,19 @@ export async function runSmartHybridAi(input: LocalAiInput): Promise<LocalAiOutp
       ],
     };
     return persist(out);
+  }
+
+  if (savedFallback) {
+    return {
+      ok: true,
+      model: savedFallback.model,
+      engineLabel: `${savedFallback.engineLabel} (saved)`,
+      zeroApiKey: true,
+      zeroTelemetry: true,
+      inferenceMs: 1,
+      responseText: savedFallback.text,
+      bullets: ['Answered from a saved reply — no new request was made'],
+    };
   }
 
   return runLocalAiClient(input);
