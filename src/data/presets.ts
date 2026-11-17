@@ -540,7 +540,7 @@ export const SPEED_DIAL_SITES = [
   {
     title: 'GitHub',
     subtitle: 'Code & Repos',
-    url: 'https://github.com/vitejs/vite',
+    url: 'https://github.com',
     icon: '🐙',
     color: 'from-emerald-500/20 to-teal-600/20',
   },

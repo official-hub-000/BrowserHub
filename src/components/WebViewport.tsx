@@ -354,16 +354,18 @@ export const WebViewport: React.FC<WebViewportProps> = ({
                 <button
                   key={site.title}
                   onClick={() => onNavigate(site.url)}
-                  className="rounded-2xl border border-slate-800 hover:border-cyan-500/50 p-3 flex flex-col items-center text-center gap-1.5 cursor-pointer transition"
+                  title={`${site.title} — ${site.subtitle}`}
+                  aria-label={`Open ${site.title}`}
+                  className="rounded-2xl border border-slate-800 hover:border-cyan-500/50 p-2 flex flex-col items-center text-center gap-1 cursor-pointer transition min-w-0"
                   style={{ backgroundColor: '#0f172a' }}
                 >
-                  <div className="w-10 h-10 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center text-lg">
+                  <div className="w-9 h-9 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center text-base shrink-0">
                     {site.icon}
                   </div>
-                  <div className="text-xs font-semibold text-white truncate w-full">
+                  <div className="text-[11px] leading-tight font-semibold text-white w-full break-words">
                     {site.title}
                   </div>
-                  <div className="text-[10px] text-slate-400 truncate w-full hidden sm:block">
+                  <div className="text-[9px] leading-tight text-slate-400 w-full hidden sm:block">
                     {site.subtitle}
                   </div>
                 </button>
