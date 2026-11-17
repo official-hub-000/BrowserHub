@@ -112,8 +112,8 @@ export const ExtensionsModal: React.FC<ExtensionsModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-3">
-      <div className="w-full max-w-2xl rounded-3xl bg-slate-950 border border-slate-800 shadow-2xl flex flex-col max-h-[90vh] overflow-hidden">
+    <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-3" onClick={onClose}>
+      <div className="w-full max-w-2xl rounded-3xl bg-slate-950 border border-slate-800 shadow-2xl flex flex-col max-h-[90vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-gradient-to-r from-purple-950/50 to-slate-900">
           <div className="flex items-center gap-2.5">

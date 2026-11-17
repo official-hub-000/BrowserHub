@@ -57,8 +57,8 @@ export const TabsDrawer: React.FC<TabsDrawerProps> = ({
     .reduce((acc, t) => acc + t.memoryMb, 0);
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-3">
-      <div className="w-full max-w-2xl rounded-3xl bg-slate-950 border border-slate-800 shadow-2xl flex flex-col max-h-[88vh] overflow-hidden">
+    <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-3" onClick={onClose}>
+      <div className="w-full max-w-2xl rounded-3xl bg-slate-950 border border-slate-800 shadow-2xl flex flex-col max-h-[88vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className="p-4 border-b border-slate-800 flex flex-wrap items-center justify-between gap-2 bg-slate-900/80">
           <div className="flex items-center gap-2">

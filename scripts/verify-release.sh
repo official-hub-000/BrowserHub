@@ -64,6 +64,12 @@ if (bad.length) { bad.forEach((b) => console.error("  FAIL " + b)); process.exit
 console.log("  native viewport sync + touch handoff guards OK");
 '
 
+echo "== Overlays can always be dismissed =="
+node scripts/modal-escape-check.mjs | tail -1
+
+echo "== 360px layout safety =="
+node scripts/narrow-layout-check.mjs | tail -1
+
 echo "== Extensions: enforced or labelled preview =="
 node scripts/extension-enforcement-check.mjs | tail -1
 

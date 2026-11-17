@@ -57,8 +57,8 @@ export const PlayStoreDownloadModal: React.FC<PlayStoreDownloadModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3">
-      <div className="w-full max-w-2xl rounded-3xl bg-slate-950 border border-emerald-500/40 shadow-2xl flex flex-col max-h-[90vh] overflow-hidden">
+    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3" onClick={onClose}>
+      <div className="w-full max-w-2xl rounded-3xl bg-slate-950 border border-emerald-500/40 shadow-2xl flex flex-col max-h-[90vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className="p-4 border-b border-slate-800 bg-gradient-to-r from-emerald-950/70 via-cyan-950/50 to-slate-950 flex items-center justify-between">
           <div className="flex items-center gap-2.5">

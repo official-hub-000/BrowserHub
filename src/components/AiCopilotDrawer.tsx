@@ -257,10 +257,11 @@ export const AiCopilotDrawer: React.FC<AiCopilotDrawerProps> = ({
       : { text: 'Waiting for page text', tone: 'text-amber-300' };
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end" style={{ backgroundColor: 'rgba(2, 6, 23, 0.8)' }}>
+    <div className="fixed inset-0 z-50 flex justify-end" style={{ backgroundColor: 'rgba(2, 6, 23, 0.8)' }} onClick={onClose}>
       <div
         className="w-full max-w-md h-full border-l border-slate-800 flex flex-col shadow-2xl"
         style={{ backgroundColor: '#090e1a' }}
+        onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div
