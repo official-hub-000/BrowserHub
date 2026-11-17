@@ -73,6 +73,12 @@ npx tsx scripts/math-and-prompt-check.mts | tail -1
 echo "== AI survives provider throttling (answered-then-apologised bug) =="
 npx tsx scripts/ai-throttle-simulation.mts | tail -1
 
+echo "== Live chat recovers (success must not self-block, providers independent) =="
+npx tsx scripts/live-chat-recovery-test.mts | tail -1
+
+echo "== Privacy shield labelled honestly + UI has visual depth =="
+node scripts/vpn-and-visual-check.mjs | tail -1
+
 echo "== Games hub honesty (no fake playability) =="
 node scripts/games-honesty-check.mjs | tail -1
 

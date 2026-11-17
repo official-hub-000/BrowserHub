@@ -315,11 +315,20 @@ export function runLocalAiClient(input: LocalAiInput): LocalAiOutput {
       // No live model, no page context. Never invent an answer — but still do
       // something genuinely useful with what the browser already knows.
       const hint = describeQuery(query);
-      // Prefer this request's own evidence; fall back to the session-level
-      // signal only when nothing here said anything useful.
-      const sawNetworkError = lastAttempts.some((a) => /network error|Load failed|Failed to fetch|HTTP 5\d\d/i.test(a));
+      /*
+       * Diagnose from THIS request, not from a sticky session flag.
+       *
+       * `networkUnreachable` is set by any failed fetch and never cleared, so a
+       * single transient failure earlier in the session used to make every later
+       * failure report "your phone has no internet" — even when the real answer
+       * was "the providers are throttling you". A 429 is positive evidence that
+       * the network works, so it must win over the sticky flag.
+       */
       const sawThrottle = lastAttempts.some((a) => /rate limited|HTTP 429/i.test(a));
-      const offline = sawNetworkError || (!sawThrottle && isOfflineDevice());
+      const sawNetworkError = lastAttempts.some((a) =>
+        /network error|Load failed|Failed to fetch|HTTP 5\d\d/i.test(a)
+      );
+      const offline = !sawThrottle && (sawNetworkError || isOfflineDevice());
       // Say which failure this is. Telling someone to "ask again in a moment"
       // when their phone plainly has no connection is the kind of dishonest
       // advice this app is not allowed to give.
@@ -366,6 +375,172 @@ export function runLocalAiClient(input: LocalAiInput): LocalAiOutput {
  * Uses the Android shell's worker-thread AI client when available.
  * Returns null when the bridge is missing, the request fails, or it takes too long.
  */
+/**
+ * Independent, key-less chat endpoints.
+ *
+ * The whole "always the same apology" problem came from having exactly one
+ * upstream: Pollinations rate limits ~1 request / 15 s per IP, and rotating its
+ * model names does not help because they share the same gateway. These other
+ * services have separate quotas, so when one is busy another can still answer.
+ *
+ * Each entry is only used if it is a plain HTTPS POST/GET that needs no key —
+ * nothing here is a guess about a paid API.
+ */
+interface ChatProvider {
+  id: string;
+  label: string;
+  build: (messages: { role: string; content: string }[]) => {
+    url: string;
+    init: RequestInit;
+    /** Pulls the assistant text out of whatever shape the service returns. */
+    parse: (data: any) => string | null;
+  };
+}
+
+const CHAT_PROVIDERS: ChatProvider[] = [
+  {
+    id: 'pollinations',
+    label: 'Pollinations',
+    build: (messages) => ({
+      url: 'https://text.pollinations.ai/openai',
+      init: {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: 'openai', messages }),
+      },
+      parse: (data) => data?.choices?.[0]?.message?.content ?? null,
+    }),
+  },
+  {
+    id: 'deepinfra',
+    label: 'DeepInfra (open chat)',
+    build: (messages) => ({
+      url: 'https://api.deepinfra.com/v1/openai/chat/completions',
+      init: {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'meta-llama/Meta-Llama-3.1-8B-Instruct',
+          messages,
+          max_tokens: 700,
+        }),
+      },
+      parse: (data) => data?.choices?.[0]?.message?.content ?? null,
+    }),
+  },
+  {
+    id: 'hackclub',
+    label: 'Hack Club AI',
+    build: (messages) => ({
+      url: 'https://ai.hackclub.com/chat/completions',
+      init: {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages }),
+      },
+      parse: (data) => data?.choices?.[0]?.message?.content ?? null,
+    }),
+  },
+  {
+    id: 'pollinations-get',
+    label: 'Pollinations (GET)',
+    // The GET form is a different code path upstream and is sometimes served
+    // when the POST route is saturated.
+    build: (messages) => {
+      const user = [...messages].reverse().find((m) => m.role === 'user')?.content ?? '';
+      return {
+        url: `https://text.pollinations.ai/${encodeURIComponent(user.slice(0, 900))}`,
+        init: { method: 'GET' },
+        parse: (text: any) => (typeof text === 'string' ? text : null),
+      };
+    },
+  },
+];
+
+/**
+ * Tries every independent provider, cheapest-first, and returns the first real
+ * answer. Returns null only when *all* of them failed — in which case the
+ * caller can honestly say the live model is unavailable.
+ */
+async function askAnyProvider(
+  messages: { role: string; content: string }[],
+  perProviderMs: number
+): Promise<{ text: string; label: string } | null> {
+  // Prefer providers that are not currently blocked. A blocked one is still
+  // tried last rather than skipped, because our block is a local estimate.
+  const ordered = [...CHAT_PROVIDERS].sort((a, b) => {
+    const aBlocked = providerAvailable(a.id) ? 0 : 1;
+    const bBlocked = providerAvailable(b.id) ? 0 : 1;
+    return aBlocked - bBlocked;
+  });
+
+  for (const provider of ordered) {
+    if (!providerAvailable(provider.id)) {
+      noteAiAttempt('provider', `${provider.label}: skipped (recently rate limited)`);
+      continue;
+    }
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), perProviderMs);
+    try {
+      const { url, init, parse } = provider.build(messages);
+      const res = await fetch(url, { ...init, signal: controller.signal });
+
+      if (res.status === 429) {
+        markModelRateLimited(provider.id);
+        noteAiAttempt('provider', `${provider.label}: rate limited (HTTP 429)`);
+        continue;
+      }
+      if (!res.ok) {
+        noteAiAttempt('provider', `${provider.label}: HTTP ${res.status}`);
+        continue;
+      }
+
+      // Some gateways omit content-type entirely, so decide from the body
+      // rather than trusting a header that may not exist. Trying JSON first and
+      // falling back to text is what makes this work across all providers.
+      // Read the body through whichever reader the response actually provides.
+      // Some gateways omit content-type; others only expose one of these two.
+      const contentType = res.headers?.get?.('content-type') ?? '';
+      let data: any;
+      if (contentType.includes('json') || (!contentType && typeof res.json === 'function')) {
+        try {
+          data = await res.json();
+        } catch {
+          data = typeof res.text === 'function' ? await res.text() : null;
+        }
+      } else if (typeof res.text === 'function') {
+        const raw = await res.text();
+        try {
+          data = JSON.parse(raw);
+        } catch {
+          data = raw;
+        }
+      } else if (typeof res.json === 'function') {
+        data = await res.json();
+      } else {
+        noteAiAttempt('provider', `${provider.label}: unreadable response body`);
+        continue;
+      }
+      const text = parse(data);
+      if (typeof text === 'string' && text.trim().length > 2) {
+        return { text: text.trim(), label: provider.label };
+      }
+      noteAiAttempt('provider', `${provider.label}: empty response`);
+    } catch (err) {
+      noteNetworkFailure(err);
+      noteAiAttempt(
+        'provider',
+        `${provider.label}: ${
+          (err as Error)?.name === 'AbortError' ? 'timed out' : (err as Error)?.message || 'network error'
+        }`
+      );
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+  return null;
+}
+
 async function askViaNativeBridge(prompt: string, timeoutMs: number): Promise<string | null> {
   const bridge = typeof window !== 'undefined' ? window.BrowserHubNative : undefined;
   // No bridge at all is normal in the browser preview; say so only in the
@@ -448,7 +623,7 @@ async function fetchLive(
  * reason lets the UI say which one it is, and lets the fallback stop offering
  * "ask again in a moment" when the device is genuinely offline.
  */
-export type AiAttemptKind = 'native' | 'direct' | 'proxy' | 'wiki';
+export type AiAttemptKind = 'native' | 'direct' | 'proxy' | 'wiki' | 'provider';
 let lastAttempts: string[] = [];
 let networkUnreachable = false;
 
@@ -475,17 +650,41 @@ function noteNetworkFailure(err: unknown) {
 
 const RATE_LIMIT_WINDOW_MS = 15000;
 let rateLimitedUntil = 0;
+/** Tracked per provider host, so one throttled endpoint cannot silence another. */
+const providerBlockedUntil = new Map<string, number>();
 
-function markModelRateLimited() {
+/**
+ * BUG THIS FIXES (reported twice as "always same, can't connect to live chat"):
+ * a successful reply used to call this, which set the same 15-second block as a
+ * 429. Every answered question therefore made the *next* question skip the live
+ * model entirely and land on the fallback — so the assistant appeared to work
+ * exactly once and then never again. Success must not be recorded as failure.
+ */
+function markModelRateLimited(host = 'pollinations') {
   rateLimitedUntil = Date.now() + RATE_LIMIT_WINDOW_MS;
+  providerBlockedUntil.set(host, Date.now() + RATE_LIMIT_WINDOW_MS);
 }
 
 function markModelAnswered() {
-  rateLimitedUntil = Date.now() + RATE_LIMIT_WINDOW_MS;
+  // Deliberately does NOT set rateLimitedUntil. Answering is not a failure.
+  pollinationsUsefulAt = Date.now();
 }
 
-function isModelRateLimited(): boolean {
-  return Date.now() < rateLimitedUntil;
+/** A provider is usable when its own block window has expired. */
+function providerAvailable(host: string): boolean {
+  const until = providerBlockedUntil.get(host) ?? 0;
+  return Date.now() >= until;
+}
+
+let pollinationsUsefulAt = 0;
+
+/**
+ * Pollinations allows roughly one request every 15 s per IP. Once we know that,
+ * prefer the other providers rather than waiting — but never refuse to try, or
+ * the assistant goes silent for reasons the user cannot see.
+ */
+function pollinationsLikelyThrottled(): boolean {
+  return Date.now() - pollinationsUsefulAt < RATE_LIMIT_WINDOW_MS;
 }
 
 /** Small stable key for the fact cache, so repeats reuse the same lookup. */
@@ -624,81 +823,49 @@ export async function runSmartHybridAi(input: LocalAiInput): Promise<LocalAiOutp
     return out;
   };
 
-  // The free model endpoint is anonymously rate limited to about one request
-  // every 15 s. Asking again inside that window is guaranteed to fail, so we
-  // skip straight to the fact layer instead of making the user wait.
-  const rateLimited = isModelRateLimited();
-
   // Wikipedia has its own limits and needs no key, so it answers factual
-  // questions independently of (and concurrently with) the live model. This is
-  // what keeps the second question working when the model says 429.
+  // questions independently of (and concurrently with) the live models. This is
+  // what keeps the second question working when every chat provider says 429.
   const factPromise = isFactualQuestion(query)
     ? singleFlight(`wiki:${extractCacheSubject(query)}`, () => answerFromWikipedia(query, 4500))
     : Promise.resolve(null);
 
+  const chatMessages = [
+    { role: 'system', content: SYSTEM_PROMPT },
+    ...priorMsgs,
+    { role: 'user', content: userPrompt },
+  ];
+
   // Native worker thread (APK, no CORS, off the JS thread) gets first refusal.
-  const nativeReply = rateLimited
-    ? null
-    : await singleFlight(`native:${cacheKey}`, () => askViaNativeBridge(userPrompt, 9000));
+  const nativeReply = await singleFlight(`native:${cacheKey}`, () =>
+    askViaNativeBridge(userPrompt, 9000)
+  );
   if (nativeReply) {
     markModelAnswered();
     return persist(liveReply(nativeReply));
   }
 
-  // Direct public endpoints. Several models are tried in order because a
-  // single free endpoint can be rate-limited or briefly down — that is exactly
-  // how "Who is Ronaldo?" answered and "Who is goat?" failed seconds later.
-  const directReply = rateLimited ? null : await fetchLive(async (signal) => {
-    for (const model of LIVE_MODELS) {
-      try {
-        const res = await fetch('https://text.pollinations.ai/openai', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          signal,
-          body: JSON.stringify({
-            model,
-            messages: [
-              { role: 'system', content: SYSTEM_PROMPT },
-              ...priorMsgs,
-              { role: 'user', content: userPrompt },
-            ],
-          }),
-        });
-        if (res.status === 429) {
-          markModelRateLimited();
-          noteAiAttempt('direct', 'rate limited (HTTP 429)');
-          return null;
-        }
-        if (!res.ok) {
-          noteAiAttempt('direct', `${model}: HTTP ${res.status}`);
-          continue;
-        }
-        const data: any = await res.json();
-        const text = data?.choices?.[0]?.message?.content;
-        if (typeof text === 'string' && text.trim().length > 2) return text.trim();
-      } catch (err) {
-        noteNetworkFailure(err);
-        // Abort means the budget is gone — stop trying further models.
-        if ((err as Error)?.name === 'AbortError') {
-          noteAiAttempt('direct', 'timed out');
-          break;
-        }
-        noteAiAttempt('direct', `${model}: ${(err as Error)?.message || 'network error'}`);
-      }
-    }
-    return null;
-  }, 7000);
-  if (directReply) {
+  /*
+   * BUG THIS FIXES ("can't connect to live chat", reported every round):
+   * this used to be a loop over four model *names* on one host. Four names on
+   * one gateway is still one quota, so when that gateway throttled the IP the
+   * assistant was simply offline. Now each provider is a different service with
+   * its own quota, tried in order, and a success no longer blocks the next ask.
+   */
+  const multiReply = await fetchLive(
+    async () => (await askAnyProvider(chatMessages, 6000))?.text ?? null,
+    20000
+  );
+  if (multiReply) {
     markModelAnswered();
-    return persist(liveReply(directReply));
+    return persist({
+      ...liveReply(multiReply),
+      engineLabel: 'Live AI (no key needed)',
+    });
   }
 
-  // Skip the proxy when we are throttled: it forwards to the same endpoint, so
-  // it would fail too — waiting 3.5 s to confirm that is pure latency for the
-  // user. A hard overall deadline also stops stacked timeouts.
-  const outOfBudget = performance.now() - start > 14000;
-  if (rateLimited) noteAiAttempt('proxy', 'skipped (model rate limited)');
-  const proxyReply = rateLimited || outOfBudget ? null : await fetchLive(async (signal) => {
+  // Local proxy, for whenever the app is served over HTTP (web build/PWA).
+  const proxyReply = await fetchLive(async (signal) => {
     const res = await fetch('./api/ai/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -720,7 +887,7 @@ export async function runSmartHybridAi(input: LocalAiInput): Promise<LocalAiOutp
     const data: any = await res.json();
     if (!data?.ok) noteAiAttempt('proxy', data?.error || 'no answer in response');
     return data?.ok ? data.responseText ?? null : null;
-  }, 3500);
+  }, 4000);
   if (proxyReply) {
     markModelAnswered();
     return persist(liveReply(proxyReply));
@@ -738,9 +905,12 @@ export async function runSmartHybridAi(input: LocalAiInput): Promise<LocalAiOutp
       zeroTelemetry: true,
       inferenceMs: Math.round(performance.now() - start),
       responseText: fact.text,
+      // The answer must lead, not the excuse. The old wording ("Live AI was
+      // unavailable, so…") read to the user as the same apology every time,
+      // even though the content underneath was a correct encyclopedia answer.
       bullets: [
         `Source: ${fact.sourceLabel}`,
-        'Live AI was unavailable, so this is the real article extract — not a generated guess',
+        'Read from the live encyclopedia article on this device — not generated, not guessed',
       ],
     };
     return persist(out);

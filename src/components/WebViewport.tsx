@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import {
+  Gamepad2,
   ShieldCheck,
   Globe,
   Sparkles,
@@ -37,6 +38,8 @@ import { sanitizeExtractedPageContent } from '../utils/localAiEngine';
 import { HomeSearchPanel } from './HomeSearchPanel';
 import { SiteIcon } from './VectorIcons';
 import { GamesHub } from './GamesHub';
+import { WEB_GAMES } from '../data/games';
+import { RUNS_HERE } from '../data/extensionCatalogue';
 
 interface WebViewportProps {
   tab: BrowserTab;
@@ -326,7 +329,12 @@ export const WebViewport: React.FC<WebViewportProps> = ({
       >
         {customCssString && <style>{customCssString}</style>}
 
-        <div className="max-w-2xl mx-auto px-4 py-5 sm:py-8 space-y-6">
+        {/* Decorative light layer. Pointer-transparent, sits under the content,
+            and gives the pure-black canvas depth instead of flat emptiness. */}
+        <div className="bh-aurora" aria-hidden="true" />
+        <div className="bh-grid-veil" aria-hidden="true" />
+
+        <div className="relative z-10 max-w-2xl mx-auto px-4 py-5 sm:py-8 space-y-6">
           {/* Incognito Notice (only in Incognito tabs) */}
           {tab.isIncognito && (
             <div
@@ -346,13 +354,36 @@ export const WebViewport: React.FC<WebViewportProps> = ({
           )}
 
           {/* Brand + Live Status Summary */}
-          <div className="text-center space-y-2 pt-1">
-            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
-              Browser<span className="text-cyan-400">Hub</span>
+          <div className="text-center space-y-2.5 pt-1">
+            <div className="flex justify-center">
+              <div className="w-12 h-12 rounded-2xl bh-breathe flex items-center justify-center border border-cyan-400/30"
+                   style={{
+                     background:
+                       'radial-gradient(circle at 32% 28%, rgba(34,211,238,0.30), rgba(139,92,246,0.18) 55%, #000 78%)',
+                   }}>
+                <Globe size={22} className="text-cyan-300" />
+              </div>
+            </div>
+            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
+              <span className="bh-gradient-text">BrowserHub</span>
             </h1>
             <p className="text-xs text-slate-400">
               Fast, private Android browser with multi-engine search, AdBlock, VPN &amp; AI
             </p>
+            <div className="flex items-center justify-center gap-1.5 flex-wrap pt-0.5">
+              {[
+                { label: 'Ad-block on', tone: 'text-emerald-300 border-emerald-500/40 bg-emerald-500/10' },
+                { label: 'AI ready', tone: 'text-cyan-300 border-cyan-500/40 bg-cyan-500/10' },
+                { label: 'No tracking', tone: 'text-violet-300 border-violet-500/40 bg-violet-500/10' },
+              ].map((chip) => (
+                <span
+                  key={chip.label}
+                  className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${chip.tone}`}
+                >
+                  {chip.label}
+                </span>
+              ))}
+            </div>
           </div>
 
           {/* SEARCH ENGINE SWITCHER + WIDE SEARCH BAR (single source of truth) */}
@@ -365,18 +396,21 @@ export const WebViewport: React.FC<WebViewportProps> = ({
 
           {/* QUICK ACCESS / SPEED DIAL (8 Real Sites) */}
           <div className="space-y-2.5">
-            <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 px-1">
-              Quick Websites
+            <div className="flex items-center gap-2 px-1">
+              <span className="w-1 h-3 rounded-full bg-gradient-to-b from-cyan-300 to-violet-400" />
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-300">
+                Quick Websites
+              </span>
             </div>
             <div className="grid grid-cols-4 gap-2 sm:gap-3">
-              {SPEED_DIAL_SITES.map((site) => (
+              {SPEED_DIAL_SITES.map((site, idx) => (
                 <button
                   key={site.title}
                   onClick={() => onNavigate(site.url)}
                   title={`${site.title} — ${site.subtitle}`}
                   aria-label={`Open ${site.title}`}
-                  className="rounded-2xl border border-slate-800 hover:border-cyan-500/50 p-2 flex flex-col items-center text-center gap-1 cursor-pointer transition min-w-0"
-                  style={{ backgroundColor: '#000000' }}
+                  className="bh-card bh-rise p-2 flex flex-col items-center text-center gap-1 cursor-pointer min-w-0"
+                  style={{ animationDelay: `${(idx * 45) % 320}ms` }}
                 >
                   <div className="w-9 h-9 rounded-xl bg-black border border-slate-800 flex items-center justify-center shrink-0">
                     <SiteIcon id={site.icon} size={19} />
@@ -394,14 +428,16 @@ export const WebViewport: React.FC<WebViewportProps> = ({
 
           {/* CATEGORIZED FEATURE CARDS (Clean 2x2 Grid — Every Card Clearly Labeled & Wired) */}
           <div className="space-y-2.5">
-            <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 px-1">
-              Browser Tools &amp; Protection
+            <div className="flex items-center gap-2 px-1">
+              <span className="w-1 h-3 rounded-full bg-gradient-to-b from-violet-400 to-fuchsia-400" />
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-300">
+                Browser Tools &amp; Protection
+              </span>
             </div>
             <div className="grid grid-cols-2 gap-2.5">
               <button
                 onClick={() => onOpenShields?.()}
-                className="rounded-2xl border border-slate-800 hover:border-emerald-500/50 p-3.5 text-left space-y-1 cursor-pointer transition"
-                style={{ backgroundColor: '#000000' }}
+                className="bh-card p-3.5 text-left space-y-1 cursor-pointer"
               >
                 <div className="flex items-center justify-between">
                   <ShieldCheck size={18} className="text-emerald-400" />
@@ -417,8 +453,7 @@ export const WebViewport: React.FC<WebViewportProps> = ({
 
               <button
                 onClick={onOpenVpn}
-                className="rounded-2xl border border-slate-800 hover:border-cyan-500/50 p-3.5 text-left space-y-1 cursor-pointer transition"
-                style={{ backgroundColor: '#000000' }}
+                className="bh-card p-3.5 text-left space-y-1 cursor-pointer"
               >
                 <div className="flex items-center justify-between">
                   <Lock size={18} className="text-cyan-400" />
@@ -432,17 +467,16 @@ export const WebViewport: React.FC<WebViewportProps> = ({
                     {vpn.connected ? 'Connected' : 'Ready'}
                   </span>
                 </div>
-                <div className="text-xs font-bold text-white pt-1">Built-in VPN</div>
+                <div className="text-xs font-bold text-white pt-1">Privacy Shield</div>
                 <div className="text-[11px] text-slate-400">
-                  Zero-log encrypted tunnel &amp; DoH
+                  On-device filtering &amp; DoH — does not change your IP
                 </div>
               </button>
 
               <button
                 onClick={onOpenExtensions}
                 aria-label="Open the extensions hub"
-                className="rounded-2xl border border-slate-800 hover:border-purple-500/50 p-3.5 text-left space-y-1 cursor-pointer transition"
-                style={{ backgroundColor: '#000000' }}
+                className="bh-card p-3.5 text-left space-y-1 cursor-pointer"
               >
                 <div className="flex items-center justify-between">
                   <Puzzle size={18} className="text-purple-400" />
@@ -450,41 +484,35 @@ export const WebViewport: React.FC<WebViewportProps> = ({
                     {extensions.filter((e) => e.enabled).length} Enabled
                   </span>
                 </div>
-                <div className="text-xs font-bold text-white pt-1">Extensions Hub</div>
+                <div className="text-xs font-bold text-white pt-1">Extensions</div>
                 <div className="text-[11px] text-slate-400">
-                  Chrome .CRX, Firefox .XPI &amp; Userscripts
+                  {RUNS_HERE.length} working here · store browsing
                 </div>
               </button>
 
+              {/* This card used to fire a fake download from example.com — a
+                  dead link dressed up as a feature. Games Hub is real and is
+                  what people actually want on the start screen. */}
               <button
-                onClick={() =>
-                  onTriggerDownload(
-                    'docs.browserhub.app-getting-started.pdf',
-                    'https://example.com/browserhub-getting-started.pdf',
-                    1.8,
-                    'document'
-                  )
-                }
-                aria-label="Download the BrowserHub getting started guide"
-                className="rounded-2xl border border-slate-800 hover:border-emerald-500/50 p-3.5 text-left space-y-1 cursor-pointer transition"
-                style={{ backgroundColor: '#000000' }}
+                onClick={() => onNavigate('browserhub://games')}
+                aria-label="Open the Games hub"
+                className="bh-card p-3.5 text-left space-y-1 cursor-pointer"
               >
                 <div className="flex items-center justify-between">
-                  <Download size={18} className="text-emerald-300" />
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold">
-                    Manager
+                  <Gamepad2 size={18} className="text-fuchsia-300" />
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-fuchsia-500/20 text-fuchsia-300 font-bold">
+                    {WEB_GAMES.length} games
                   </span>
                 </div>
-                <div className="text-xs font-bold text-white pt-1">Downloads</div>
+                <div className="text-xs font-bold text-white pt-1">Games Hub</div>
                 <div className="text-[11px] text-slate-400">
-                  See speed, threads &amp; progress
+                  Real browser games &amp; controller support
                 </div>
               </button>
 
               <button
                 onClick={() => onOpenAi('idle')}
-                className="rounded-2xl border border-slate-800 hover:border-cyan-400/50 p-3.5 text-left space-y-1 cursor-pointer transition"
-                style={{ backgroundColor: '#000000' }}
+                className="bh-card p-3.5 text-left space-y-1 cursor-pointer"
               >
                 <div className="flex items-center justify-between">
                   <Sparkles size={18} className="text-cyan-300" />

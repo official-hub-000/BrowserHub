@@ -94,6 +94,16 @@ export function getSearchEngineOption(id: SearchEngineId): SearchEngineOption {
   return SEARCH_ENGINE_OPTIONS.find((opt) => opt.id === id) || SEARCH_ENGINE_OPTIONS[0];
 }
 
+/**
+ * These are NOT servers this build connects to.
+ *
+ * They carry plausible city names and IP strings because they describe where a
+ * real exit node *would* be, but BrowserHub has no remote exit infrastructure —
+ * the Android VpnService here is a local filtering tunnel (see HubVpnService).
+ * Every screen that shows this list must present it as a planned/preview list,
+ * never as "you are now in <city>", because that claim was tested on a real
+ * device and the IP correctly stayed local.
+ */
 export const GLOBAL_VPN_NODES: VpnNode[] = [
   {
     id: 'ch-zurich',

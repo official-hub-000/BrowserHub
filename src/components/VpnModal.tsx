@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Power,
   Shield,
@@ -20,9 +20,62 @@ interface VpnModalProps {
   onClose: () => void;
 }
 
+interface ExitReport {
+  ip: string | null;
+  country: string | null;
+  city: string | null;
+  isp: string | null;
+  error: boolean;
+}
+
+/**
+ * Shows the user their real public exit. They connected the shield, checked a
+ * "what is my IP" site, and saw their own location — which is correct behaviour
+ * for a local filter, but with no evidence on screen it reads as a broken VPN.
+ * Displaying the actual exit turns an invisible truth into a verifiable one.
+ */
+const EXIT_ENDPOINTS = [
+  'https://ipapi.co/json/',
+  'https://ipwho.is/',
+];
+
 export const VpnModal: React.FC<VpnModalProps> = ({ vpn, onUpdateVpn, onClose }) => {
   const activeNode =
     GLOBAL_VPN_NODES.find((n) => n.id === vpn.selectedNodeId) || GLOBAL_VPN_NODES[0];
+
+  const [exit, setExit] = useState<ExitReport | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      for (const url of EXIT_ENDPOINTS) {
+        try {
+          const res = await fetch(url);
+          if (!res.ok) continue;
+          const data: any = await res.json();
+          const ip = data?.ip ?? null;
+          if (!ip) continue;
+          if (!cancelled) {
+            setExit({
+              ip,
+              country: data?.country_name ?? data?.country ?? null,
+              city: data?.city ?? null,
+              isp: data?.org ?? data?.connection?.isp ?? null,
+              error: false,
+            });
+          }
+          return;
+        } catch {
+          // Try the next endpoint; an offline phone simply shows "unavailable".
+        }
+      }
+      if (!cancelled) setExit({ ip: null, country: null, city: null, isp: null, error: true });
+    };
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [vpn.connected]);
 
   const handleToggleConnect = async () => {
     if (vpn.connected) {
@@ -69,14 +122,17 @@ export const VpnModal: React.FC<VpnModalProps> = ({ vpn, onUpdateVpn, onClose })
               <Lock className="w-5 h-5" />
             </div>
             <div>
-              <div className="text-sm font-bold text-white flex items-center gap-2">
-                Private Network Shield
+              <div className="text-sm font-bold text-white flex items-center gap-2 flex-wrap">
+                On-Device Privacy Shield
                 <span className="text-[10px] px-2 py-0.5 rounded-full bg-cyan-500/15 text-cyan-300">
                   Android VpnService
                 </span>
+                <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-bold">
+                  NOT A LOCATION VPN
+                </span>
               </div>
               <div className="text-[11px] text-slate-400">
-                On-device filtering • DoH resolver • Zero logs
+                Filters this app on your phone · does not change your IP
               </div>
             </div>
           </div>
@@ -90,10 +146,11 @@ export const VpnModal: React.FC<VpnModalProps> = ({ vpn, onUpdateVpn, onClose })
         <div className="px-4 py-2 bg-amber-500/10 border-b border-amber-500/30 flex items-start gap-2">
           <AlertTriangle size={13} className="text-amber-400 mt-0.5 shrink-0" />
           <p className="text-[10px] leading-relaxed text-amber-200/90">
-            This build runs the shield on your device (ad &amp; tracker blocking, tracker-parameter
-            stripping, DoH resolver preference). Remote exit-node routing — the &quot;change my IP&quot;
-            part — is <strong>not active yet</strong>, so the node list below shows planned
-            locations and is clearly marked.
+            <strong>Your IP address and location do not change.</strong> That is expected, not a
+            bug: this shield filters inside BrowserHub (ad &amp; tracker blocking, tracking-parameter
+            stripping, encrypted DNS preference), but it has no remote exit servers to route your
+            traffic through. A location-changing VPN needs servers to exit from, and this build
+            ships none. Use a dedicated VPN app if you need a different IP.
           </p>
         </div>
 
@@ -122,6 +179,30 @@ export const VpnModal: React.FC<VpnModalProps> = ({ vpn, onUpdateVpn, onClose })
             </div>
             <div className="text-[10px] text-cyan-300">
               {vpn.encryptedMb.toFixed(1)} MB filtered on this device
+            </div>
+            <div className="text-[10px] leading-relaxed pt-1 border-t border-slate-800/70 mt-1">
+              <div className="text-slate-500 uppercase tracking-wider text-[9px] font-bold">
+                Your real public exit
+              </div>
+              {exit === null ? (
+                <div className="text-slate-400 font-mono">Checking…</div>
+              ) : exit.ip ? (
+                <>
+                  <div className="text-slate-200 font-mono">{exit.ip}</div>
+                  <div className="text-slate-400">
+                    {[exit.city, exit.country].filter(Boolean).join(', ')}
+                    {exit.isp ? ` · ${exit.isp}` : ''}
+                  </div>
+                  <div className="text-amber-300/90">
+                    This is your phone&apos;s own location, and it stays that way while the shield is
+                    on. The shield filters content; it does not move your exit.
+                  </div>
+                </>
+              ) : (
+                <div className="text-slate-400">
+                  Could not read your IP (likely offline). Your location is unchanged either way.
+                </div>
+              )}
             </div>
           </div>
 

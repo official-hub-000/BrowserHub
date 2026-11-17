@@ -102,6 +102,24 @@ const ARTICLES: Record<string, any> = {
     } as any;
   }
 
+  // Independent providers added in round 5. Each follows the same condition as
+  // the main endpoint, so "throttled" means the whole internet is throttling —
+  // which is the case this simulation exists to test.
+  if (u.includes('deepinfra.com') || u.includes('hackclub.com')) {
+    if (MODE === 'offline') throw new TypeError('Load failed');
+    if (MODE === 'throttled' || throttled) {
+      return { ok: false, status: 429, json: async () => ({}) } as any;
+    }
+    return {
+      ok: true,
+      status: 200,
+      headers: { get: () => 'application/json' },
+      json: async () => ({
+        choices: [{ message: { content: 'A live model reply from another provider.' } }],
+      }),
+    } as any;
+  }
+
   if (u.includes('wikipedia.org/api/rest_v1/page/summary/')) {
     const raw = decodeURIComponent(u.split('/summary/')[1] || '').split('?')[0];
     const key = raw.replace(/\s+/g, '_').toLowerCase();

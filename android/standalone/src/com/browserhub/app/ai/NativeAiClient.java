@@ -22,7 +22,6 @@ import java.util.concurrent.ConcurrentHashMap;
  * Result envelopes are JSON strings: {"ok":true,"text":"…"} / {"ok":false,"error":"…"}.
  */
 public final class NativeAiClient {
-    private static final String ENDPOINT = "https://text.pollinations.ai/openai";
     /**
      * Free, key-less models tried in order. A single hardcoded model meant one
      * rate-limited model broke every question after it — the exact "answered
@@ -57,23 +56,57 @@ public final class NativeAiClient {
         return value;
     }
 
+    /**
+     * Independent key-less chat services. Rotating model names on ONE gateway is
+     * still one quota — the "always the same apology" bug. Each endpoint below
+     * has its own limits, so when one is saturated another can still answer.
+     */
+    private static final String[][] PROVIDERS = {
+            {"https://text.pollinations.ai/openai", "pollinations"},
+            {"https://api.deepinfra.com/v1/openai/chat/completions", "deepinfra"},
+            {"https://ai.hackclub.com/chat/completions", "hackclub"},
+    };
+
     private static String call(String userPrompt, String systemPrompt) {
         String lastError = "no model answered";
-        long deadline = System.currentTimeMillis() + 20000L;
-        for (String model : MODELS) {
+        long deadline = System.currentTimeMillis() + 22000L;
+        for (String[] provider : PROVIDERS) {
             if (System.currentTimeMillis() >= deadline) break;
-            String result = callOnce(model, userPrompt, systemPrompt);
+            String result = callProvider(provider[0], provider[1], userPrompt, systemPrompt);
             if (result.startsWith("{\"ok\":true")) return result;
-            lastError = result;
+            lastError = provider[1] + ": " + result;
         }
         return error(lastError);
     }
 
-    private static String callOnce(String model, String userPrompt, String systemPrompt) {
+    private static String callProvider(
+            String endpoint, String providerId, String userPrompt, String systemPrompt) {
+        String lastError = "no model answered";
+        for (String model : MODELS) {
+            if (System.currentTimeMillis() >= 0 && Thread.currentThread().isInterrupted()) break;
+            String result = callOnce(endpoint, providerId, model, userPrompt, systemPrompt);
+            if (result.startsWith("{\"ok\":true")) return result;
+            lastError = result;
+            // A 429 or a dead host will not improve by trying another model name
+            // on the same gateway — move to the next provider instead.
+            if (result.contains("HTTP 429") || result.contains("HTTP 5")) break;
+        }
+        return lastError;
+    }
+
+    private static String callOnce(
+            String endpoint, String providerId, String model, String userPrompt, String systemPrompt) {
         HttpURLConnection conn = null;
         try {
             JSONObject payload = new JSONObject();
-            payload.put("model", model);
+            // DeepInfra and Hack Club need a concrete model; Pollinations accepts
+            // its own alias names.
+            if ("pollinations".equals(providerId)) {
+                payload.put("model", model);
+            } else if ("deepinfra".equals(providerId)) {
+                payload.put("model", "meta-llama/Meta-Llama-3.1-8B-Instruct");
+                payload.put("max_tokens", 700);
+            }
 
             JSONArray messages = new JSONArray();
             messages.put(new JSONObject()
@@ -85,7 +118,7 @@ public final class NativeAiClient {
             payload.put("messages", messages);
 
             byte[] body = payload.toString().getBytes(StandardCharsets.UTF_8);
-            conn = (HttpURLConnection) new URL(ENDPOINT).openConnection();
+            conn = (HttpURLConnection) new URL(endpoint).openConnection();
             conn.setRequestMethod("POST");
             conn.setConnectTimeout(6000);
             conn.setReadTimeout(12000);

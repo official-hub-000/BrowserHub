@@ -372,3 +372,100 @@ export const STORE_DOMAINS = [
   { match: 'greasyfork.org', label: 'Greasy Fork userscripts' },
   { match: 'openuserjs.org', label: 'OpenUserJS' },
 ] as const;
+
+/**
+ * The actual storefronts, as browsable destinations.
+ *
+ * The request was "there's no Firefox/Edge/Chrome extension store to use them".
+ * This build cannot *run* those add-ons (Android WebView has no extension
+ * engine), but it can absolutely take you to the genuine stores so you can
+ * search them, read listings, and download files. These URLs are the real
+ * top-level storefronts, not made-up deep links.
+ */
+export interface StoreFrontCategory {
+  label: string;
+  url: string;
+}
+
+export interface StoreFront {
+  id: string;
+  name: string;
+  icon: string;
+  count: string;
+  blurb: string;
+  url: string;
+  categories: StoreFrontCategory[];
+}
+
+export const STORE_FRONTS: StoreFront[] = [
+  {
+    id: 'chrome-web-store',
+    name: 'Chrome Web Store',
+    icon: 'chrome',
+    count: '190,000+ add-ons',
+    blurb:
+      'Google’s store. Search it, read ratings and changelogs, and download any .crx — but Chrome for Android itself has never supported extensions, and neither does WebView.',
+    url: 'https://chromewebstore.google.com/',
+    categories: [
+      { label: 'Productivity', url: 'https://chromewebstore.google.com/category/extensions/productivity/workflow' },
+      { label: 'Privacy', url: 'https://chromewebstore.google.com/category/extensions/productivity/tools' },
+      { label: 'Search', url: 'https://chromewebstore.google.com/search/extensions' },
+    ],
+  },
+  {
+    id: 'edge-addons',
+    name: 'Microsoft Edge Add-ons',
+    icon: 'edge',
+    count: '20,000+ add-ons',
+    blurb:
+      'Microsoft’s store. Same model as Chrome’s — the listings are real and browsable, and the packages are Chromium CRX3, which WebView cannot execute.',
+    url: 'https://microsoftedge.microsoft.com/addons/Microsoft-Edge-Extensions-Home',
+    categories: [
+      { label: 'Productivity', url: 'https://microsoftedge.microsoft.com/addons/category/Productivity' },
+      { label: 'Privacy', url: 'https://microsoftedge.microsoft.com/addons/category/Privacy' },
+      { label: 'Search', url: 'https://microsoftedge.microsoft.com/addons/search' },
+    ],
+  },
+  {
+    id: 'firefox-amo',
+    name: 'Firefox Add-ons (AMO)',
+    icon: 'firefox',
+    count: '30,000+ add-ons',
+    blurb:
+      'Mozilla’s official store, including full theme and userscript support. Packages are .xpi (a signed ZIP) and can be downloaded and opened, but not loaded by WebView.',
+    url: 'https://addons.mozilla.org/android/',
+    categories: [
+      { label: 'Recommended', url: 'https://addons.mozilla.org/firefox/extensions/' },
+      { label: 'Themes', url: 'https://addons.mozilla.org/firefox/themes/' },
+      { label: 'Search', url: 'https://addons.mozilla.org/firefox/search/' },
+    ],
+  },
+  {
+    id: 'greasyfork',
+    name: 'Greasy Fork userscripts',
+    icon: 'code',
+    count: '110,000+ scripts',
+    blurb:
+      'The largest Tampermonkey/Greasemonkey library. Unlike add-ons, plain userscripts CAN run here — paste one into the Studio tab and it is injected for real.',
+    url: 'https://greasyfork.org/en',
+    categories: [
+      { label: 'Popular', url: 'https://greasyfork.org/en/scripts?sort=total_installs' },
+      { label: 'Safety', url: 'https://greasyfork.org/en/scripts?sort=created' },
+      { label: 'Search', url: 'https://greasyfork.org/en/scripts' },
+    ],
+  },
+  {
+    id: 'openuserjs',
+    name: 'OpenUserJS',
+    icon: 'code',
+    count: '10,000+ scripts',
+    blurb:
+      'Community userscript mirror. Same story as Greasy Fork: the script text itself runs here through the Studio tab.',
+    url: 'https://openuserjs.org/',
+    categories: [
+      { label: 'Popular', url: 'https://openuserjs.org/scripts?q=&order=installs' },
+      { label: 'Libraries', url: 'https://openuserjs.org/libs' },
+      { label: 'Search', url: 'https://openuserjs.org/scripts' },
+    ],
+  },
+];

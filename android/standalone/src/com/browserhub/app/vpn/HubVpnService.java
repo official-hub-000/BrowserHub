@@ -25,6 +25,19 @@ public class HubVpnService extends VpnService {
         return START_STICKY;
     }
 
+    /**
+     * Establishes a LOCAL filtering tunnel.
+     *
+     * IMPORTANT — this is why the user's IP does not change, and why it is not a
+     * bug: the route below is 10.88.0.0/24, the tunnel's own private subnet. It
+     * does not carry user traffic, because no remote exit server exists to carry
+     * it to. Adding 0.0.0.0/0 here without a real upstream would black-hole every
+     * connection and look like a total network failure.
+     *
+     * So the honest description is: this service lets the app apply its filter
+     * and DNS policy locally. It is NOT a location-changing VPN, and the UI in
+     * VpnModal says exactly that and shows the user their real exit IP.
+     */
     private void establishTunnel(String nodeId) {
         teardown();
         try {

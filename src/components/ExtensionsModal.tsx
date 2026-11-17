@@ -18,6 +18,7 @@ import {
   EXTENSION_CATALOGUE as CATALOGUE,
   CATALOGUE_GROUPS,
   SUPPORT_BADGE,
+  STORE_FRONTS,
 } from '../data/extensionCatalogue';
 
 import { parseGlobalStoreUrl, unpackExtensionFile } from '../utils/extensionUnpacker';
@@ -43,7 +44,9 @@ export const ExtensionsModal: React.FC<ExtensionsModalProps> = ({
   onRemoveExtension,
   onClose,
 }) => {
-  const [activeTab, setActiveTab] = useState<'installed' | 'store' | 'import' | 'studio'>('installed');
+  const [activeTab, setActiveTab] = useState<
+    'installed' | 'store' | 'browse' | 'import' | 'studio'
+  >('installed');
   const [storeQuery, setStoreQuery] = useState('');
   const [storeUrlInput, setStoreUrlInput] = useState('');
   const [statusToast, setStatusToast] = useState<string | null>(null);
@@ -144,12 +147,13 @@ export const ExtensionsModal: React.FC<ExtensionsModalProps> = ({
         </div>
 
         {/* Navigation Tabs */}
-        <div className="grid grid-cols-4 gap-1 p-2 bg-[#060608] border-b border-slate-800 text-xs">
+        <div className="grid grid-cols-5 gap-1 p-2 bg-[#060608] border-b border-slate-800 text-[10px]">
           {[
             { id: 'installed', label: `Installed (${extensions.length})` },
-            { id: 'store', label: '1-Tap Hub' },
-            { id: 'import', label: 'CRX / XPI / URL' },
-            { id: 'studio', label: 'Userscript IDE' },
+            { id: 'store', label: 'Working' },
+            { id: 'browse', label: 'Stores' },
+            { id: 'import', label: 'Import' },
+            { id: 'studio', label: 'Studio' },
           ].map((t) => (
             <button
               key={t.id}
@@ -394,6 +398,80 @@ export const ExtensionsModal: React.FC<ExtensionsModalProps> = ({
                   OpenUserJS link in the <strong className="text-slate-200">Import</strong> tab. It opens the real
                   listing, and any CSS or userscript part can be applied — the extension sandbox itself cannot run in
                   WebView.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'browse' && (
+            <div className="space-y-3">
+              <div className="rounded-xl border border-slate-800 bg-[#060608] px-3 py-2 text-[10px] leading-relaxed text-slate-400">
+                These open the <strong className="text-slate-200">real</strong> extension stores in a
+                tab, so you can search them like on a desktop. You can read listings, reviews and
+                documentation and download files. What you cannot do is make Chrome, Edge or Firefox
+                extension code run inside Android WebView — that engine does not exist here. Tap a
+                card to browse; tap the download in the Import tab to keep the file.
+              </div>
+
+              {STORE_FRONTS.map((store) => (
+                <div
+                  key={store.id}
+                  className="rounded-2xl border border-slate-800 bg-[#08080b] p-3 space-y-2"
+                >
+                  <div className="flex items-start gap-2.5">
+                    <div className="w-9 h-9 rounded-xl bg-[#121216] border border-slate-700 flex items-center justify-center shrink-0">
+                      <SiteIcon id={store.icon} size={18} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-[12px] font-bold text-white flex items-center gap-1.5 flex-wrap">
+                        <span>{store.name}</span>
+                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-[#121216] text-slate-400">
+                          {store.count}
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-slate-400 mt-0.5 leading-relaxed">
+                        {store.blurb}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => onNavigate(store.url)}
+                      title={`Browse ${store.name}`}
+                      aria-label={`Browse ${store.name}`}
+                      className="px-2.5 py-1.5 rounded-xl text-[10px] font-bold bg-purple-500/20 border border-purple-400/60 text-white cursor-pointer flex items-center gap-1"
+                    >
+                      <ExternalLink size={9} />
+                      <span>Browse</span>
+                    </button>
+                    {store.categories.slice(0, 3).map((cat) => (
+                      <button
+                        key={cat.label}
+                        type="button"
+                        onClick={() => onNavigate(cat.url)}
+                        title={`${store.name}: ${cat.label}`}
+                        aria-label={`${store.name} category ${cat.label}`}
+                        className="px-2 py-1.5 rounded-xl text-[10px] font-semibold bg-black border border-slate-700 text-slate-300 cursor-pointer"
+                      >
+                        {cat.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+
+              <div className="rounded-xl border border-amber-500/30 bg-[#0d0a05] p-3 space-y-1">
+                <div className="text-[11px] font-bold text-amber-200 flex items-center gap-1.5">
+                  <AlertTriangle size={11} className="text-amber-400" />
+                  <span>What &quot;browse&quot; means here</span>
+                </div>
+                <p className="text-[10px] leading-relaxed text-amber-200/90">
+                  It opens the genuine storefront in a tab. Installing an add-on into BrowserHub is
+                  only possible for the nine native equivalents in the <strong>Working</strong> tab.
+                  Every other add-on will browse fine and do nothing if installed, which is exactly
+                  what the status labels prevent.
                 </p>
               </div>
             </div>

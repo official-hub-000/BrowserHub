@@ -60,11 +60,30 @@ function stripLiterals(line) {
 const jsEngine = fs.readFileSync(path.join(ROOT, 'src/utils/localAiEngine.ts'), 'utf8');
 const problems = [];
 
-if (!/LIVE_MODELS\s*=\s*\[/.test(jsEngine)) {
-  problems.push('src/utils/localAiEngine.ts: LIVE_MODELS is no longer a list');
+/*
+ * Round 5 changed the strategy: rotating model names on one gateway is still
+ * one quota, which is exactly why the assistant went silent whenever that
+ * gateway throttled the IP. What matters now is that several INDEPENDENT
+ * services are tried, and that a successful answer does not block the next ask.
+ */
+if (!/CHAT_PROVIDERS\s*:\s*ChatProvider\[\]/.test(jsEngine)) {
+  problems.push('src/utils/localAiEngine.ts: no provider list — a single upstream is back');
 }
-if (!/for \(const model of LIVE_MODELS\)/.test(jsEngine)) {
-  problems.push('src/utils/localAiEngine.ts: the model list is never iterated');
+const providerHosts = [...jsEngine.matchAll(/url:\s*'https:\/\/([^/']+)/g)].map((m) => m[1]);
+const distinctHosts = new Set(providerHosts);
+if (distinctHosts.size < 2) {
+  problems.push(
+    `src/utils/localAiEngine.ts: all chat requests go to ${[...distinctHosts].join(', ')} — one quota, not independent providers`
+  );
+}
+if (!/for \(const provider of ordered\)/.test(jsEngine)) {
+  problems.push('src/utils/localAiEngine.ts: the provider list is never iterated');
+}
+// The exact bug reported three times: answering set the rate-limit window.
+if (/function markModelAnswered\(\)\s*\{[^}]*rateLimitedUntil\s*=/.test(jsEngine)) {
+  problems.push(
+    'src/utils/localAiEngine.ts: a successful answer still sets the rate-limit window — every reply blocks the next question'
+  );
 }
 if (!/getCachedAnswer|cacheKey/.test(jsEngine)) {
   problems.push('src/utils/localAiEngine.ts: no answer cache (repeat questions re-hit the network)');
