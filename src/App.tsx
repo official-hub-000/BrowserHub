@@ -209,12 +209,8 @@ export function App() {
     theme: 'cyber-cyan',
     customAccentHex: '#22d3ee',
     addressBarPosition: 'top',
-    engine: 'hybrid-auto',
     searchEngine: 'google',
-    phoneFrameMode: false,
     uiDensity: 'comfortable',
-    showBookmarksBar: false,
-    showVirtualCursorInDesktop: true,
     biometricLockIncognito: false,
     readerFont: 'sans',
     readerTheme: 'slate',
@@ -809,8 +805,12 @@ export function App() {
       style={{
         backgroundColor: activeTab.isIncognito ? '#160926' : themeStyle.bgBar,
         borderColor: themeStyle.border,
+        gap: customization.uiDensity === 'compact' ? 4 : 6,
       }}
-      className="px-2.5 py-2 border-b flex flex-col gap-1.5 shrink-0 z-20"
+      className={`${
+        customization.uiDensity === 'compact' ? 'px-2 py-1' : 'px-2.5 py-2'
+      } border-b flex flex-col shrink-0 z-20`}
+      data-density={customization.uiDensity}
     >
       {instantMathResult && (
         <div
@@ -1158,7 +1158,9 @@ export function App() {
 
       <button
         onClick={() => setShowTabs(true)}
-        className="py-1.5 rounded-xl hover:bg-slate-800/70 text-slate-200 flex flex-col items-center justify-center gap-0.5 cursor-pointer"
+        className={`py-1.5 rounded-xl hover:bg-slate-800/70 text-slate-200 flex flex-col items-center justify-center gap-0.5 cursor-pointer ${
+          tabs.length > 1 ? 'bh-dock-active' : ''
+        }`}
       >
         <div className="relative flex items-center justify-center">
           <Layers size={18} className={activeTab.isIncognito ? 'text-purple-300' : 'text-slate-200'} />
@@ -1181,8 +1183,16 @@ export function App() {
 
   return (
     <div
-      style={{ backgroundColor: themeStyle.bgShell }}
-      className="h-full w-full flex flex-col overflow-hidden relative"
+      style={
+        {
+          backgroundColor: themeStyle.bgShell,
+          // The user-picked accent drives the browser's own chrome through one
+          // CSS variable, so "custom accent" is a real setting, not decoration.
+          '--bh-accent': customization.customAccentHex,
+          borderColor: customization.customAccentHex,
+        } as React.CSSProperties
+      }
+      className="h-full w-full flex flex-col overflow-hidden relative bh-app-shell"
     >
       {/* Top Address Bar Placement */}
       {customization.addressBarPosition === 'top' && SearchAddressBar}

@@ -61,6 +61,12 @@ if (bad.length) { bad.forEach((b) => console.error("  FAIL " + b)); process.exit
 console.log("  native viewport sync + touch handoff guards OK");
 '
 
+echo "== No fake feature claims =="
+node scripts/honesty-check.mjs | tail -2
+
+echo "== Every visible setting has an effect =="
+node scripts/settings-effect-check.mjs | tail -2
+
 echo "== Settings persistence =="
 node scripts/prefs-persistence-test.mjs | tail -1
 node scripts/prefs-wiring-check.mjs

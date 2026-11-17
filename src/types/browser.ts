@@ -1,4 +1,5 @@
-export type BrowserEngineType = 'hybrid-auto' | 'geckoview-136' | 'chromium-blink-134';
+/** Kept for bridge compatibility: BrowserHub renders with one Chromium WebView. */
+export type BrowserEngineType = 'system-webview';
 
 export type AddressBarPosition = 'bottom' | 'top';
 
@@ -153,12 +154,8 @@ export interface BrowserCustomization {
   theme: ThemePresetId;
   customAccentHex: string;
   addressBarPosition: AddressBarPosition;
-  engine: BrowserEngineType;
   searchEngine: SearchEngineId;
-  phoneFrameMode: boolean; // Toggle realistic Android Phone Bezel vs Fullscreen
   uiDensity: 'compact' | 'comfortable';
-  showBookmarksBar: boolean;
-  showVirtualCursorInDesktop: boolean;
   biometricLockIncognito: boolean;
   readerFont: 'sans' | 'serif' | 'mono';
   readerTheme: 'amoled' | 'sepia' | 'slate';

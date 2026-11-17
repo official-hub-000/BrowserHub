@@ -99,3 +99,33 @@ textarea {
   background-color: rgba(244, 63, 94, 0.14) !important;
   cursor: crosshair !important;
 }
+
+/* User-chosen accent color: one variable drives the browser's own chrome so the
+   "Custom Accent" setting is visible everywhere, not just in the settings sheet. */
+.bh-app-shell {
+  --bh-accent: #22d3ee;
+}
+
+.bh-app-shell .bh-accent-ring:focus-within {
+  border-color: var(--bh-accent) !important;
+}
+
+.bh-app-shell .bh-accent-fill {
+  background-color: var(--bh-accent) !important;
+}
+
+.bh-app-shell .bh-accent-text {
+  color: var(--bh-accent) !important;
+}
+
+.bh-app-shell .bh-accent-glow {
+  box-shadow: 0 0 0 1px var(--bh-accent);
+}
+
+/* Active bottom-dock item is tinted with the user's accent. No color-mix: the
+   Android WebView in the release pipeline cannot be relied on to support it. */
+.bh-app-shell nav .bh-dock-active {
+  color: var(--bh-accent) !important;
+  border-color: var(--bh-accent) !important;
+  box-shadow: inset 0 0 0 1px var(--bh-accent);
+}

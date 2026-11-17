@@ -17,8 +17,10 @@ export const DevToolsPanel: React.FC<DevToolsPanelProps> = ({
   const [jsInput, setJsInput] = useState('navigator.userAgent');
   const [consoleHistory, setConsoleHistory] = useState<Array<{ cmd: string; out: string }>>([
     {
-      cmd: 'window.__BROWSERHUB_ENGINE__',
-      out: '"Hybrid Android v1.0 (GeckoView 136 + Blink 134 • Zero Telemetry)"',
+      cmd: 'navigator.userAgent',
+      out: JSON.stringify(
+        typeof navigator !== 'undefined' ? navigator.userAgent : 'unavailable'
+      ),
     },
   ]);
 

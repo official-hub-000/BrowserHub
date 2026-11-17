@@ -6,7 +6,7 @@ import {
   Download,
   Terminal,
   Smartphone,
-  Monitor,
+  LayoutGrid,
   CheckCircle2,
   BookOpen,
   Search,
@@ -90,21 +90,20 @@ export const CustomizeDrawer: React.FC<CustomizeDrawerProps> = ({
             <div className="grid grid-cols-2 gap-2">
               <button
                 onClick={() =>
-                  onUpdateCustomization({ phoneFrameMode: !customization.phoneFrameMode })
+                  onUpdateCustomization({
+                    uiDensity: customization.uiDensity === 'compact' ? 'comfortable' : 'compact',
+                  })
                 }
+                aria-pressed={customization.uiDensity === 'compact'}
                 className={`p-2.5 rounded-2xl border text-xs font-semibold cursor-pointer ${
-                  customization.phoneFrameMode
+                  customization.uiDensity === 'compact'
                     ? 'bg-emerald-500/20 border-emerald-400 text-emerald-200'
                     : 'bg-slate-900 border-slate-800 text-slate-300'
                 }`}
               >
                 <span className="inline-flex items-center gap-1.5">
-                  {customization.phoneFrameMode ? (
-                    <Smartphone size={12} className="shrink-0" />
-                  ) : (
-                    <Monitor size={12} className="shrink-0" />
-                  )}
-                  <span>{customization.phoneFrameMode ? 'Android Bezel Frame' : 'Full Viewport'}</span>
+                  <LayoutGrid size={12} className="shrink-0" />
+                  <span>{customization.uiDensity === 'compact' ? 'Compact UI' : 'Comfortable UI'}</span>
                 </span>
               </button>
               <button
@@ -155,35 +154,34 @@ export const CustomizeDrawer: React.FC<CustomizeDrawerProps> = ({
             </div>
           </div>
 
-          {/* Hybrid Rendering Engine Selector */}
+          {/* Rendering engine — report the engine that actually renders pages.
+              BrowserHub ships one Chromium WebView (System WebView / Blink);
+              a fake GeckoView switch would be a dead control. */}
           <div className="space-y-2">
             <div className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
               <Cpu className="w-3.5 h-3.5 text-emerald-400" />
-              Android Hybrid Rendering Engine
+              Rendering Engine
             </div>
-            <div className="grid grid-cols-3 gap-1.5 text-[11px]">
-              {(
-                [
-                  { id: 'hybrid-auto', label: 'Hybrid Auto' },
-                  { id: 'geckoview-136', label: 'GeckoView 136' },
-                  { id: 'chromium-blink-134', label: 'Blink 134' },
-                ] as const
-              ).map((eng) => (
-                <button
-                  key={eng.id}
-                  onClick={async () => {
-                    await AndroidHybridBridge.switchEngine(eng.id);
-                    onUpdateCustomization({ engine: eng.id });
-                  }}
-                  className={`py-2 px-2 rounded-xl border font-semibold cursor-pointer ${
-                    customization.engine === eng.id
-                      ? 'bg-emerald-500/20 border-emerald-400 text-emerald-200'
-                      : 'bg-slate-900 border-slate-800 text-slate-400'
-                  }`}
-                >
-                  {eng.label}
-                </button>
-              ))}
+            <div className="rounded-xl border border-emerald-500/40 bg-emerald-950/40 p-3 space-y-1">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-bold text-emerald-200">
+                  Android System WebView (Chromium / Blink)
+                </span>
+                <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-500 text-slate-950 font-black shrink-0">
+                  ACTIVE
+                </span>
+              </div>
+              <p className="text-[10px] leading-relaxed text-emerald-200/70">
+                BrowserHub renders pages with the WebView engine installed on your
+                phone, so it updates with Android and needs no bundled renderer.
+                There is no second engine to switch to in this build — showing a
+                fake GeckoView toggle would do nothing.
+              </p>
+              <div className="text-[10px] font-mono text-emerald-300/80 pt-0.5">
+                {AndroidHybridBridge.isNativeAndroid()
+                  ? AndroidHybridBridge.getRuntimeBadge()
+                  : 'Web preview runtime'}
+              </div>
             </div>
           </div>
 
