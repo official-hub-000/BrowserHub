@@ -67,6 +67,9 @@ console.log("  native viewport sync + touch handoff guards OK");
 echo "== AI reliability: model rotation in the engine + both native shells =="
 node scripts/ai-reliability-check.mjs | tail -1
 
+echo "== Exact arithmetic + no prompt contamination =="
+npx tsx scripts/math-and-prompt-check.mts | tail -1
+
 echo "== AI survives provider throttling (answered-then-apologised bug) =="
 npx tsx scripts/ai-throttle-simulation.mts | tail -1
 

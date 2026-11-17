@@ -36,6 +36,7 @@ import {
   SEARCH_ENGINE_OPTIONS,
   THEME_PRESETS,
 } from './data/presets';
+import { evaluateArithmetic } from './utils/mathEngine';
 import { WebViewport } from './components/WebViewport';
 import { ShieldsPanel } from './components/ShieldsPanel';
 import { VpnModal } from './components/VpnModal';
@@ -595,22 +596,12 @@ export function App() {
     };
   }, [activeTabId, activeTab.historyIndex, activeTab.url, anyModalOpen]);
 
-  // Instant Omnibox Math Calculator
+  // Instant Omnibox Math Calculator — same parser the AI uses, so `×`, `÷`,
+  // `%` and parentheses behave identically in both places.
   const instantMathResult = useMemo(() => {
     const expr = omniboxText.trim();
     if (!expr || expr.startsWith('http') || expr.includes('://')) return null;
-    if (!/^[\d\s+\-*/().]+$/.test(expr) || !/[+\-*/]/.test(expr) || !/\d/.test(expr)) {
-      return null;
-    }
-    try {
-      const val = Function(`"use strict"; return (${expr});`)();
-      if (typeof val === 'number' && Number.isFinite(val)) {
-        return Number(val.toFixed(6)).toString();
-      }
-      return null;
-    } catch {
-      return null;
-    }
+    return evaluateArithmetic(expr)?.value ?? null;
   }, [omniboxText]);
 
   const updateTab = (tabId: string, updater: (t: BrowserTab) => BrowserTab) => {

@@ -1,4 +1,5 @@
 import { answerFromWikipedia, isFactualQuestion } from './wikipediaAnswer';
+import { evaluateArithmetic } from './mathEngine';
 import {
   getPageContextForAi,
   sanitizeExtractedPageContent,
@@ -83,31 +84,12 @@ function rankSentences(sentences: string[], query = ''): string[] {
     .map((x) => x.sentence);
 }
 
+/**
+ * Arithmetic is answered exclusively by the local parser in mathEngine.ts.
+ * It never touches the network and never guesses.
+ */
 function tryEvaluateMath(expr: string): string | null {
-  const normalized = expr
-    .trim()
-    .replace(/^(what\s+is|what's|calculate|compute|solve|how\s+much\s+is)\s+/i, '')
-    .replace(/[?=]+$/, '')
-    .trim();
-
-  const pctMatch = /^(\d+(?:\.\d+)?)\s*%\s*(?:of)\s*(\d+(?:\.\d+)?)$/i.exec(normalized);
-  if (pctMatch) {
-    const ans = (parseFloat(pctMatch[1]) / 100) * parseFloat(pctMatch[2]);
-    return `${pctMatch[1]}% of ${pctMatch[2]} = ${Number(ans.toFixed(6))}`;
-  }
-
-  if (/^[\d\s+\-*/().%^]+$/.test(normalized) && /[+\-*/%^]/.test(normalized) && /\d/.test(normalized)) {
-    try {
-      const jsExpr = normalized.replace(/\^/g, '**');
-      const val = Function(`"use strict"; return (${jsExpr});`)();
-      if (typeof val === 'number' && Number.isFinite(val)) {
-        return `${normalized} = ${Number(val.toFixed(8))}`;
-      }
-    } catch {
-      return null;
-    }
-  }
-  return null;
+  return evaluateArithmetic(expr)?.value ?? null;
 }
 
 const GREETING_RE =
@@ -157,9 +139,15 @@ function handleNonFactualQuery(
     };
   }
 
-  const mathAns = tryEvaluateMath(q);
-  if (mathAns) {
-    return { text: `**${mathAns}**`, bullets: ['Computed instantly on-device'] };
+  const math = evaluateArithmetic(q);
+  if (math) {
+    const working = math.steps.length > 1 ? `\n\n${math.steps
+      .map((step, i) => `${i + 1}. ${step}`)
+      .join('\n')}` : '';
+    return {
+      text: `**${math.display} = ${math.value}**${working}`,
+      bullets: ['Computed on-device — no network, no rounding guesswork'],
+    };
   }
 
   if (/^(write|draft|compose)\s+(an?\s+)?(email|message|letter|note|reply|text|sms)\b/i.test(lower)) {
@@ -347,7 +335,8 @@ export function runLocalAiClient(input: LocalAiInput): LocalAiOutput {
         (offline
           ? `3. **Turn on mobile data or Wi-Fi and ask again** — the search and page-reading above already work without it.\n\n`
           : `3. **Ask again in about 15 seconds** — the free model accepts roughly one question per 15 seconds.\n\n`) +
-        `What I can always do on-device: exact math (**"18% of 2450"**), email and message drafts, page summaries, page Q&A, and a privacy check of the URL you're on.`;
+        `What I can do on-device right now: exact arithmetic (**"1270+23-10/80×18%100"**), email and message drafts, and a privacy check of the URL you're on.\n` +
+        `Page summaries and page Q&A need a page open — they read the real text, they are not guesses.`;
       bullets = [
         'Tap Summarize after opening a page for an on-device answer from its real text',
         ...(lastAttempts.length ? [`Why: ${lastAttempts.slice(-2).join(' · ')}`] : []),
@@ -511,7 +500,9 @@ const SYSTEM_PROMPT = `You are BrowserHub AI, the assistant built into the Brows
 Rules:
 - Reply in clean Markdown: short paragraphs, "### " headings, "- " bullets, **bold** for key terms. Never output raw HTML.
 - Be warm, direct and concise. Answer the user's actual question first.
-- If webpage text is provided, use it only when the question is about that page; otherwise answer normally from your own knowledge.
+- Webpage text is attached ONLY as optional background. It is NEVER the subject of the question unless the user explicitly refers to "this page", "the article", "summarize", or asks what the page says.
+- For any general question (facts, history, science, people, places, math, advice), answer from your own knowledge and IGNORE the webpage block completely.
+- Never substitute details from the webpage for the answer, and never present page content as the answer to a general question.
 - If the user is on a search results page, never quote the result listing, menus or filter bars as if they were article content.
 - Never invent page contents, statistics, or citations. If you are unsure, say so plainly.
 - Keep answers under ~250 words unless asked for detail.`;
@@ -569,16 +560,35 @@ export async function runSmartHybridAi(input: LocalAiInput): Promise<LocalAiOutp
   }
 
   const hasPageText = ctx.text.length >= 60;
-  const pageBlock = hasPageText
-    ? `\n\n--- OPEN WEBPAGE ---\nTitle: ${pageTitle}\nURL: ${input.url}\nContext: ${ctx.contextNote}\nVisible text:\n"""${ctx.text.slice(0, 3500)}"""\n--- END WEBPAGE ---`
-    : `\n\nContext: ${ctx.contextNote}`;
+
+  /**
+   * Page text is attached only when the question is about the page.
+   *
+   * This is the "totally wrong" bug: every chat question used to carry the full
+   * visible text of whatever was open, so a question about Japan got answered
+   * from a news article about parking. Sending the page unconditionally invites
+   * the model to answer the page instead of the question.
+   */
+  const asksAboutPage =
+    mode === 'summarize' ||
+    mode === 'eli5' ||
+    mode === 'browse_for_me' ||
+    /\b(this|the)\s+(page|article|site|website|story|post|document)\b/i.test(query) ||
+    /\b(summarize|summarise|tl;?dr|explain (this|it)|what does (this|it) say|read (this|it))/i.test(query);
+
+  const attachPage = hasPageText && asksAboutPage;
+  const pageBlock = attachPage
+    ? `\n\n--- OPEN WEBPAGE (background only) ---\nTitle: ${pageTitle}\nURL: ${input.url}\nContext: ${ctx.contextNote}\nVisible text:\n"""${ctx.text.slice(0, 3000)}"""\n--- END WEBPAGE ---`
+    : '';
 
   let userPrompt: string;
   if (mode === 'summarize') {
     if (!hasPageText) return runLocalAiClient(input);
+    if (!attachPage) return runLocalAiClient(input);
     userPrompt = `Summarize this webpage into 4-5 crisp bullet points. Only use the text inside the webpage block.${pageBlock}`;
   } else if (mode === 'eli5') {
     if (!hasPageText) return runLocalAiClient(input);
+    if (!attachPage) return runLocalAiClient(input);
     userPrompt = `Explain this webpage to a curious beginner in plain language, 3-4 short paragraphs.${pageBlock}`;
   } else if (mode === 'browse_for_me') {
     userPrompt = `${query || pageTitle}${pageBlock}`;
@@ -598,7 +608,7 @@ export async function runSmartHybridAi(input: LocalAiInput): Promise<LocalAiOutp
     zeroTelemetry: true,
     inferenceMs: Math.round(performance.now() - start),
     responseText: reply,
-    bullets: hasPageText ? ['Answered using the clean text of this page'] : [],
+    bullets: attachPage ? ['Answered using the clean text of this page'] : [],
   });
 
   // Live attempts run with a shared budget so the drawer never looks frozen.
