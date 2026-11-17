@@ -24,7 +24,7 @@ export interface CachedAnswer {
 }
 
 const memory = new Map<string, CachedAnswer>();
-const inFlight = new Map<string, Promise<string | null>>();
+const inFlight = new Map<string, Promise<unknown>>();
 
 function normalize(key: string): string {
   return key
@@ -89,15 +89,12 @@ export function rememberAnswer(key: string, answer: CachedAnswer) {
 }
 
 /** Runs `task` once per key; concurrent callers await the same promise. */
-export function singleFlight(
-  key: string,
-  task: () => Promise<string | null>
-): Promise<string | null> {
+export function singleFlight<T>(key: string, task: () => Promise<T>): Promise<T> {
   const k = normalize(key);
   const existing = inFlight.get(k);
-  if (existing) return existing;
+  if (existing) return existing as Promise<T>;
   const p = task().finally(() => inFlight.delete(k));
-  inFlight.set(k, p);
+  inFlight.set(k, p as Promise<unknown>);
   return p;
 }
 

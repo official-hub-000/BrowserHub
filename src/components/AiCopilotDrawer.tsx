@@ -171,7 +171,7 @@ export const AiCopilotDrawer: React.FC<AiCopilotDrawerProps> = ({
     if (loading) return;
     setLoading(true);
     setSlowNetwork(false);
-    const slowTimer = window.setTimeout(() => setSlowNetwork(true), 2500);
+    const slowTimer = window.setTimeout(() => setSlowNetwork(true), 1500);
 
     let nativeText = '';
     try {
@@ -196,15 +196,37 @@ export const AiCopilotDrawer: React.FC<AiCopilotDrawerProps> = ({
       ]);
     }
 
-    const res = await runSmartHybridAi({
-      mode,
-      title: tab.title && tab.title !== tab.url ? tab.title : ctx.title,
-      url: tab.url,
-      content: ctx.text,
-      query: customQuery || '',
-      history: messages.map((m) => ({ role: m.role, content: m.content })),
-      searchEngineName: getSearchEngineOption(searchEngineId).name,
-    });
+    // Every failure path must still produce a message. Before this, any throw
+    // left `loading` true forever: the spinner stayed up and, because
+    // execute() bails on `if (loading) return`, every later question was
+    // silently dropped. That is what "the AI is not working" looked like.
+    let res: Awaited<ReturnType<typeof runSmartHybridAi>>;
+    try {
+      res = await runSmartHybridAi({
+        mode,
+        title: tab.title && tab.title !== tab.url ? tab.title : ctx.title,
+        url: tab.url,
+        content: ctx.text,
+        query: customQuery || '',
+        history: messages.map((m) => ({ role: m.role, content: m.content })),
+        searchEngineName: getSearchEngineOption(searchEngineId).name,
+      });
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : String(err);
+      res = {
+        ok: true,
+        model: 'BrowserHub-Error',
+        engineLabel: 'Request failed',
+        zeroApiKey: true,
+        zeroTelemetry: true,
+        inferenceMs: 0,
+        responseText:
+          'I could not complete that request. Nothing was sent anywhere and no answer was made up.\n\n' +
+          `Technical detail: ${detail}\n\n` +
+          'Try again, or open a page and ask me to summarize it — that path works entirely on-device.',
+        bullets: [],
+      };
+    }
 
     setMessages((prev) => [
       ...prev,

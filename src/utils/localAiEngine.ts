@@ -1,3 +1,4 @@
+import { answerFromWikipedia, isFactualQuestion } from './wikipediaAnswer';
 import {
   getPageContextForAi,
   sanitizeExtractedPageContent,
@@ -417,6 +418,33 @@ async function fetchLive(
   }
 }
 
+/**
+ * Remembers when the free model endpoint throttled us.
+ *
+ * Pollinations limits anonymous callers to roughly one request every 15 s.
+ * Without this guard the next question spends its whole budget re-learning
+ * that, which is why asking twice quickly produced "answered, then apologised".
+ */
+const RATE_LIMIT_WINDOW_MS = 15000;
+let rateLimitedUntil = 0;
+
+function markModelRateLimited() {
+  rateLimitedUntil = Date.now() + RATE_LIMIT_WINDOW_MS;
+}
+
+function markModelAnswered() {
+  rateLimitedUntil = Date.now() + RATE_LIMIT_WINDOW_MS;
+}
+
+function isModelRateLimited(): boolean {
+  return Date.now() < rateLimitedUntil;
+}
+
+/** Small stable key for the fact cache, so repeats reuse the same lookup. */
+function extractCacheSubject(query: string): string {
+  return query.trim().toLowerCase().replace(/\s+/g, ' ').slice(0, 80);
+}
+
 /** Free, key-less models tried in order until one answers. */
 const LIVE_MODELS = ['openai', 'mistral', 'llama', 'openai-fast'];
 
@@ -522,16 +550,31 @@ export async function runSmartHybridAi(input: LocalAiInput): Promise<LocalAiOutp
     return out;
   };
 
+  // The free model endpoint is anonymously rate limited to about one request
+  // every 15 s. Asking again inside that window is guaranteed to fail, so we
+  // skip straight to the fact layer instead of making the user wait.
+  const rateLimited = isModelRateLimited();
+
+  // Wikipedia has its own limits and needs no key, so it answers factual
+  // questions independently of (and concurrently with) the live model. This is
+  // what keeps the second question working when the model says 429.
+  const factPromise = isFactualQuestion(query)
+    ? singleFlight(`wiki:${extractCacheSubject(query)}`, () => answerFromWikipedia(query, 4500))
+    : Promise.resolve(null);
+
   // Native worker thread (APK, no CORS, off the JS thread) gets first refusal.
-  const nativeReply = await singleFlight(`native:${cacheKey}`, () =>
-    askViaNativeBridge(userPrompt, 15000)
-  );
-  if (nativeReply) return persist(liveReply(nativeReply));
+  const nativeReply = rateLimited
+    ? null
+    : await singleFlight(`native:${cacheKey}`, () => askViaNativeBridge(userPrompt, 9000));
+  if (nativeReply) {
+    markModelAnswered();
+    return persist(liveReply(nativeReply));
+  }
 
   // Direct public endpoints. Several models are tried in order because a
   // single free endpoint can be rate-limited or briefly down — that is exactly
   // how "Who is Ronaldo?" answered and "Who is goat?" failed seconds later.
-  const directReply = await fetchLive(async (signal) => {
+  const directReply = rateLimited ? null : await fetchLive(async (signal) => {
     for (const model of LIVE_MODELS) {
       try {
         const res = await fetch('https://text.pollinations.ai/openai', {
@@ -547,6 +590,10 @@ export async function runSmartHybridAi(input: LocalAiInput): Promise<LocalAiOutp
             ],
           }),
         });
+        if (res.status === 429) {
+          markModelRateLimited();
+          return null;
+        }
         if (!res.ok) continue;
         const data: any = await res.json();
         const text = data?.choices?.[0]?.message?.content;
@@ -557,11 +604,17 @@ export async function runSmartHybridAi(input: LocalAiInput): Promise<LocalAiOutp
       }
     }
     return null;
-  }, 12000);
-  if (directReply) return persist(liveReply(directReply));
+  }, 7000);
+  if (directReply) {
+    markModelAnswered();
+    return persist(liveReply(directReply));
+  }
 
-  // Same-origin proxy (Android shell asset build & web preview, and CORS fallback).
-  const proxyReply = await fetchLive(async (signal) => {
+  // Skip the proxy when we are throttled: it forwards to the same endpoint, so
+  // it would fail too — waiting 3.5 s to confirm that is pure latency for the
+  // user. A hard overall deadline also stops stacked timeouts.
+  const outOfBudget = performance.now() - start > 14000;
+  const proxyReply = rateLimited || outOfBudget ? null : await fetchLive(async (signal) => {
     const res = await fetch('./api/ai/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -579,8 +632,29 @@ export async function runSmartHybridAi(input: LocalAiInput): Promise<LocalAiOutp
     if (!res.ok) return null;
     const data: any = await res.json();
     return data?.ok ? data.responseText ?? null : null;
-  }, 9000);
-  if (proxyReply) return persist(liveReply(proxyReply));
+  }, 3500);
+  if (proxyReply) {
+    markModelAnswered();
+    return persist(liveReply(proxyReply));
+  }
+
+  const fact = await factPromise;
+  if (fact) {
+    const out: LocalAiOutput = {
+      ok: true,
+      model: 'BrowserHub-Wikipedia',
+      engineLabel: fact.sourceLabel,
+      zeroApiKey: true,
+      zeroTelemetry: true,
+      inferenceMs: Math.round(performance.now() - start),
+      responseText: fact.text,
+      bullets: [
+        `Source: ${fact.sourceLabel}`,
+        'Live AI was unavailable, so this is the real article extract — not a generated guess',
+      ],
+    };
+    return persist(out);
+  }
 
   return runLocalAiClient(input);
 }
