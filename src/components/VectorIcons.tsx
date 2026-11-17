@@ -385,6 +385,38 @@ export const SiteIcon: React.FC<EngineIconProps> = ({ id, size = 18, className =
           <circle cx="12" cy="12" r="1.3" fill="#ffe4e6" />
         </svg>
       );
+    /* Vector marks for imported extension sources. These ids are referenced by
+       extensionUnpacker; without them an import would render a blank disc. */
+    case 'firefox':
+      return (
+        <svg {...common}>
+          <circle cx="12" cy="12" r="11.2" fill="#121216" />
+          <path d="M12 3.2c3.4 0 5 2.1 5 4.3 0 1.7-1.1 2.6-1.1 3.7 0 1 .8 1.4.8 2.5 0 1.7-1.7 2.4-2.9 2.4-1.4 0-2.1-.8-2.8-.8-.6 0-1.1.6-2.2.6-2.2 0-3.6-1.8-3.6-4.2 0-3.6 2.8-6.1 6.8-6.1Z" fill="#f97316" />
+          <circle cx="12" cy="12" r="3" fill="#fed7aa" />
+        </svg>
+      );
+    case 'puzzle':
+      return (
+        <svg {...common}>
+          <circle cx="12" cy="12" r="11.2" fill="#121216" />
+          <path d="M9 8.5h1.8a1.2 1.2 0 1 1 2.4 0H15v1.9a1.2 1.2 0 1 1 0 2.4v1.7h-1.8a1.2 1.2 0 1 0-2.4 0H9v-1.7a1.2 1.2 0 1 0 0-2.4V8.5Z" fill="#a78bfa" />
+        </svg>
+      );
+    case 'globe':
+      return (
+        <svg {...common}>
+          <circle cx="12" cy="12" r="11.2" fill="#0e7490" />
+          <circle cx="12" cy="12" r="6.4" fill="none" stroke="#cffafe" strokeWidth="1.5" />
+          <path d="M5.6 12h12.8M12 5.6c2 1.8 2 10.6 0 12.8M12 5.6c-2 1.8-2 10.6 0 12.8" stroke="#cffafe" strokeWidth="1.2" fill="none" />
+        </svg>
+      );
+    case 'code':
+      return (
+        <svg {...common}>
+          <circle cx="12" cy="12" r="11.2" fill="#121216" />
+          <path d="M9.6 8.6 6.2 12l3.4 3.4M14.4 8.6 17.8 12l-3.4 3.4" stroke="#22d3ee" strokeWidth="1.7" strokeLinecap="round" fill="none" />
+        </svg>
+      );
     default:
       return (
         <svg {...common}>

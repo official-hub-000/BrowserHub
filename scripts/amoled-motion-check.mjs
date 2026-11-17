@@ -161,7 +161,7 @@ const overlayFiles = [
   'components/CustomizeDrawer.tsx',
   'components/AiCopilotDrawer.tsx',
   'components/ExtensionsModal.tsx',
-  'components/PlayStoreDownloadModal.tsx',
+  'components/AboutDiagnosticsModal.tsx',
   'components/ShieldsPanel.tsx',
   'components/TabsDrawer.tsx',
   'components/VpnModal.tsx',

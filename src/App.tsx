@@ -10,6 +10,7 @@ import {
   Search,
   X,
   Crosshair,
+  Info,
   PictureInPicture2,
   ChevronDown,
   Menu,
@@ -45,10 +46,11 @@ import { AiCopilotDrawer } from './components/AiCopilotDrawer';
 import { TabsDrawer } from './components/TabsDrawer';
 import { CustomizeDrawer } from './components/CustomizeDrawer';
 import { DevToolsPanel } from './components/DevToolsPanel';
-import { PlayStoreDownloadModal } from './components/PlayStoreDownloadModal';
+import { AboutDiagnosticsModal } from './components/AboutDiagnosticsModal';
 import { MenuHubModal } from './components/MenuHubModal';
 import { TranslateModal } from './components/TranslateModal';
 import { AndroidHybridBridge } from './bridge/androidHybridBridge';
+import { classifyUrl } from './utils/urlSafety';
 import { SearchEngineIcon } from './components/VectorIcons';
 import { getPhraseDictionary } from './utils/translator';
 import {
@@ -265,7 +267,20 @@ export function App() {
   const [showTabs, setShowTabs] = useState(false);
   const [showCustomize, setShowCustomize] = useState(false);
   const [showDevTools, setShowDevTools] = useState(false);
-  const [showPlayStoreModal, setShowPlayStoreModal] = useState(false);
+  const [showAboutModal, setShowAboutModal] = useState(false);
+  /**
+   * One-line notice for navigation outcomes the user could not otherwise see —
+   * a deep link translated to its web version, or one this browser genuinely
+   * cannot open. Silence there is what made a DNS error page look like a
+   * broken app.
+   */
+  const [navNotice, setNavNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!navNotice) return undefined;
+    const timer = window.setTimeout(() => setNavNotice(null), 7000);
+    return () => window.clearTimeout(timer);
+  }, [navNotice]);
 
   const [fireSweepAnim, setFireSweepAnim] = useState(false);
   const [pipTitle, setPipTitle] = useState<string | null>(null);
@@ -312,7 +327,7 @@ export function App() {
     aiDrawerState.open ||
     showTabs ||
     showCustomize ||
-    showPlayStoreModal;
+    showAboutModal;
 
   const isNativeRealWebUrl = (u: string) => {
     if (!AndroidHybridBridge.hasJniBridge()) return false;
@@ -578,7 +593,7 @@ export function App() {
         setAiDrawerState({ open: false });
         setShowTabs(false);
         setShowCustomize(false);
-        setShowPlayStoreModal(false);
+        setShowAboutModal(false);
         return true;
       }
       if (activeTab.historyIndex > 0) {
@@ -633,17 +648,41 @@ export function App() {
         : 'https://github.com/explore';
     }
 
-    const isProtocol =
-      /^https?:\/\//i.test(targetUrl) || targetUrl.startsWith('browserhub://');
-    const looksLikeDomain =
-      !targetUrl.includes(' ') && /\.[a-z]{2,}(\/|$)/i.test(targetUrl);
+    /*
+     * BUG THIS FIXES (screenshot from a real device):
+     *   "The web page at https://intent//play.google.com/... could not be loaded
+     *    because: net::ERR_NAME_NOT_RESOLVED"
+     * An `intent://` deep link was passed straight to the WebView, which tried
+     * to resolve "intent" as a hostname. classifyUrl() now decides what the
+     * input actually is: a web url, an internal page, an app deep link with a
+     * web fallback, or something a browser genuinely cannot open.
+     */
+    const classified = classifyUrl(targetUrl);
 
-    if (!isProtocol) {
-      if (looksLikeDomain) {
-        targetUrl = `https://${targetUrl}`;
+    if (classified.kind === 'unsafe') {
+      setNavNotice(classified.reason);
+      return;
+    }
+
+    if (classified.kind === 'app-scheme') {
+      if (classified.webUrl) {
+        // The link asked for another app but contains a real web address —
+        // follow the web address rather than failing with a DNS error.
+        setNavNotice(classified.note);
+        targetUrl = classified.webUrl;
       } else {
-        targetUrl = activeSearchEngine.buildUrl(targetUrl);
+        // Nothing web to fall back to. Hand it to Android, and if that is not
+        // possible say so instead of showing an unresolvable page.
+        const handedOff = AndroidHybridBridge.openExternalUrl?.(classified.url) ?? false;
+        setNavNotice(
+          handedOff ? `${classified.note} Handed it to Android.` : classified.note
+        );
+        return;
       }
+    } else if (classified.kind === 'search') {
+      targetUrl = activeSearchEngine.buildUrl(classified.query);
+    } else {
+      targetUrl = classified.url;
     }
 
     // Both the shield toggle and the ClearURLs extension strip parameters.
@@ -1339,7 +1378,6 @@ export function App() {
             onOpenNewIncognito={() => handleNewTab(true)}
             onTriggerDownload={handleTriggerDownload}
             onEnablePip={(title) => setPipTitle(title)}
-            onOpenPlayStore={() => setShowPlayStoreModal(true)}
             onLiveContentLoaded={(summaryText, pageTitle) => {
               setLivePageTexts((prev) => ({ ...prev, [activeTab.id]: summaryText }));
               updateTab(activeTab.id, (t) => ({ ...t, title: pageTitle }));
@@ -1558,6 +1596,7 @@ export function App() {
           onToggleDevTools={() => setShowDevTools((v) => !v)}
           onOpenBenchmark={() => navigateTab(activeTab.id, 'browserhub://benchmark')}
           onOpenGames={() => navigateTab(activeTab.id, 'browserhub://games')}
+          onOpenAbout={() => setShowAboutModal(true)}
           onOpenAi={(mode) => setAiDrawerState({ open: true, mode })}
           onToggleToolbarPosition={() =>
             setCustomization((prev) => ({
@@ -1565,7 +1604,6 @@ export function App() {
               addressBarPosition: prev.addressBarPosition === 'top' ? 'bottom' : 'top',
             }))
           }
-          onOpenPlayStore={() => setShowPlayStoreModal(true)}
         />
       )}
 
@@ -1681,11 +1719,31 @@ export function App() {
         />
       )}
 
-      {showPlayStoreModal && (
-        <PlayStoreDownloadModal
-          deferredInstallPrompt={deferredInstallPrompt}
-          onClose={() => setShowPlayStoreModal(false)}
-        />
+      {showAboutModal && <AboutDiagnosticsModal onClose={() => setShowAboutModal(false)} />}
+
+      {/*
+        Navigation notice. Above the dock, below dialogs, and it never blocks the
+        page underneath except for its own dismiss button.
+      */}
+      {navNotice && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="absolute left-2 right-2 z-30 flex items-start gap-2 rounded-xl border border-cyan-500/40 px-3 py-2 shadow-lg"
+          style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 74px)', backgroundColor: '#050506' }}
+        >
+          <Info size={13} className="text-cyan-300 mt-0.5 shrink-0" />
+          <p className="flex-1 text-[10px] leading-relaxed text-slate-200">{navNotice}</p>
+          <button
+            type="button"
+            onClick={() => setNavNotice(null)}
+            aria-label="Dismiss this notice"
+            title="Dismiss"
+            className="p-0.5 rounded text-slate-400 cursor-pointer shrink-0"
+          >
+            <X size={12} />
+          </button>
+        </div>
       )}
     </div>
   );

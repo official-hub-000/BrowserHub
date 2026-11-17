@@ -79,6 +79,9 @@ npx tsx scripts/live-chat-recovery-test.mts | tail -1
 echo "== Privacy shield labelled honestly + UI has visual depth =="
 node scripts/vpn-and-visual-check.mjs | tail -1
 
+echo "== URL safety (intent:// can never reach the WebView) =="
+npx tsx scripts/url-safety-test.mts | tail -1
+
 echo "== Games hub honesty (no fake playability) =="
 node scripts/games-honesty-check.mjs | tail -1
 

@@ -44,6 +44,11 @@ export interface AndroidJniBridge {
   setPageTranslation?: (langCode: string, dictionaryJson: string) => void;
   /** Returns the JSON result envelope once ready, or null while pending. */
   pollAiResult?: (requestId: string) => string | null;
+  /**
+   * Hands a non-web URI (tel:, mailto:, market:, intent:) to the Android OS.
+   * Returns false when nothing on the device can handle it.
+   */
+  openExternalUrl?: (url: string) => boolean;
 }
 
 declare global {
@@ -74,6 +79,23 @@ export interface BrowserHubCapacitorPlugin {
 const CapacitorNative = registerPlugin<BrowserHubCapacitorPlugin>('BrowserHubNative');
 
 export const AndroidHybridBridge = {
+  /**
+   * Sends a deep link to Android. A WebView cannot render `tel:` or `market:`,
+   * and attempting to load one produces a DNS error page, so those have to be
+   * handed to the OS explicitly.
+   */
+  openExternalUrl(url: string): boolean {
+    if (!url) return false;
+    if (this.hasJniBridge() && window.BrowserHubNative?.openExternalUrl) {
+      try {
+        return Boolean(window.BrowserHubNative.openExternalUrl(url));
+      } catch {
+        return false;
+      }
+    }
+    return false;
+  },
+
   hasJniBridge(): boolean {
     return typeof window !== 'undefined' && Boolean(window.BrowserHubNative);
   },

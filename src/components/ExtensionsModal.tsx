@@ -90,10 +90,26 @@ export const ExtensionsModal: React.FC<ExtensionsModalProps> = ({
     }
 
     const ext = parseGlobalStoreUrl(input);
-    onInstallExtension(ext);
+
+    /*
+     * A .crx/.xpi record cannot execute in Android WebView. Installing it put a
+     * card in the list that changed nothing — exactly "I can't add any of them /
+     * they don't work". A userscript is different: its code genuinely runs, so
+     * only that case is added outright.
+     */
+    if (ext.effectKey === 'custom-script') {
+      onInstallExtension(ext);
+      setStoreUrlInput('');
+      flashNotice(`Added "${ext.name}" — edit its code in the Studio tab`);
+      setActiveTab('installed');
+      return;
+    }
+
     setStoreUrlInput('');
-    flashNotice(`Imported "${ext.name}" (${ext.format})`);
-    setActiveTab('installed');
+    flashNotice(
+      `${ext.name} was read as a ${ext.format} package. Android WebView cannot run its code, so it was not added. ` +
+        `See the Working tab for native equivalents, or paste a userscript.`
+    );
   };
 
   const handleCreateStudioExt = (e: React.FormEvent) => {

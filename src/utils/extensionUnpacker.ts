@@ -26,8 +26,8 @@ export async function unpackExtensionFile(file: File): Promise<BrowserExtension>
       format: 'USER.JS',
       description:
         descMatch?.[1]?.trim() ||
-        'Custom Userscript injected via BrowserHub Violentmonkey/GM Runtime.',
-      icon: '📜',
+        'Userscript imported from a .user.js file. Its code is injected into every page.',
+      icon: 'code',
       enabled: true,
       allowIncognito: true,
       permissions: grantMatches.length > 0 ? grantMatches : ['activeTab', 'DOM-Inject'],
@@ -116,7 +116,7 @@ export async function unpackExtensionFile(file: File): Promise<BrowserExtension>
           manifest.description && !manifest.description.startsWith('__MSG_')
             ? manifest.description
             : `Unpacked ${format} WebExtension archive (${Object.keys(zip.files).length} files verified).`,
-        icon: format === 'XPI' ? '🦊' : '🧩',
+        icon: format === 'XPI' ? 'firefox' : 'puzzle',
         enabled: true,
         allowIncognito: false,
         permissions: perms.length > 0 ? perms : ['storage', 'activeTab'],
@@ -136,8 +136,8 @@ export async function unpackExtensionFile(file: File): Promise<BrowserExtension>
     author: 'Sideloaded Package',
     source: 'sideload-file',
     format,
-    description: `Sideloaded ${format} extension (${(file.size / 1024).toFixed(1)} KB) registered in Universal Extension Runtime.`,
-    icon: format === 'XPI' ? '🦊' : '🧩',
+    description: `Sideloaded ${format} package (${(file.size / 1024).toFixed(1)} KB). No readable CSS or script was found inside it, so it cannot change a page here.`,
+    icon: format === 'XPI' ? 'firefox' : 'puzzle',
     enabled: true,
     allowIncognito: false,
     permissions: ['activeTab', 'storage', 'scripting'],
@@ -195,12 +195,28 @@ export function parseGlobalStoreUrl(input: string): BrowserExtension {
         ? 'userscript'
         : 'chrome-web-store',
     format: isFirefox ? 'XPI' : isUserscript ? 'USER.JS' : 'CRX3',
-    description: `Imported globally from ${
-      isFirefox ? 'Firefox Add-ons (AMO)' : isUserscript ? 'Userscript Registry' : 'Chrome Web Store'
-    } via BrowserHub Universal WebExtension Polyfill Bridge.`,
-    icon: isFirefox ? '🦊' : isUserscript ? '⚡' : '🌐',
+    /*
+     * BUG THIS FIXES ("extension not working, I can't add any of them"):
+     * every import produced `effectKey` undefined, so the entry appeared in the
+     * Installed list while changing nothing — a label, not an extension. A
+     * userscript can genuinely run here, so it is wired to custom-script and
+     * ships real code. A .crx/.xpi cannot execute in WebView and says so.
+     */
+    description: isUserscript
+      ? 'Imported userscript. Edit its code in the Studio tab — plain DOM scripts run for real in every page.'
+      : `Imported ${isFirefox ? 'Firefox .xpi' : 'Chrome .crx'} package record from ${
+          isFirefox ? 'Firefox Add-ons (AMO)' : 'Chrome Web Store'
+        }. Android WebView has no extension engine, so its code cannot execute here — see the Working tab for native equivalents.`,
+    // Vector icon ids only: the app bans emoji in the UI.
+    icon: isFirefox ? 'firefox' : isUserscript ? 'code' : 'globe',
     enabled: true,
     allowIncognito: true,
     permissions: ['activeTab', 'storage', 'webRequest', 'scripting'],
+    ...(isUserscript
+      ? {
+          effectKey: 'custom-script' as const,
+          customJs: `/* Imported from ${trimmed}\n   Replace the body with the userscript you want to run.\n   GM_* helpers are not available; plain DOM code works. */\n(function () {\n  try {\n    console.info('[BrowserHub] userscript active on', location.host);\n  } catch (e) {}\n})();`,
+        }
+      : {}),
   };
 }

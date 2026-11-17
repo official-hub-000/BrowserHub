@@ -122,6 +122,24 @@ if (problems.length === 0) {
     }
   }
 
+  /*
+   * A "WORKING" entry whose effect needs author content must SHIP that content.
+   * Installing Stylus with no stylesheet produced an extension that provably did
+   * nothing — exactly the "I can't add any of them / it doesn't work" report.
+   */
+  for (const raw of entries) {
+    const id = raw.match(/id:\s*'([^']+)'/)?.[1] ?? '(unnamed)';
+    const support = raw.match(/support:\s*'([a-z-]+)'/)?.[1];
+    const effectKey = raw.match(/effectKey:\s*'([a-z-]+)'/)?.[1];
+    if (support !== 'runs-here') continue;
+    if (effectKey === 'custom-css' && !/customCss:\s*`[^`]{20,}`/.test(raw)) {
+      problems.push(`${id}: runs-here custom-css with no shipped stylesheet — installing it does nothing`);
+    }
+    if (effectKey === 'custom-script' && !/customJs:\s*`[^`]{20,}`/.test(raw)) {
+      problems.push(`${id}: runs-here custom-script with no shipped script — installing it does nothing`);
+    }
+  }
+
   if (runsHere === 0) problems.push('no extension actually runs — the "working" group would be empty');
   if (listed === 0) problems.push('catalogue has no listings, so the honest "not working" group is missing');
 
@@ -137,6 +155,28 @@ if (problems.length === 0) {
     problems.push(
       'ExtensionsModal.tsx: still uses the flat DISCOVER_WORLD_EXTENSIONS list, which has no per-entry status'
     );
+  }
+
+  /*
+   * Imports must not create inert entries: a userscript has to carry real code
+   * (or the custom-script effect is a no-op) and a .crx/.xpi must not be added.
+   * Comments are stripped first — a comment about the old bug is not the bug.
+   */
+  const unpacker = fs
+    .readFileSync(path.join(ROOT, 'src/utils/extensionUnpacker.ts'), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/^\s*\/\/.*$/gm, '');
+  if (/icon:[^\n]*[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u.test(unpacker)) {
+    problems.push('extensionUnpacker.ts: emoji icon in an imported extension (the UI is vector-only)');
+  }
+  if (/effectKey:\s*undefined/.test(unpacker)) {
+    problems.push('extensionUnpacker.ts: an import path sets effectKey undefined — the entry would do nothing');
+  }
+  if (!/customJs:\s*`/.test(unpacker)) {
+    problems.push('extensionUnpacker.ts: imported userscripts carry no code, so they cannot run');
+  }
+  if (!/cannot run its code|cannot execute/.test(modal)) {
+    problems.push('ExtensionsModal.tsx: importing a .crx/.xpi does not tell the user it cannot run');
   }
 
   /* No silent over-claim in the store copy. */

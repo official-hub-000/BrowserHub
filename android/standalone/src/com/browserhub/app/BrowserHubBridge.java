@@ -73,6 +73,18 @@ public class BrowserHubBridge {
         );
     }
 
+    /**
+     * Hands a deep link (tel:, mailto:, market:, intent:) to the OS.
+     *
+     * A WebView cannot render these — attempting a load produces
+     * net::ERR_NAME_NOT_RESOLVED, which is exactly the error screen reported.
+     * Returns false when nothing on the device can handle the URI.
+     */
+    @JavascriptInterface
+    public boolean openExternalUrl(String url) {
+        return activity.openExternalUrl(url);
+    }
+
     /** Reliable clipboard write for Android WebView (execCommand often fails). */
     @JavascriptInterface
     public void copyToClipboard(final String text) {

@@ -250,11 +250,31 @@ public class MainActivity extends Activity {
                 if ("http".equalsIgnoreCase(scheme) || "https".equalsIgnoreCase(scheme)) {
                     return false;
                 }
-                try {
-                    startActivity(new Intent(Intent.ACTION_VIEW, uri));
-                } catch (Throwable ignored) {
-                }
+                // Every non-web scheme goes to the OS. This covers intent://,
+                // market://, tel:, mailto: and friends — all of which would
+                // otherwise render as a name-not-resolved error.
+                openExternalUrl(uri.toString());
                 return true;
+            }
+
+            /**
+             * A page can start a navigation without going through
+             * shouldOverrideUrlLoading (for example `location.href = "intent://…"`).
+             * When that happens the WebView has already begun resolving the
+             * pseudo-scheme as a hostname and the user sees a DNS error. Catching
+             * it here and restoring the previous page keeps that off the screen.
+             */
+            @Override
+            public void onPageStarted(WebView view, String url, android.graphics.Bitmap favicon) {
+                super.onPageStarted(view, url, favicon);
+                if (url == null) return;
+                if (url.startsWith("http://") || url.startsWith("https://")) return;
+                view.stopLoading();
+                openExternalUrl(url);
+                notifyShellUrlChanged(url, "App link");
+                if (lastLoadedUrl != null && isWebLoadableUrl(lastLoadedUrl)) {
+                    view.loadUrl(lastLoadedUrl);
+                }
             }
 
             @Override
@@ -706,6 +726,18 @@ public class MainActivity extends Activity {
                 }
 
                 if (!url.equals(lastLoadedUrl)) {
+                    /*
+                     * Defence in depth for the reported net::ERR_NAME_NOT_RESOLVED
+                     * screen. The shell now classifies URLs before calling this,
+                     * but a deep link must NEVER reach loadUrl even if that check
+                     * is bypassed: a WebView resolves "intent" as a hostname.
+                     */
+                    if (!isWebLoadableUrl(url)) {
+                        lastLoadedUrl = url;
+                        openExternalUrl(url);
+                        notifyShellUrlChanged(url, "App link");
+                        return;
+                    }
                     lastLoadedUrl = url;
                     browserWebView.loadUrl(url);
                 } else if (uaChanged) {
@@ -728,6 +760,59 @@ public class MainActivity extends Activity {
                 }
             }
         });
+    }
+
+    /** True only for URLs a WebView can render: http(s) with a real host. */
+    private static boolean isWebLoadableUrl(final String url) {
+        if (url == null) return false;
+        String u = url.trim();
+        if (!u.startsWith("http://") && !u.startsWith("https://")) return false;
+        try {
+            Uri parsed = Uri.parse(u);
+            String host = parsed.getHost();
+            // "https://intent//play.google.com/..." parses with host "intent",
+            // which has no dot and cannot resolve. Reject it here.
+            return host != null && host.contains(".");
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    /** True only for web URLs; everything else is handed to the OS. */
+    public boolean openExternalUrl(final String url) {
+        if (url == null || url.trim().isEmpty()) return false;
+        final String target = url.trim();
+        if (target.startsWith("http://") || target.startsWith("https://")) return false;
+        final boolean[] handled = new boolean[] { false };
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    Intent intent;
+                    if (target.startsWith("intent:")) {
+                        intent = Intent.parseUri(target, Intent.URI_INTENT_SCHEME);
+                    } else {
+                        intent = new Intent(Intent.ACTION_VIEW, Uri.parse(target));
+                    }
+                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    if (intent.resolveActivity(getPackageManager()) != null) {
+                        startActivity(intent);
+                        handled[0] = true;
+                        return;
+                    }
+                    // An intent:// link often carries a browser fallback.
+                    String fallback = intent.getStringExtra("browser_fallback_url");
+                    if (fallback != null && !fallback.isEmpty()) {
+                        startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(fallback))
+                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+                        handled[0] = true;
+                    }
+                } catch (Throwable ignored) {
+                    // Nothing on this device understands the scheme.
+                }
+            }
+        });
+        return handled[0];
     }
 
     public void setBrowserVisibleOnly(final boolean visible) {

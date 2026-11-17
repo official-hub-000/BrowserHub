@@ -22,6 +22,7 @@ import {
   Terminal,
   Zap,
   Gamepad2,
+  Info,
   Download,
   Sparkles,
   PanelBottom,
@@ -71,7 +72,13 @@ interface MenuHubModalProps {
   onOpenGames: () => void;
   onOpenAi: (mode: string) => void;
   onToggleToolbarPosition: () => void;
-  onOpenPlayStore: () => void;
+  /**
+   * The old "APK & Play Store" panel is gone. Every button in it pointed at
+   * `/api/download/...`, a dev-server route that does not exist in a static
+   * build, so tapping it inside the installed APK could only fail. Replaced
+   * with a real diagnostics panel.
+   */
+  onOpenAbout: () => void;
 }
 
 export const MenuHubModal: React.FC<MenuHubModalProps> = ({
@@ -108,7 +115,7 @@ export const MenuHubModal: React.FC<MenuHubModalProps> = ({
   onOpenGames,
   onOpenAi,
   onToggleToolbarPosition,
-  onOpenPlayStore,
+  onOpenAbout,
 }) => {
   const runAndClose = (fn: () => void) => {
     onClose();
@@ -479,11 +486,11 @@ export const MenuHubModal: React.FC<MenuHubModalProps> = ({
               </button>
 
               <button
-                onClick={() => runAndClose(onOpenPlayStore)}
-                className="p-3 rounded-xl bg-emerald-950/40 hover:bg-emerald-950/70 border border-emerald-500/40 text-left flex items-center gap-2.5 text-xs font-semibold text-emerald-300 cursor-pointer"
+                onClick={() => runAndClose(onOpenAbout)}
+                className="p-3 rounded-xl bg-black hover:bg-[#121216] border border-slate-800 text-left flex items-center gap-2.5 text-xs font-semibold text-slate-200 cursor-pointer"
               >
-                <Download size={16} className="text-emerald-400" />
-                <span>APK &amp; Play Store</span>
+                <Info size={16} className="text-cyan-400" />
+                <span>About &amp; Diagnostics</span>
               </button>
             </div>
           </section>

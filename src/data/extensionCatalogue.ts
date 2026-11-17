@@ -101,8 +101,21 @@ export const EXTENSION_CATALOGUE: CatalogueEntry[] = [
     rating: '4.8 ★',
     usersCount: '1.8M+',
     support: 'runs-here',
-    works: 'Your own CSS from the Studio tab is injected into pages and applied immediately.',
+    works: 'Ships with a working dark stylesheet injected into every page; edit it in Studio.',
     implementation: 'Author CSS injected into every document.',
+    /*
+     * BUG THIS FIXES (reported as "extension not working, I can't add any"):
+     * hasCustomCss() requires a non-empty `customCss`, so installing this entry
+     * with no stylesheet installed an extension that provably did nothing.
+     */
+    customCss: `/* BrowserHub Stylus — default dark polish. Edit in the Studio tab. */
+html { color-scheme: dark !important; }
+body { background-color: #0b0b0e !important; }
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: #08080b; }
+::-webkit-scrollbar-thumb { background: #22d3ee55; border-radius: 8px; }
+::selection { background: #22d3ee44 !important; }
+img, video { border-radius: 6px; }`,
     storeUrl: 'https://chromewebstore.google.com/detail/stylus/clngdbkpkpeebahjckkjfobafhncgmne',
   },
   {
@@ -188,8 +201,21 @@ export const EXTENSION_CATALOGUE: CatalogueEntry[] = [
     rating: '4.4 ★',
     usersCount: '80K+',
     support: 'runs-here',
-    works: 'Your own script text is injected and executed in the page. Third-party GM_* APIs are not available.',
+    works: 'Runs a real userscript in every page. Ships with a small one you can replace in Studio.',
     implementation: 'Author script injected into the document.',
+    // Same bug as Stylus above: hasUserScript() needs non-empty `customJs`.
+    customJs: `/* BrowserHub userscript example — replace it in the Studio tab.
+   GM_* helper APIs are not available; plain DOM code works. */
+(function () {
+  try {
+    document.documentElement.setAttribute('data-browserhub-userscript', 'on');
+    document.querySelectorAll('a').forEach(function (a) {
+      a.style.touchAction = 'manipulation';
+    });
+  } catch (e) {
+    /* a page without a document is not an error worth surfacing */
+  }
+})();`,
     storeUrl: 'https://greasyfork.org/en',
   },
   {

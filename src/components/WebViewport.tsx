@@ -65,7 +65,6 @@ interface WebViewportProps {
     category: 'apk' | 'video' | 'archive' | 'document'
   ) => void;
   onEnablePip: (title: string) => void;
-  onOpenPlayStore?: () => void;
   onLiveContentLoaded?: (summaryText: string, pageTitle: string) => void;
 }
 
@@ -99,7 +98,6 @@ export const WebViewport: React.FC<WebViewportProps> = ({
   onOpenVpn,
   onOpenShields,
   onOpenExtensions,
-  onOpenPlayStore,
   onLiveContentLoaded,
   onZapElement,
   onToggleDesktop,
@@ -568,29 +566,6 @@ export const WebViewport: React.FC<WebViewportProps> = ({
             </button>
           </div>
 
-          {/* Web Preview Only: Download Android APK Card (hidden when already inside Android APK!) */}
-          {!isNativeAndroid && onOpenPlayStore && (
-            <div
-              className="rounded-2xl border border-emerald-500/35 p-4 flex items-center justify-between gap-3"
-              style={{ backgroundColor: '#091f1a' }}
-            >
-              <div className="space-y-0.5">
-                <div className="text-xs font-bold text-emerald-300">
-                  Test on Your Android Phone
-                </div>
-                <div className="text-[11px] text-slate-300">
-                  Download the signed BrowserHub v1.0.0 Android APK or Play Store kit.
-                </div>
-              </div>
-              <button
-                onClick={onOpenPlayStore}
-                className="px-3.5 py-2 rounded-xl bg-emerald-400 hover:bg-emerald-300 text-slate-950 font-bold text-xs inline-flex items-center gap-1.5 shrink-0 cursor-pointer"
-              >
-                <Download size={14} />
-                <span>Get APK</span>
-              </button>
-            </div>
-          )}
         </div>
       </div>
     );
