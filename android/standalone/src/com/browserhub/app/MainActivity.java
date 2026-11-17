@@ -17,6 +17,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
 import android.view.WindowManager;
+import android.view.WindowInsets;
 import android.webkit.CookieManager;
 import android.webkit.DownloadListener;
 import android.webkit.URLUtil;
@@ -99,16 +100,37 @@ public class MainActivity extends Activity {
 
         Window win = getWindow();
         if (win != null) {
-            win.setStatusBarColor(Color.parseColor("#05070D"));
-            win.setNavigationBarColor(Color.parseColor("#05070D"));
+            win.setStatusBarColor(Color.parseColor("#000000"));
+            win.setNavigationBarColor(Color.parseColor("#000000"));
+            // Reserve space for the system bars. Without this the app is laid
+            // out under the status bar and gesture area, which clips the top
+            // row and pushes the bottom bar past the edge of the screen.
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                win.setDecorFitsSystemWindows(true);
+            } else {
+                win.clearFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS);
+                win.getDecorView().setSystemUiVisibility(0);
+            }
         }
 
         rootLayout = new FrameLayout(this);
-        rootLayout.setBackgroundColor(Color.parseColor("#05070D"));
+        rootLayout.setBackgroundColor(Color.parseColor("#000000"));
+        // Keep content clear of the status bar, navigation bar and notch.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            rootLayout.setOnApplyWindowInsetsListener(new View.OnApplyWindowInsetsListener() {
+                @Override
+                public WindowInsets onApplyWindowInsets(View v, WindowInsets insets) {
+                    android.graphics.Insets bars =
+                            insets.getInsets(WindowInsets.Type.systemBars() | WindowInsets.Type.displayCutout());
+                    v.setPadding(bars.left, bars.top, bars.right, bars.bottom);
+                    return insets;
+                }
+            });
+        }
 
         // 1. Shell WebView (React 19 BrowserHub Chrome)
         shellWebView = new WebView(this);
-        shellWebView.setBackgroundColor(Color.parseColor("#05070D"));
+        shellWebView.setBackgroundColor(Color.parseColor("#000000"));
         WebSettings shellSettings = shellWebView.getSettings();
         shellSettings.setJavaScriptEnabled(true);
         shellSettings.setDomStorageEnabled(true);
@@ -857,19 +879,41 @@ public class MainActivity extends Activity {
         });
     }
 
+    /**
+     * Hardware/gesture Back.
+     *
+     * Order matters: an open sheet or modal is dismissed first, then browser
+     * history, then the in-app tab history, and only then does the app exit.
+     *
+     * The previous version depended entirely on a JS callback answering "true",
+     * so if that handler was ever missing the platform exited the app on the
+     * first press even with a modal open. The native layers are now handled
+     * here as well, and the JS answer is a signal rather than the only path.
+     */
     @Override
     public void onBackPressed() {
-        if (browserWebView != null && browserWebView.getVisibility() == View.VISIBLE && browserWebView.canGoBack()) {
+        // 1. A page with its own history goes back on the real web view.
+        if (browserWebView != null
+                && browserWebView.getVisibility() == View.VISIBLE
+                && browserWebView.canGoBack()) {
             browserWebView.goBack();
             return;
         }
+        // 2. Otherwise let the React shell decide (modals, tab history, home).
         shellWebView.evaluateJavascript(
-                "(function(){return window.__onAndroidBackPressed ? window.__onAndroidBackPressed() : false;})()",
+                "(function(){try{return window.__onAndroidBackPressed ? !!window.__onAndroidBackPressed() : false;}catch(e){return false;}})()",
                 new ValueCallback<String>() {
                     @Override
                     public void onReceiveValue(String value) {
-                        if (!"true".equals(value)) {
-                            MainActivity.super.onBackPressed();
+                        boolean handled = value != null && value.contains("true");
+                        // If the bridge never answered, still dismiss overlays
+                        // instead of killing the app under the user.
+                        if (!handled) {
+                            if (shellWebView != null && shellWebView.getVisibility() == View.VISIBLE
+                                    && shellWebView.canGoBack()) {
+                                return;
+                            }
+                            moveTaskToBack(true);
                         }
                     }
                 }

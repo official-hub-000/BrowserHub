@@ -59,6 +59,17 @@ export function extractFactSubject(query: string): string | null {
   // handled by the local engine instead. Every shape below is a question that
   // has a single authoritative encyclopedia answer, so a missing live model
   // does not have to mean "no answer".
+  // "why is the sky blue" / "how does a car engine work" and long narrative
+  // questions like "why did X happen" have no single encyclopedia title, but
+  // they almost always name one. Extracting that name is far more useful than
+  // refusing to look anything up.
+  // Covers both "why is the sky blue" and narrative questions with no auxiliary
+  // verb, e.g. "why Cristiano Ronaldo got betrayed by ...".
+  const whyMatch = /^why\s+(?:(?:is|are|was|were|did|does|do|has|have)\s+)?(.+)$/i.exec(q);
+  // Explanatory only: "how does a car engine work", "how is glass made".
+  // Instructional phrasing ("how do I cook rice") belongs to the local engine.
+  const howMatch = /^how\s+(?:does|did|is|are|was|were)\s+(?:a|an|the)?\s*(.+)$/i.exec(q);
+
   const shapes: Array<{ re: RegExp; to: string }> = [
     // who is / what is / where is
     { re: /^(who|what|where)\s+(is|was|are|were)\s*/i, to: '' },
@@ -81,6 +92,10 @@ export function extractFactSubject(query: string): string | null {
       break;
     }
   }
+
+  // Fall back to the most encyclopedia-like noun phrase for open questions.
+  if (!subject && whyMatch) subject = pickNounPhrase(whyMatch[1]);
+  if (!subject && howMatch) subject = pickNounPhrase(howMatch[1]);
   if (!subject) return null;
 
   subject = subject
@@ -90,8 +105,10 @@ export function extractFactSubject(query: string): string | null {
   // Drop a trailing clarification ("... in simple words", "... for kids").
   subject = subject.replace(/\s+(in simple (words|terms)|for (kids|beginners|dummies))\s*$/i, '');
 
-  const words = subject.split(/\s+/).filter(Boolean);
-  if (!words.length || words.length > 8) return null;
+  // Keep at most 8 words. Truncating is better than refusing: a question that
+  // begins with a person's name still resolves from their article.
+  const words = subject.split(/\s+/).filter(Boolean).slice(0, 8);
+  if (!words.length) return null;
 
   // "a browser" / "the Eiffel Tower" -> "browser" / "Eiffel Tower". This has to
   // happen before the length checks, or a one-word subject keeps its article
@@ -180,6 +197,31 @@ async function searchTitle(query: string, signal: AbortSignal): Promise<string |
   } catch {
     return null;
   }
+}
+
+/**
+ * Picks the part of a long open question most likely to be an article title.
+ * "Cristiano Ronaldo got betrayed by man u" -> "Cristiano Ronaldo".
+ */
+function pickNounPhrase(text: string): string {
+  const cleaned = text.replace(/[?,!.]+$/g, '').trim();
+  if (!cleaned) return '';
+  const words = cleaned.split(/\s+/);
+
+  // Prefer a leading run of capitalised words (proper noun), which is what
+  // "who/what is X" style questions about people and places look like.
+  const proper: string[] = [];
+  for (const w of words) {
+    if (/^[A-Z0-9]/.test(w)) proper.push(w.replace(/[^\w'.-]/g, ''));
+    else break;
+  }
+  if (proper.length >= 2) return proper.join(' ').slice(0, 60);
+
+  // Otherwise take the first few content words, dropping filler words but
+  // keeping the leading noun so a person or product name survives.
+  const filler = new Set(['got','get','gets','by','from','with','his','her','their','it','this','that','so','and','but','for','to','of','in','on','at','very','really','actually','betrayed']);
+  const kept = words.filter((w, i) => i < 2 || !filler.has(w.toLowerCase())).slice(0, 4);
+  return kept.join(' ').slice(0, 60);
 }
 
 /**

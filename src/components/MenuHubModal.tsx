@@ -21,6 +21,7 @@ import {
   SlidersHorizontal,
   Terminal,
   Zap,
+  Gamepad2,
   Download,
   Sparkles,
   PanelBottom,
@@ -67,6 +68,7 @@ interface MenuHubModalProps {
   onOpenCustomize: () => void;
   onToggleDevTools: () => void;
   onOpenBenchmark: () => void;
+  onOpenGames: () => void;
   onOpenAi: (mode: string) => void;
   onToggleToolbarPosition: () => void;
   onOpenPlayStore: () => void;
@@ -103,6 +105,7 @@ export const MenuHubModal: React.FC<MenuHubModalProps> = ({
   onOpenCustomize,
   onToggleDevTools,
   onOpenBenchmark,
+  onOpenGames,
   onOpenAi,
   onToggleToolbarPosition,
   onOpenPlayStore,
@@ -457,6 +460,14 @@ export const MenuHubModal: React.FC<MenuHubModalProps> = ({
                 <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#121216] text-slate-400 font-bold">
                   {showDevTools ? 'ON' : 'OFF'}
                 </span>
+              </button>
+
+              <button
+                onClick={() => runAndClose(onOpenGames)}
+                className="p-3 rounded-xl bg-black hover:bg-[#121216] border border-slate-800 text-left flex items-center gap-2.5 text-xs font-semibold text-slate-200 cursor-pointer"
+              >
+                <Gamepad2 size={16} className="text-fuchsia-400" />
+                <span>Games Hub</span>
               </button>
 
               <button

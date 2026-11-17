@@ -73,6 +73,15 @@ npx tsx scripts/math-and-prompt-check.mts | tail -1
 echo "== AI survives provider throttling (answered-then-apologised bug) =="
 npx tsx scripts/ai-throttle-simulation.mts | tail -1
 
+echo "== Games hub honesty (no fake playability) =="
+node scripts/games-honesty-check.mjs | tail -1
+
+echo "== Screen fits the device + Back always works =="
+node scripts/viewport-and-back-check.mjs | tail -1
+
+echo "== Extension store: every entry says whether it works =="
+node scripts/extensions-honesty-check.mjs | tail -1
+
 echo "== Pure AMOLED black + motion =="
 node scripts/amoled-motion-check.mjs | tail -1
 

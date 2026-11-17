@@ -3,13 +3,18 @@
 import fs from 'node:fs';
 
 const presets = fs.readFileSync('src/data/presets.ts', 'utf8');
+const catalogue = fs.readFileSync('src/data/extensionCatalogue.ts', 'utf8');
 const effects = fs.readFileSync('src/utils/extensionEffects.ts', 'utf8');
 const modal = fs.readFileSync('src/components/ExtensionsModal.tsx', 'utf8');
 const app = fs.readFileSync('src/App.tsx', 'utf8');
 const viewport = fs.readFileSync('src/components/WebViewport.tsx', 'utf8');
 const nativeJava = fs.readFileSync('android/standalone/src/com/browserhub/app/MainActivity.java', 'utf8');
 
-const keys = [...presets.matchAll(/effectKey: '([\w-]+)'/g)].map((m) => m[1]);
+// Both sources offer extensions: the bundled presets and the store catalogue.
+const keys = [
+  ...presets.matchAll(/effectKey: '([\w-]+)'/g),
+  ...catalogue.matchAll(/effectKey: '([\w-]+)'/g),
+].map((m) => m[1]);
 const enforced = [...(effects.match(/ENFORCED_EFFECT_KEYS[\s\S]*?\]\)/) || [''])[0].matchAll(/'([\w-]+)'/g)].map(
   (m) => m[1]
 );
@@ -44,8 +49,14 @@ for (const key of enforced) {
     bad.push(`'${key}' is listed as enforced but no code reads it`);
   }
 }
+// The catalogue states its status per entry, so a catalogue key is already
+// labelled by the card it sits on; the modal must render that status.
+const catalogueKeys = new Set([...catalogue.matchAll(/effectKey: '([\w-]+)'/g)].map((m) => m[1]));
+const modalLabelsStatus = /Not working here|SUPPORT_BADGE/.test(modal);
+
 for (const key of keys) {
   if (!enforced.includes(key) && !modal.includes('PREVIEW')) {
+    if (catalogueKeys.has(key) && modalLabelsStatus) continue;
     bad.push(`'${key}' is neither enforced nor labelled a preview`);
   }
 }

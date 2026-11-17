@@ -148,6 +148,15 @@ if (MODE === 'throttled') {
     'must not fall through to the apology while a source is available'
   );
 
+  // A "why" question about a named subject must reach the article too — this
+  // is the shape the user actually asked ("Why Cristiano Ronaldo got ...").
+  const why = await ask('Why Cristiano Ronaldo got betrayed by man u, real Madrid, juventus and Portugal');
+  assert.match(
+    why.out.engineLabel,
+    /Wikipedia/,
+    `a why-question about a named subject must be answered, got "${why.out.engineLabel}"`
+  );
+
   // A second, differently shaped factual question must also be answered.
   const second = await ask('Who wrote Hamlet?');
   assert.match(second.out.engineLabel, /Wikipedia/, `second factual question must be answered, got "${second.out.engineLabel}"`);

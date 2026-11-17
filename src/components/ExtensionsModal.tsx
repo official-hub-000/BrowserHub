@@ -9,9 +9,17 @@ import {
   Plus,
   CheckCircle2,
   EyeOff,
+  Search,
+  AlertTriangle,
+  ExternalLink,
 } from 'lucide-react';
 import type { BrowserExtension } from '../types/browser';
-import { DISCOVER_WORLD_EXTENSIONS } from '../data/presets';
+import {
+  EXTENSION_CATALOGUE as CATALOGUE,
+  CATALOGUE_GROUPS,
+  SUPPORT_BADGE,
+} from '../data/extensionCatalogue';
+
 import { parseGlobalStoreUrl, unpackExtensionFile } from '../utils/extensionUnpacker';
 import { SiteIcon } from './VectorIcons';
 import { isExtensionEnforced } from '../utils/extensionEffects';
@@ -36,6 +44,7 @@ export const ExtensionsModal: React.FC<ExtensionsModalProps> = ({
   onClose,
 }) => {
   const [activeTab, setActiveTab] = useState<'installed' | 'store' | 'import' | 'studio'>('installed');
+  const [storeQuery, setStoreQuery] = useState('');
   const [storeUrlInput, setStoreUrlInput] = useState('');
   const [statusToast, setStatusToast] = useState<string | null>(null);
   const [studioName, setStudioName] = useState('Custom Neon Link Highlighter');
@@ -218,74 +227,176 @@ export const ExtensionsModal: React.FC<ExtensionsModalProps> = ({
             ))}
 
           {activeTab === 'store' && (
-            <>
-            <div className="rounded-xl border border-slate-800 bg-[#060608] px-3 py-2 text-[10px] leading-relaxed text-slate-400">
-              <strong className="text-slate-200">RUNS HERE</strong> extensions change
-              real pages in this build (request filtering, injected CSS/JS, URL
-              cleanup). <strong className="text-slate-200">PREVIEW</strong> entries are
-              store listings: this build cannot execute full Chrome/Firefox extension
-              sandboxes inside Android WebView, and it will not pretend to.
-            </div>
-            <div className="space-y-2.5">
-              <div className="text-xs text-slate-400">
-                Verified desktop extensions pre-configured for 1-tap installation on Android:
+            <div className="space-y-3">
+              <div className="rounded-xl border border-slate-800 bg-[#060608] px-3 py-2 text-[10px] leading-relaxed text-slate-400">
+                Every card states whether the extension <strong className="text-emerald-300">actually works</strong> in
+                this build. Android WebView has no extension engine — no Chrome, Edge or Firefox add-on can execute its
+                code inside it. So BrowserHub ships native equivalents for the ones it can honour, and labels the rest
+                honestly instead of installing something that does nothing.
               </div>
-              {DISCOVER_WORLD_EXTENSIONS.map((item) => {
-                const alreadyInstalled = extensions.some((e) => e.id === item.id);
+
+              <div className="flex items-center gap-2 rounded-xl border border-slate-800 bg-[#08080b] px-3 py-2">
+                <Search size={14} className="text-slate-500 shrink-0" />
+                <input
+                  value={storeQuery}
+                  onChange={(e) => setStoreQuery(e.target.value)}
+                  placeholder="Search the catalogue"
+                  className="flex-1 bg-transparent outline-none text-[12px] text-white placeholder:text-slate-500"
+                />
+                {storeQuery ? (
+                  <button type="button" onClick={() => setStoreQuery('')} className="text-[10px] text-slate-400 cursor-pointer">
+                    Clear
+                  </button>
+                ) : null}
+              </div>
+
+              {CATALOGUE_GROUPS.map((group) => {
+                const items = CATALOGUE.filter(
+                  (e) =>
+                    e.support === group.id &&
+                    (!storeQuery.trim() ||
+                      e.name.toLowerCase().includes(storeQuery.trim().toLowerCase()) ||
+                      e.description.toLowerCase().includes(storeQuery.trim().toLowerCase()))
+                );
+                if (items.length === 0) return null;
+                const badge = SUPPORT_BADGE[group.id];
                 return (
-                  <div
-                    key={item.id}
-                    className="rounded-2xl bg-[#08080b] border border-slate-800 p-3.5 flex items-center justify-between gap-3"
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-[#121216] border border-slate-700 flex items-center justify-center"><SiteIcon id={item.icon} size={22} /></div>
-                      <div>
-                        <div className="text-xs font-bold text-white flex items-center gap-2 flex-wrap">
-                          <span>{item.name}</span>
-                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#121216] text-purple-300">
-                            {item.format}
-                          </span>
-                          <span
-                            className={`text-[9px] px-1.5 py-0.5 rounded font-bold ${
-                              isExtensionEnforced(item)
-                                ? 'bg-emerald-500/20 text-emerald-300'
-                                : 'bg-amber-500/20 text-amber-300'
+                  <div key={group.id} className="space-y-2">
+                    <div className="flex items-center gap-2 pt-1">
+                      <span
+                        className={`text-[9px] px-1.5 py-0.5 rounded font-bold ${
+                          badge.tone === 'green'
+                            ? 'bg-emerald-500/20 text-emerald-300'
+                            : badge.tone === 'amber'
+                              ? 'bg-amber-500/20 text-amber-300'
+                              : 'bg-[#121216] text-slate-400'
+                        }`}
+                      >
+                        {badge.label}
+                      </span>
+                      <span className="text-[10px] text-slate-500">{group.hint}</span>
+                    </div>
+
+                    {items.map((item) => {
+                      const alreadyInstalled = extensions.some((e) => e.id === item.id);
+                      const works = item.support === 'runs-here';
+                      return (
+                        <div
+                          key={item.id}
+                          className="rounded-2xl bg-[#08080b] border border-slate-800 p-3 space-y-2"
+                        >
+                          <div className="flex items-start gap-2.5">
+                            <div className="w-9 h-9 rounded-xl bg-[#121216] border border-slate-700 flex items-center justify-center shrink-0">
+                              <SiteIcon id={item.icon} size={18} />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="text-[12px] font-bold text-white flex items-center gap-1.5 flex-wrap">
+                                <span>{item.name}</span>
+                                <span className="text-[9px] px-1.5 py-0.5 rounded bg-[#121216] text-purple-300">
+                                  {item.format}
+                                </span>
+                              </div>
+                              <p className="text-[10px] text-slate-400 mt-0.5 leading-relaxed">{item.description}</p>
+                              <div className="text-[9px] text-amber-300 mt-0.5">
+                                {item.rating} · {item.usersCount} users
+                              </div>
+                            </div>
+                          </div>
+
+                          <div
+                            className={`flex items-start gap-1.5 text-[10px] leading-relaxed rounded-lg px-2 py-1.5 ${
+                              works ? 'bg-emerald-500/10 text-emerald-200' : 'bg-[#0d0a05] text-amber-200'
                             }`}
                           >
-                            {isExtensionEnforced(item) ? 'RUNS HERE' : 'PREVIEW'}
-                          </span>
+                            {works ? (
+                              <CheckCircle2 size={10} className="mt-0.5 shrink-0 text-emerald-400" />
+                            ) : (
+                              <AlertTriangle size={10} className="mt-0.5 shrink-0 text-amber-400" />
+                            )}
+                            <span>
+                              {works ? 'Working: ' : 'Not working here: '}
+                              {item.works}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            {works ? (
+                              <button
+                                type="button"
+                                disabled={alreadyInstalled}
+                                title={alreadyInstalled ? 'Already installed' : `Add ${item.name}`}
+                                aria-label={alreadyInstalled ? 'Already installed' : `Add ${item.name}`}
+                                onClick={() => {
+                                  onInstallExtension({ ...item, enabled: true, allowIncognito: true });
+                                  flashNotice(`Added "${item.name}"`);
+                                }}
+                                className={`px-3 py-1.5 rounded-xl text-[11px] font-bold ${
+                                  alreadyInstalled
+                                    ? 'bg-[#121216] text-slate-500 cursor-default'
+                                    : 'bg-purple-500 hover:bg-purple-400 text-white cursor-pointer'
+                                }`}
+                              >
+                                {alreadyInstalled ? 'Installed' : '+ Install'}
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                disabled={!item.storeUrl}
+                                title={
+                                  item.storeUrl
+                                    ? `Open the official listing for ${item.name} (cannot be installed into WebView)`
+                                    : 'No official listing'
+                                }
+                                aria-label={`Open the official listing for ${item.name}`}
+                                onClick={() => item.storeUrl && onNavigate(item.storeUrl)}
+                                className={`px-3 py-1.5 rounded-xl text-[11px] font-bold border flex items-center gap-1.5 ${
+                                  item.storeUrl
+                                    ? 'bg-black border-slate-700 text-slate-200 cursor-pointer'
+                                    : 'bg-[#121216] border-slate-800 text-slate-600 cursor-not-allowed'
+                                }`}
+                              >
+                                <ExternalLink size={10} />
+                                <span>Official listing</span>
+                              </button>
+                            )}
+                            {!works && item.support === 'importable' ? (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  onInstallExtension({ ...item, enabled: true, allowIncognito: true });
+                                  flashNotice(`Imported "${item.name}" (inactive — cannot execute here)`);
+                                }}
+                                disabled={alreadyInstalled}
+                                title="Import the package record for inspection. Its scripts will not run."
+                                aria-label={`Import ${item.name} for inspection`}
+                                className={`px-2.5 py-1.5 rounded-xl text-[11px] font-semibold border ${
+                                  alreadyInstalled
+                                    ? 'bg-[#121216] border-slate-800 text-slate-600 cursor-default'
+                                    : 'bg-black border-slate-700 text-slate-300 cursor-pointer'
+                                }`}
+                              >
+                                {alreadyInstalled ? 'Imported' : 'Import'}
+                              </button>
+                            ) : null}
+                            <span className="text-[9px] text-slate-600 ml-auto uppercase">{item.source}</span>
+                          </div>
                         </div>
-                        <p className="text-[11px] text-slate-400 mt-0.5">{item.description}</p>
-                        <div className="text-[10px] text-amber-300 mt-1">
-                          {item.rating} • {item.usersCount} users
-                        </div>
-                      </div>
-                    </div>
-                    <button
-                      disabled={alreadyInstalled}
-                      title={alreadyInstalled ? 'Already installed' : `Add ${item.name}`}
-                      aria-label={alreadyInstalled ? 'Already installed' : `Add ${item.name}`}
-                      onClick={() => {
-                        onInstallExtension({
-                          ...item,
-                          enabled: true,
-                          allowIncognito: true,
-                        });
-                        flashNotice(`Added "${item.name}"!`);
-                      }}
-                      className={`px-3 py-1.5 rounded-xl text-xs font-bold shrink-0 cursor-pointer ${
-                        alreadyInstalled
-                          ? 'bg-[#121216] text-slate-500 cursor-default'
-                          : 'bg-purple-500 hover:bg-purple-400 text-white'
-                      }`}
-                    >
-                      {alreadyInstalled ? 'Installed' : '+ Add'}
-                    </button>
+                      );
+                    })}
                   </div>
                 );
               })}
+
+              <div className="rounded-xl border border-slate-800 bg-[#060608] p-3 space-y-1.5">
+                <div className="text-[11px] font-bold text-slate-200">Have a store link?</div>
+                <p className="text-[10px] leading-relaxed text-slate-400">
+                  Paste any Chrome Web Store, Edge Add-ons, Firefox Add-ons, Greasy Fork or
+                  OpenUserJS link in the <strong className="text-slate-200">Import</strong> tab. It opens the real
+                  listing, and any CSS or userscript part can be applied — the extension sandbox itself cannot run in
+                  WebView.
+                </p>
+              </div>
             </div>
-            </>
           )}
 
           {activeTab === 'import' && (

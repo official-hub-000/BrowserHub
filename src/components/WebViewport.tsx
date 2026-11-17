@@ -36,6 +36,7 @@ import { AndroidHybridBridge } from '../bridge/androidHybridBridge';
 import { sanitizeExtractedPageContent } from '../utils/localAiEngine';
 import { HomeSearchPanel } from './HomeSearchPanel';
 import { SiteIcon } from './VectorIcons';
+import { GamesHub } from './GamesHub';
 
 interface WebViewportProps {
   tab: BrowserTab;
@@ -568,7 +569,18 @@ export const WebViewport: React.FC<WebViewportProps> = ({
   }
 
   // ============================================================================
-  // 2. BENCHMARK SUITE (browserhub://benchmark)
+  // 2. GAMES HUB (browserhub://games)
+  // ============================================================================
+  if (tab.url === 'browserhub://games') {
+    return (
+      <div className="h-full w-full">
+        <GamesHub onNavigate={onNavigate} />
+      </div>
+    );
+  }
+
+  // ============================================================================
+  // 3. BENCHMARK SUITE (browserhub://benchmark)
   // ============================================================================
   if (tab.url === 'browserhub://benchmark') {
     const scores = [

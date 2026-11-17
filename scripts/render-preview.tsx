@@ -10,6 +10,7 @@ import { App } from '../src/App';
 import { MenuHubModal } from '../src/components/MenuHubModal';
 import { TranslateModal } from '../src/components/TranslateModal';
 import { AiCopilotDrawer } from '../src/components/AiCopilotDrawer';
+import { GamesHub } from '../src/components/GamesHub';
 import { GLOBAL_VPN_NODES } from '../src/data/presets';
 
 if (!(globalThis as any).performance) (globalThis as any).performance = { now: () => Date.now() };
@@ -65,13 +66,14 @@ const surfaces: Record<string, string> = {
   ai: renderToString(
     React.createElement(AiCopilotDrawer, { tab, livePageText: '', initialMode: 'idle', onClose() {} })
   ),
+  games: renderToString(React.createElement(GamesHub, { onNavigate() {} })),
 };
 
 for (const [name, body] of Object.entries(surfaces)) {
   const html = `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=390, initial-scale=1">
 <style>${css}</style>
-<style>body{margin:0;background:#05070d;color:#f1f5f9;font-family:system-ui,sans-serif}.phone{width:390px;height:780px;margin:16px auto;border-radius:24px;overflow:hidden;position:relative;border:1px solid #1e293b}#root{height:100%}</style>
+<style>body{margin:0;background:#000000;color:#f1f5f9;font-family:system-ui,sans-serif}.phone{width:390px;height:780px;margin:16px auto;border-radius:24px;overflow:hidden;position:relative;border:1px solid #1a1a1f}#root{height:100%}</style>
 </head><body><div class="phone"><div id="root">${body}</div></div></body></html>`;
   writeFileSync(`/tmp/preview-${name}.html`, html);
   console.log(`/tmp/preview-${name}.html  ${body.length} chars`);

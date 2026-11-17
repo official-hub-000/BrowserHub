@@ -499,9 +499,14 @@ export function App() {
     syncViewportRef.current();
   });
 
-  // Live callbacks from the native page (URL / title / ad-blocked counters)
+  // Live callbacks from the native page (URL / title / ad-blocked counters).
+  //
+  // This must NOT bail out on a missing bridge for the lifetime of the app. The
+  // JS interface is injected by the native host, and if React mounted before it
+  // became visible the handlers were never installed — so the hardware Back
+  // button found no handler and the platform exited the app instead of going
+  // back. Registration is now unconditional; each handler degrades safely.
   useEffect(() => {
-    if (!AndroidHybridBridge.hasJniBridge() || !window.BrowserHubNative) return;
 
     window.__onNativeUrlChanged = (newUrl: string, newTitle: string) => {
       if (!newUrl || newUrl.startsWith('about:')) return;
@@ -1552,6 +1557,7 @@ export function App() {
           onOpenCustomize={() => setShowCustomize(true)}
           onToggleDevTools={() => setShowDevTools((v) => !v)}
           onOpenBenchmark={() => navigateTab(activeTab.id, 'browserhub://benchmark')}
+          onOpenGames={() => navigateTab(activeTab.id, 'browserhub://games')}
           onOpenAi={(mode) => setAiDrawerState({ open: true, mode })}
           onToggleToolbarPosition={() =>
             setCustomization((prev) => ({
