@@ -101,6 +101,40 @@ function urlSafe(raw: string): string {
   return raw.trim();
 }
 
+/* ------------------------------------------------------------------ *
+ * Settings persistence. Every user-facing preference in this browser is
+ * stored on the device (localStorage) so a restart never silently resets
+ * the search engine, theme, shields or extension state back to defaults.
+ * ------------------------------------------------------------------ */
+const STORE_KEY = 'browserhub.prefs.v1';
+
+type StoredPrefs = {
+  customization?: Partial<BrowserCustomization>;
+  shields?: Partial<ShieldState>;
+  vpn?: Partial<VpnState>;
+  extensions?: BrowserExtension[];
+};
+
+function readStoredPrefs(): StoredPrefs {
+  try {
+    const raw = window.localStorage.getItem(STORE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? (parsed as StoredPrefs) : {};
+  } catch {
+    return {};
+  }
+}
+
+/** Reads a nested section and merges it over defaults (never inverts a default). */
+function withStored<T extends object>(section: keyof StoredPrefs, fallback: T): T {
+  const stored = readStoredPrefs()[section] as Partial<T> | undefined;
+  if (!stored || typeof stored !== 'object') return fallback;
+  return { ...fallback, ...stored };
+}
+
+const STORED = readStoredPrefs();
+
 export function App() {
   // Start with 1 clean Home Tab (no pre-cluttered demo tabs)
   const [tabs, setTabs] = useState<BrowserTab[]>([
@@ -131,7 +165,8 @@ export function App() {
   const [splitTabId, setSplitTabId] = useState<string | null>(null);
 
   // Shields & Privacy State
-  const [shields, setShields] = useState<ShieldState>({
+  const [shields, setShields] = useState<ShieldState>(() =>
+    withStored<ShieldState>('shields', {
     enabled: true,
     blockAds: true,
     blockTrackers: true,
@@ -145,10 +180,12 @@ export function App() {
     totalTrackersBlocked: 0,
     totalDataSavedMb: 0,
     totalTimeSavedSec: 0,
-  });
+    })
+  );
 
   // VPN State
-  const [vpn, setVpn] = useState<VpnState>({
+  const [vpn, setVpn] = useState<VpnState>(() =>
+    withStored<VpnState>('vpn', {
     connected: false,
     connecting: false,
     selectedNodeId: GLOBAL_VPN_NODES[0].id,
@@ -158,13 +195,17 @@ export function App() {
     blockWebRtcLeak: true,
     splitTunnelBypassLocal: true,
     encryptedMb: 0,
-  });
+    })
+  );
 
   // Extensions State
-  const [extensions, setExtensions] = useState<BrowserExtension[]>(INITIAL_EXTENSIONS);
+  const [extensions, setExtensions] = useState<BrowserExtension[]>(
+    () => STORED.extensions || INITIAL_EXTENSIONS
+  );
 
   // Customization State — clean full-bleed layout + Google default search (switchable in 1 tap)
-  const [customization, setCustomization] = useState<BrowserCustomization>({
+  const [customization, setCustomization] = useState<BrowserCustomization>(() =>
+    withStored<BrowserCustomization>('customization', {
     theme: 'cyber-cyan',
     customAccentHex: '#22d3ee',
     addressBarPosition: 'top',
@@ -178,7 +219,8 @@ export function App() {
     readerFont: 'sans',
     readerTheme: 'slate',
     readerFontSize: 17,
-  });
+    })
+  );
 
   const [downloads, setDownloads] = useState<DownloadItem[]>([]);
   const [networkLogs, setNetworkLogs] = useState<NetworkLogEntry[]>([
@@ -285,6 +327,34 @@ export function App() {
   useEffect(() => {
     if (!activeTab.translatedLang) setTranslateNotice(null);
   }, [activeTab.translatedLang]);
+
+  // Persist preferences whenever they change (debounced to one write per idle tick).
+  useEffect(() => {
+    const id = window.setTimeout(() => {
+      try {
+        window.localStorage.setItem(
+          STORE_KEY,
+          JSON.stringify({
+            customization,
+            shields,
+            vpn: {
+              // Connection state is runtime-only; only choices are persisted.
+              selectedNodeId: vpn.selectedNodeId,
+              protocol: vpn.protocol,
+              dohProvider: vpn.dohProvider,
+              killSwitch: vpn.killSwitch,
+              blockWebRtcLeak: vpn.blockWebRtcLeak,
+              splitTunnelBypassLocal: vpn.splitTunnelBypassLocal,
+            },
+            extensions,
+          })
+        );
+      } catch {
+        // Storage full or disabled — the browser keeps working in memory.
+      }
+    }, 250);
+    return () => window.clearTimeout(id);
+  }, [customization, shields, vpn, extensions]);
 
   const nativeSyncInputs = {
     url: activeTab.url,

@@ -61,6 +61,10 @@ if (bad.length) { bad.forEach((b) => console.error("  FAIL " + b)); process.exit
 console.log("  native viewport sync + touch handoff guards OK");
 '
 
+echo "== Settings persistence =="
+node scripts/prefs-persistence-test.mjs | tail -1
+node scripts/prefs-wiring-check.mjs
+
 echo "== Offline page translator injection =="
 node scripts/translate-injection-test.mjs | tail -1
 
