@@ -120,7 +120,6 @@ export interface ShieldState {
   antiFingerprinting: boolean;
   httpsEverywhere: boolean;
   blockCryptominers: boolean;
-  turboDataSaver: boolean;
   totalAdsBlocked: number;
   totalTrackersBlocked: number;
   totalDataSavedMb: number;

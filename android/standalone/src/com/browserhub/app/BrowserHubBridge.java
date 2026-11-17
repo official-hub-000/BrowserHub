@@ -57,12 +57,16 @@ public class BrowserHubBridge {
             String customCss,
             int zoomPct,
             String findQuery,
-            boolean visible
+            boolean visible,
+            boolean trackerBlockOn,
+            boolean antiFingerprintOn,
+            boolean httpsUpgradeOn
     ) {
         activity.syncNativeBrowserViewport(
                 url, topCssPx, bottomCssPx, winHeightCss,
                 isDesktop, adblockOn, darkReaderOn, cookieKillerOn,
-                customCss, zoomPct, findQuery, visible
+                customCss, zoomPct, findQuery, visible,
+                trackerBlockOn, antiFingerprintOn, httpsUpgradeOn
         );
     }
 

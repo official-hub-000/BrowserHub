@@ -15,22 +15,31 @@ import android.webkit.WebStorage
 class HubShieldEngine {
 
     @Volatile var adblockEnabled: Boolean = true
+    /** Analytics / fingerprinting is a separate list so the two toggles differ. */
+    @Volatile var trackerBlockEnabled: Boolean = true
     @Volatile var cookieAutoReject: Boolean = true
     @Volatile var stripTrackingParams: Boolean = true
 
-    private val blockedHostSuffixes = listOf(
+    /** Advertising networks — gated by the Native Ad Blocker toggle. */
+    private val adHostSuffixes = listOf(
         "doubleclick.net",
         "googlesyndication.com",
         "googleadservices.com",
+        "taboola.com",
+        "outbrain.com",
+        "criteo.com",
+        "adnxs.com"
+    )
+
+    /** Analytics / fingerprinting — gated by the separate tracker toggle. */
+    private val trackerHostSuffixes = listOf(
         "google-analytics.com",
         "googletagmanager.com",
         "connect.facebook.net",
         "hotjar.com",
-        "taboola.com",
-        "outbrain.com",
-        "criteo.com",
-        "adnxs.com",
-        "fingerprintjs.io"
+        "fingerprintjs.io",
+        "scorecardresearch.com",
+        "clarity.ms"
     )
 
     private val trackingQueryKeys = setOf(
@@ -38,11 +47,15 @@ class HubShieldEngine {
         "fbclid", "gclid", "dclid", "msclkid", "mc_eid", "igshid", "si"
     )
 
-    fun shouldBlockNetworkRequest(rawUrl: String): Boolean {
-        if (!adblockEnabled) return false
-        val host = Uri.parse(rawUrl).host?.lowercase() ?: return false
-        return blockedHostSuffixes.any { host == it || host.endsWith(".$it") }
+    /** @return "ads", "trackers" or null when the request is allowed. */
+    fun matchBlockList(rawUrl: String): String? {
+        val host = Uri.parse(rawUrl).host?.lowercase() ?: return null
+        if (adblockEnabled && adHostSuffixes.any { host == it || host.endsWith(".$it") }) return "ads"
+        if (trackerBlockEnabled && trackerHostSuffixes.any { host == it || host.endsWith(".$it") }) return "trackers"
+        return null
     }
+
+    fun shouldBlockNetworkRequest(rawUrl: String): Boolean = matchBlockList(rawUrl) != null
 
     fun cleanTrackingParameters(rawUrl: String): String {
         if (!stripTrackingParams) return rawUrl

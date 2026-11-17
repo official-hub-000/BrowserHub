@@ -8,7 +8,7 @@ import {
   Link2Off,
   Cookie,
   Cpu,
-  Gauge,
+  Lock,
 } from 'lucide-react';
 import type { BrowserTab, ShieldState } from '../types/browser';
 
@@ -39,39 +39,39 @@ export const ShieldsPanel: React.FC<ShieldsPanelProps> = ({
   }> = [
     {
       key: 'blockAds',
-      label: 'Direct Native Ad Blocker',
-      desc: 'Blocks banner, pop-under & pre-roll video ads (EasyList + uBO Core)',
+      label: 'Native Ad Blocker',
+      desc: 'Blocks known ad-network requests before the page can load them',
       icon: <ShieldCheck className="w-4 h-4 text-emerald-400" />,
     },
     {
       key: 'blockTrackers',
-      label: 'Cross-Site Tracker Shield',
-      desc: 'Blocks telemetry pixels, behavioral analytics & third-party cookies',
+      label: 'Analytics & Tracker Shield',
+      desc: 'Blocks analytics beacons, session recorders & fingerprint scripts (separate list)',
       icon: <Cpu className="w-4 h-4 text-cyan-400" />,
     },
     {
       key: 'blockCookieBanners',
-      label: 'Auto-Kill GDPR Cookie Walls',
-      desc: 'Dismisses intrusive consent popups automatically',
+      label: 'Cookie-Wall Killer',
+      desc: 'Hides common GDPR / consent overlay elements',
       icon: <Cookie className="w-4 h-4 text-amber-400" />,
     },
     {
       key: 'antiFingerprinting',
-      label: 'Canvas / WebGL / Audio Randomizer',
-      desc: 'Spoofs hardware entropy per domain so sites cannot fingerprint your phone',
+      label: 'Canvas & Hardware Spoofing',
+      desc: 'Perturbs canvas pixels and reports generic CPU/memory values',
       icon: <Fingerprint className="w-4 h-4 text-purple-400" />,
     },
     {
       key: 'stripTrackingParams',
-      label: 'ClearURLs Parameter Stripper',
-      desc: 'Strips utm_*, fbclid, gclid & 250+ tracking URL parameters',
+      label: 'Tracking-Parameter Stripper',
+      desc: 'Removes utm_*, fbclid, gclid and similar parameters from links you open',
       icon: <Link2Off className="w-4 h-4 text-rose-400" />,
     },
     {
-      key: 'turboDataSaver',
-      label: 'Turbo Lite Compression',
-      desc: 'Compresses heavy scripts & defers offscreen media for 3x speed',
-      icon: <Gauge className="w-4 h-4 text-sky-400" />,
+      key: 'httpsEverywhere',
+      label: 'HTTPS-Only Upgrades',
+      desc: 'Rewrites plain http:// pages to https:// before they load',
+      icon: <Lock className="w-4 h-4 text-sky-400" />,
     },
   ];
 

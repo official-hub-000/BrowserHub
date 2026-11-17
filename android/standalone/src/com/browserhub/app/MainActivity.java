@@ -48,14 +48,21 @@ public class MainActivity extends Activity {
     private static final String DESKTOP_UA =
             "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36";
 
-    private static final Set<String> AD_TRACKER_DOMAINS = new HashSet<String>(Arrays.asList(
+    /** Advertising networks — gated by the "Direct Native Ad Blocker" toggle. */
+    private static final Set<String> AD_DOMAINS = new HashSet<String>(Arrays.asList(
             "doubleclick.net", "googlesyndication.com", "googleadservices.com",
-            "google-analytics.com", "googletagmanager.com", "connect.facebook.net",
             "taboola.com", "outbrain.com", "criteo.com", "adnxs.com",
             "rubiconproject.com", "pubmatic.com", "openx.net", "adsrvr.org",
-            "scorecardresearch.com", "hotjar.com", "clarity.ms", "popads.net",
-            "exoclick.com", "fingerprintjs.io", "moatads.com", "quantserve.com",
+            "popads.net", "exoclick.com", "moatads.com",
             "amazon-adsystem.com", "adcolony.com", "applovin.com", "unityads.unity3d.com"
+    ));
+
+    /** Analytics / fingerprinting — gated by the separate tracker toggle, so a
+     *  user who keeps ads visible can still block being measured. */
+    private static final Set<String> TRACKER_DOMAINS = new HashSet<String>(Arrays.asList(
+            "google-analytics.com", "googletagmanager.com", "connect.facebook.net",
+            "scorecardresearch.com", "hotjar.com", "clarity.ms", "fingerprintjs.io",
+            "quantserve.com"
     ));
 
     private FrameLayout rootLayout;
@@ -67,6 +74,10 @@ public class MainActivity extends Activity {
     private volatile boolean darkReaderEnabled = false;
     private volatile boolean cookieKillerEnabled = true;
     private volatile String activeCustomCss = "";
+    private volatile boolean trackerBlockEnabled = true;
+    /** Script/CSS-injected shields that the shell toggles independently. */
+    private volatile boolean antiFingerprintEnabled = true;
+    private volatile boolean httpsUpgradeEnabled = true;
     private volatile String extractedPageText = "";
 
     private String lastLoadedUrl = "";
@@ -190,11 +201,12 @@ public class MainActivity extends Activity {
         browserWebView.setWebViewClient(new WebViewClient() {
             @Override
             public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
-                if (adblockEnabled && !request.isForMainFrame()) {
+                if ((adblockEnabled || trackerBlockEnabled) && !request.isForMainFrame()) {
                     Uri u = request.getUrl();
                     String host = u != null && u.getHost() != null ? u.getHost().toLowerCase() : "";
-                    if (isAdOrTrackerHost(host)) {
-                        notifyShellAdBlocked(host);
+                    String list = matchBlockList(host);
+                    if (list != null) {
+                        notifyShellAdBlocked(host, list);
                         return new WebResourceResponse(
                                 "text/plain",
                                 "UTF-8",
@@ -258,20 +270,27 @@ public class MainActivity extends Activity {
             syncNativeBrowserViewport(
                     dataUrl, 0f, 76f, 800f, false,
                     adblockEnabled, darkReaderEnabled, cookieKillerEnabled,
-                    activeCustomCss, 100, "", true
+                    activeCustomCss, 100, "", true,
+                    trackerBlockEnabled, antiFingerprintEnabled, httpsUpgradeEnabled
             );
             notifyShellUrlChanged(dataUrl, dataUrl);
         }
     }
 
-    private boolean isAdOrTrackerHost(String host) {
-        if (host.isEmpty()) return false;
-        for (String blocked : AD_TRACKER_DOMAINS) {
-            if (host.equals(blocked) || host.endsWith("." + blocked)) {
-                return true;
+    /** Returns the matched list name ("ads" / "trackers") or null when allowed. */
+    private String matchBlockList(String host) {
+        if (host == null || host.isEmpty()) return null;
+        if (adblockEnabled) {
+            for (String blocked : AD_DOMAINS) {
+                if (host.equals(blocked) || host.endsWith("." + blocked)) return "ads";
             }
         }
-        return false;
+        if (trackerBlockEnabled) {
+            for (String blocked : TRACKER_DOMAINS) {
+                if (host.equals(blocked) || host.endsWith("." + blocked)) return "trackers";
+            }
+        }
+        return null;
     }
 
     private void injectExtensionsAndExtractText(WebView view) {
@@ -285,6 +304,37 @@ public class MainActivity extends Activity {
         }
         if (activeCustomCss != null && !activeCustomCss.isEmpty()) {
             css.append(activeCustomCss);
+        }
+
+        if (antiFingerprintEnabled) {
+            view.evaluateJavascript(
+                    "(function(){try{"
+                            + "if(window.__bhFpOn){return;}window.__bhFpOn=true;"
+                            + "var seed=0;for(var i=0;i<8;i++){seed=(seed*31+Math.floor(Math.random()*255))>>>0;}"
+                            + "var rnd=function(){seed=(seed*1103515245+12345)>>>0;return seed/4294967296;};"
+                            + "var origGet=HTMLCanvasElement.prototype.toDataURL;"
+                            + "HTMLCanvasElement.prototype.toDataURL=function(){"
+                            + "  try{var ctx=this.getContext('2d');"
+                            + "    if(ctx){ctx.fillStyle='rgba('+Math.floor(rnd()*255)+','+Math.floor(rnd()*255)+','+Math.floor(rnd()*255)+',0.01)';"
+                            + "      ctx.fillRect(0,0,this.width||1,this.height||1);}}catch(e){}"
+                            + "  return origGet.apply(this,arguments);"
+                            + "};"
+                            + "if(navigator.hardwareConcurrency){try{Object.defineProperty(navigator,'hardwareConcurrency',{get:function(){return 4+Math.floor(rnd()*4);}});}catch(e){}}"
+                            + "if(navigator.deviceMemory){try{Object.defineProperty(navigator,'deviceMemory',{get:function(){return 2+Math.floor(rnd()*6);}});}catch(e){}}"
+                            + "}catch(e){}})();",
+                    null
+            );
+        }
+
+        if (httpsUpgradeEnabled) {
+            view.evaluateJavascript(
+                    "(function(){try{"
+                            + "if(location.protocol==='http:'&&!location.hostname.startsWith('localhost')"
+                            + "&&!location.hostname.endsWith('.local')){"
+                            + "  location.replace('https://'+location.host+location.pathname+location.search);"
+                            + "}}catch(e){}})();",
+                    null
+            );
         }
 
         if (css.length() > 0) {
@@ -431,12 +481,13 @@ public class MainActivity extends Activity {
         });
     }
 
-    private void notifyShellAdBlocked(final String host) {
+    private void notifyShellAdBlocked(final String host, final String list) {
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
                 shellWebView.evaluateJavascript(
-                        "if(window.__onNativeAdBlocked){window.__onNativeAdBlocked('" + escapeJs(host) + "');}",
+                        "if(window.__onNativeAdBlocked){window.__onNativeAdBlocked('" + escapeJs(host)
+                                + "','" + list + "');}",
                         null
                 );
             }
@@ -455,9 +506,15 @@ public class MainActivity extends Activity {
             final String customCss,
             final int zoomPct,
             final String findQuery,
-            final boolean visible
+            final boolean visible,
+            final boolean trackerBlockOn,
+            final boolean antiFingerprintOn,
+            final boolean httpsUpgradeOn
     ) {
         this.adblockEnabled = adblockOn;
+        this.trackerBlockEnabled = trackerBlockOn;
+        this.antiFingerprintEnabled = antiFingerprintOn;
+        this.httpsUpgradeEnabled = httpsUpgradeOn;
         this.darkReaderEnabled = darkReaderOn;
         this.cookieKillerEnabled = cookieKillerOn;
         this.activeCustomCss = customCss != null ? customCss : "";
@@ -543,7 +600,9 @@ public class MainActivity extends Activity {
                     // most) instead of hammering evaluateJavascript each frame.
                     String cssNow = activeCustomCss
                             + "|dr=" + darkReaderEnabled
-                            + "|ck=" + cookieKillerEnabled;
+                            + "|ck=" + cookieKillerEnabled
+                            + "|fp=" + antiFingerprintEnabled
+                            + "|https=" + httpsUpgradeEnabled;
                     long now = System.currentTimeMillis();
                     if (!cssNow.equals(lastInjectedCss) || now - lastInjectAtMs > 4000L) {
                         lastInjectedCss = cssNow;

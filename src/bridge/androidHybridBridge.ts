@@ -23,7 +23,10 @@ export interface AndroidJniBridge {
     customCss: string,
     zoomPct: number,
     findQuery: string,
-    visible: boolean
+    visible: boolean,
+    trackerBlockOn: boolean,
+    antiFingerprintOn: boolean,
+    httpsUpgradeOn: boolean
   ) => void;
   setWebViewportVisible?: (visible: boolean) => void;
   nativeGoBack?: () => boolean;
@@ -41,7 +44,8 @@ declare global {
   interface Window {
     BrowserHubNative?: AndroidJniBridge;
     __onNativeUrlChanged?: (url: string, title: string) => void;
-    __onNativeAdBlocked?: (domain: string) => void;
+    /** `list` is "ads" or "trackers" so the two shield counters stay separate. */
+    __onNativeAdBlocked?: (domain: string, list?: string) => void;
     __onAndroidBackPressed?: () => boolean;
     /** Real match counts coming back from the native Find-in-page engine. */
     __onNativeFindResult?: (activeOrdinal: number, totalMatches: number) => void;

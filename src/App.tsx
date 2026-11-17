@@ -175,7 +175,6 @@ export function App() {
     antiFingerprinting: true,
     httpsEverywhere: true,
     blockCryptominers: true,
-    turboDataSaver: false,
     totalAdsBlocked: 0,
     totalTrackersBlocked: 0,
     totalDataSavedMb: 0,
@@ -429,7 +428,10 @@ export function App() {
       customCss,
       inputs.zoom,
       inputs.findQuery,
-      shouldShowNativeWeb
+      shouldShowNativeWeb,
+      inputs.shields.enabled && inputs.shields.blockTrackers,
+      inputs.shields.enabled && inputs.shields.antiFingerprinting,
+      inputs.shields.enabled && inputs.shields.httpsEverywhere
     );
   };
 
@@ -495,14 +497,24 @@ export function App() {
       );
     };
 
-    window.__onNativeAdBlocked = (domain: string) => {
+    window.__onNativeAdBlocked = (domain: string, list?: string) => {
+      const isTracker = list === 'trackers';
       setShields((prev) => ({
         ...prev,
-        totalAdsBlocked: prev.totalAdsBlocked + 1,
+        totalAdsBlocked: isTracker ? prev.totalAdsBlocked : prev.totalAdsBlocked + 1,
+        totalTrackersBlocked: isTracker
+          ? prev.totalTrackersBlocked + 1
+          : prev.totalTrackersBlocked,
       }));
       setTabs((prev) =>
         prev.map((t) =>
-          t.id === activeTabId ? { ...t, adsBlocked: t.adsBlocked + 1 } : t
+          t.id === activeTabId
+            ? {
+                ...t,
+                adsBlocked: isTracker ? t.adsBlocked : t.adsBlocked + 1,
+                trackersBlocked: isTracker ? t.trackersBlocked + 1 : t.trackersBlocked,
+              }
+            : t
         )
       );
       setNetworkLogs((prev) => [
@@ -510,7 +522,7 @@ export function App() {
           id: `blk-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
           domain: domain || 'ad-tracker',
           url: `https://${domain || 'tracker'}`,
-          type: 'tracker',
+          type: isTracker ? 'tracker' : 'ad-banner',
           status: 'blocked',
           ruleMatched: 'Native HubShield Filter',
           latencyMs: 0,

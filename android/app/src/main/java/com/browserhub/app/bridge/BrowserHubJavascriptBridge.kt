@@ -85,12 +85,16 @@ class BrowserHubJavascriptBridge(
         customCss: String,
         zoomPct: Int,
         findQuery: String,
-        visible: Boolean
+        visible: Boolean,
+        trackerBlockOn: Boolean,
+        antiFingerprintOn: Boolean,
+        httpsUpgradeOn: Boolean
     ) {
         activity.syncNativeBrowserViewport(
             url, topCssPx, bottomCssPx, winHeightCss,
             isDesktop, adblockOn, darkReaderOn, cookieKillerOn,
-            customCss, zoomPct, findQuery, visible
+            customCss, zoomPct, findQuery, visible,
+            trackerBlockOn, antiFingerprintOn, httpsUpgradeOn
         )
     }
 

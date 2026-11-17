@@ -61,6 +61,9 @@ class MainActivity : AppCompatActivity() {
     @Volatile var darkReaderEnabled: Boolean = false
     @Volatile var cookieKillerEnabled: Boolean = true
     @Volatile var activeCustomCss: String = ""
+    @Volatile private var trackerBlockEnabled: Boolean = true
+    @Volatile private var antiFingerprintEnabled: Boolean = true
+    @Volatile private var httpsUpgradeEnabled: Boolean = true
     @Volatile var extractedPageText: String = ""
 
     private val vpnPermissionLauncher = registerForActivityResult(
@@ -229,6 +232,37 @@ class MainActivity : AppCompatActivity() {
         if (activeCustomCss.isNotEmpty()) {
             css.append(activeCustomCss)
         }
+
+        if (antiFingerprintEnabled) {
+            view.evaluateJavascript(
+                "(function(){try{" +
+                    "if(window.__bhFpOn){return;}window.__bhFpOn=true;" +
+                    "var seed=0;for(var i=0;i<8;i++){seed=(seed*31+Math.floor(Math.random()*255))>>>0;}" +
+                    "var rnd=function(){seed=(seed*1103515245+12345)>>>0;return seed/4294967296;};" +
+                    "var origGet=HTMLCanvasElement.prototype.toDataURL;" +
+                    "HTMLCanvasElement.prototype.toDataURL=function(){" +
+                    "  try{var ctx=this.getContext('2d');" +
+                    "    if(ctx){ctx.fillStyle='rgba('+Math.floor(rnd()*255)+','+Math.floor(rnd()*255)+','+Math.floor(rnd()*255)+',0.01)';" +
+                    "      ctx.fillRect(0,0,this.width||1,this.height||1);}}catch(e){}" +
+                    "  return origGet.apply(this,arguments);" +
+                    "};" +
+                    "if(navigator.hardwareConcurrency){try{Object.defineProperty(navigator,'hardwareConcurrency',{get:function(){return 4+Math.floor(rnd()*4);}});}catch(e){}}" +
+                    "if(navigator.deviceMemory){try{Object.defineProperty(navigator,'deviceMemory',{get:function(){return 2+Math.floor(rnd()*6);}});}catch(e){}}" +
+                    "}catch(e){}})();",
+                null
+            )
+        }
+
+        if (httpsUpgradeEnabled) {
+            view.evaluateJavascript(
+                "(function(){try{" +
+                    "if(location.protocol==='http:'&&!location.hostname.startsWith('localhost')" +
+                    "&&!location.hostname.endsWith('.local')){" +
+                    "  location.replace('https://'+location.host+location.pathname+location.search);" +
+                    "}}catch(e){}})();",
+                null
+            )
+        }
         if (css.isNotEmpty()) {
             val safeCss = css.toString().replace("\\", "\\\\").replace("'", "\\'").replace("\n", " ")
             view.evaluateJavascript(
@@ -384,9 +418,16 @@ class MainActivity : AppCompatActivity() {
         customCss: String,
         zoomPct: Int,
         findQuery: String,
-        visible: Boolean
+        visible: Boolean,
+        trackerBlockOn: Boolean,
+        antiFingerprintOn: Boolean,
+        httpsUpgradeOn: Boolean
     ) {
         shieldEngine.adblockEnabled = adblockOn
+        shieldEngine.trackerBlockEnabled = trackerBlockOn
+        this.trackerBlockEnabled = trackerBlockOn
+        this.antiFingerprintEnabled = antiFingerprintOn
+        this.httpsUpgradeEnabled = httpsUpgradeOn
         this.darkReaderEnabled = darkReaderOn
         this.cookieKillerEnabled = cookieKillerOn
         this.activeCustomCss = customCss
@@ -457,7 +498,9 @@ class MainActivity : AppCompatActivity() {
             } else {
                 val cssNow = activeCustomCss +
                     "|dr=" + darkReaderEnabled +
-                    "|ck=" + cookieKillerEnabled
+                    "|ck=" + cookieKillerEnabled +
+                    "|fp=" + antiFingerprintEnabled +
+                    "|https=" + httpsUpgradeEnabled
                 val now = System.currentTimeMillis()
                 if (cssNow != lastInjectedCss || now - lastInjectAtMs > 4000L) {
                     lastInjectedCss = cssNow
