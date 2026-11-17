@@ -38,6 +38,7 @@ node -e '
 const fs = require("fs");
 const app = fs.readFileSync("src/App.tsx", "utf8");
 const java = fs.readFileSync("android/standalone/src/com/browserhub/app/MainActivity.java", "utf8");
+const kt = fs.readFileSync("android/app/src/main/java/com/browserhub/app/MainActivity.kt", "utf8");
 let bad = [];
 // 1. The native browser view is stacked ABOVE the React shell, so the shell
 //    must re-sync its rect continuously and yield while shell UI floats on top.
@@ -51,6 +52,11 @@ if (!/setTranslationY\(browserWebView\.getHeight\(\)/.test(java)) bad.push("Main
 if (!/bringToFront\(\)/.test(java)) bad.push("MainActivity.java: browser view not raised when shown");
 if (!/onFindResultReceived/.test(java)) bad.push("MainActivity.java: find-in-page never reports match counts");
 if (!/__onNativeFindResult/.test(app)) bad.push("App.tsx: find bar cannot show real match counts");
+if (!/setFocusableInTouchMode\(false\)/.test(java)) bad.push("MainActivity.java: hidden browser view stays focusable");
+if (!/isFocusableInTouchMode = false/.test(kt)) bad.push("MainActivity.kt (Play Store shell): hidden browser view stays focusable");
+if (!/bringToFront\(\)/.test(kt)) bad.push("MainActivity.kt (Play Store shell): browser view not raised when shown");
+if (!/applyPageTranslation/.test(java) || !/applyPageTranslation/.test(kt)) bad.push("page translation missing from a native shell");
+if (!/setPageTranslation/.test(app)) bad.push("App.tsx never sends the translation lexicon to the page");
 if (bad.length) { bad.forEach((b) => console.error("  FAIL " + b)); process.exit(1); }
 console.log("  native viewport sync + touch handoff guards OK");
 '

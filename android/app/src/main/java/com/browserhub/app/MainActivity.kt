@@ -54,6 +54,8 @@ class MainActivity : AppCompatActivity() {
     private var lastTopPx: Int = -1
     private var lastBottomPx: Int = -1
     private var lastFindQuery: String = ""
+    private var lastInjectedCss: String = ""
+    private var lastInjectAtMs: Long = 0L
     private var pendingVpnIntent: Intent? = null
 
     @Volatile var darkReaderEnabled: Boolean = false
@@ -273,6 +275,82 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    /**
+     * Applies offline phrase translation to the real page DOM. The shell sends
+     * the lexicon it already ships, so this stays zero-key and zero-network.
+     * An empty language restores the pristine page.
+     *
+     * The injected script deliberately uses no backslash escapes (no RegExp
+     * literals) so it survives Java/Kotlin string escaping unchanged.
+     */
+    fun applyPageTranslation(langCode: String, dictionaryJson: String) {
+        runOnUiThread {
+            if (browserWebView.visibility != View.VISIBLE) return@runOnUiThread
+            if (langCode.isEmpty()) {
+                browserWebView.evaluateJavascript(
+                    "(function(){if(window.__bhTranslateOff){window.__bhTranslateOff();}})();",
+                    null
+                )
+                return@runOnUiThread
+            }
+            val safeDict = dictionaryJson.ifEmpty { "{}" }
+            val safeLang = langCode.replace("'", "")
+            val js = "(function(){try{" +
+                "var dict=" + safeDict + ";" +
+                "if(window.__bhTranslateOff){window.__bhTranslateOff();}" +
+                "var keys=[];for(var kk in dict){if(Object.prototype.hasOwnProperty.call(dict,kk)&&dict[kk]){keys.push(kk);}}" +
+                "keys.sort(function(a,b){return b.length-a.length;});" +
+                "var isWordChar=function(ch){return ch.length>0&&'abcdefghijklmnopqrstuvwxyz0123456789'.indexOf(ch)>=0;};" +
+                "var convert=function(text){" +
+                "  var lower=text.toLowerCase();var out='';var i=0;" +
+                "  while(i<text.length){" +
+                "    var hit=null;" +
+                "    for(var k=0;k<keys.length;k++){" +
+                "      var key=keys[k];" +
+                "      if(lower.indexOf(key,i)===i){" +
+                "        var before=i===0?' ':lower.charAt(i-1);" +
+                "        var after=i+key.length>=lower.length?' ':lower.charAt(i+key.length);" +
+                "        if(!isWordChar(before)&&!isWordChar(after)){hit=key;break;}" +
+                "      }" +
+                "    }" +
+                "    if(hit){out+=dict[hit];i+=hit.length;}else{out+=text.charAt(i);i++;}" +
+                "  }" +
+                "  return out;" +
+                "};" +
+                "var changed=0;" +
+                "var walker=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT,null,false);" +
+                "var nodes=[];var n;" +
+                "while((n=walker.nextNode())){" +
+                "  var p=n.parentNode;if(!p)continue;" +
+                "  var tag=p.nodeName;" +
+                "  if(tag==='SCRIPT'||tag==='STYLE'||tag==='NOSCRIPT'||tag==='TEXTAREA'||tag==='CODE'||tag==='PRE'){continue;}" +
+                "  var t=n.nodeValue;if(!t||!t.trim()||t.length>800){continue;}" +
+                "  nodes.push(n);" +
+                "}" +
+                "for(var i2=0;i2<nodes.length;i2++){" +
+                "  var node=nodes[i2];var original=node.nodeValue;var next=convert(original);" +
+                "  if(next!==original){node.__bhOrig=original;node.nodeValue=next;changed++;}" +
+                "}" +
+                "window.__bhTranslateOff=function(){" +
+                "  var w=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT,null,false);" +
+                "  var m;while((m=w.nextNode())){if(m.__bhOrig!==undefined){m.nodeValue=m.__bhOrig;m.__bhOrig=undefined;}}" +
+                "};" +
+                "if(window.__onNativeTranslateResult){window.__onNativeTranslateResult('" + safeLang + "',changed);}" +
+                "}catch(err){}})();"
+            browserWebView.evaluateJavascript(js, null)
+        }
+    }
+
+    private fun notifyShellFindResult(activeOrdinal: Int, totalMatches: Int) {
+        runOnUiThread {
+            shellWebView.evaluateJavascript(
+                "if(window.__onNativeFindResult){window.__onNativeFindResult(" +
+                    activeOrdinal + "," + totalMatches + ");}",
+                null
+            )
+        }
+    }
+
     private fun notifyShellUrlChanged(url: String, title: String) {
         runOnUiThread {
             val su = escapeJs(url)
@@ -315,6 +393,14 @@ class MainActivity : AppCompatActivity() {
 
         runOnUiThread {
             if (!visible || (!url.startsWith("http://") && !url.startsWith("https://"))) {
+                // A GONE-then-VISIBLE WebView can keep a cached touch target on
+                // some OEM skins and swallow taps meant for the React shell.
+                browserWebView.clearFocus()
+                browserWebView.stopLoading()
+                browserWebView.isFocusable = false
+                browserWebView.isFocusableInTouchMode = false
+                browserWebView.translationY =
+                    browserWebView.height + 2f * resources.displayMetrics.density
                 browserWebView.visibility = View.GONE
                 return@runOnUiThread
             }
@@ -346,24 +432,58 @@ class MainActivity : AppCompatActivity() {
 
             if (findQuery != lastFindQuery) {
                 lastFindQuery = findQuery
-                if (findQuery.isEmpty()) browserWebView.clearMatches() else browserWebView.findAllAsync(findQuery)
+                if (findQuery.isEmpty()) {
+                    browserWebView.clearMatches()
+                    notifyShellFindResult(0, 0)
+                } else {
+                    browserWebView.setFindListener { activeOrdinal, numberOfMatches, isDoneCounting ->
+                        if (isDoneCounting) notifyShellFindResult(activeOrdinal, numberOfMatches)
+                    }
+                    browserWebView.findAllAsync(findQuery)
+                }
             }
 
+            browserWebView.isFocusable = true
+            browserWebView.isFocusableInTouchMode = true
+            browserWebView.translationY = 0f
             browserWebView.visibility = View.VISIBLE
+            browserWebView.bringToFront()
+
             if (url != lastLoadedUrl) {
                 lastLoadedUrl = url
                 browserWebView.loadUrl(url)
             } else if (uaChanged) {
                 browserWebView.reload()
             } else {
-                injectExtensionsAndExtractText(browserWebView)
+                val cssNow = activeCustomCss +
+                    "|dr=" + darkReaderEnabled +
+                    "|ck=" + cookieKillerEnabled
+                val now = System.currentTimeMillis()
+                if (cssNow != lastInjectedCss || now - lastInjectAtMs > 4000L) {
+                    lastInjectedCss = cssNow
+                    lastInjectAtMs = now
+                    injectExtensionsAndExtractText(browserWebView)
+                }
             }
         }
     }
 
     fun setBrowserVisibleOnly(visible: Boolean) {
         runOnUiThread {
-            browserWebView.visibility = if (visible) View.VISIBLE else View.GONE
+            if (visible) {
+                browserWebView.isFocusable = true
+                browserWebView.isFocusableInTouchMode = true
+                browserWebView.translationY = 0f
+                browserWebView.visibility = View.VISIBLE
+                browserWebView.bringToFront()
+            } else {
+                browserWebView.clearFocus()
+                browserWebView.isFocusable = false
+                browserWebView.isFocusableInTouchMode = false
+                browserWebView.translationY =
+                    browserWebView.height + 2f * resources.displayMetrics.density
+                browserWebView.visibility = View.GONE
+            }
         }
     }
 

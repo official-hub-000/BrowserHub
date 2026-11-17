@@ -68,6 +68,11 @@ class BrowserHubJavascriptBridge(
     fun getActivePageText(): String = activity.extractedPageText
 
     @JavascriptInterface
+    fun setPageTranslation(langCode: String, dictionaryJson: String) {
+        activity.applyPageTranslation(langCode, dictionaryJson)
+    }
+
+    @JavascriptInterface
     fun syncWebViewport(
         url: String,
         topCssPx: Float,
