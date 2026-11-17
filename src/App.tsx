@@ -1352,6 +1352,10 @@ export function App() {
       {showExtensions && (
         <ExtensionsModal
           extensions={extensions}
+          onNavigate={(u) => {
+            setShowExtensions(false);
+            navigateTab(activeTab.id, u);
+          }}
           onToggleExtension={(id) =>
             setExtensions((prev) =>
               prev.map((e) => (e.id === id ? { ...e, enabled: !e.enabled } : e))

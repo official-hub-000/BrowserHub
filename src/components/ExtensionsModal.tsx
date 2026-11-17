@@ -16,6 +16,7 @@ import { parseGlobalStoreUrl, unpackExtensionFile } from '../utils/extensionUnpa
 
 interface ExtensionsModalProps {
   extensions: BrowserExtension[];
+  onNavigate: (url: string) => void;
   onToggleExtension: (id: string) => void;
   onToggleIncognitoExt: (id: string) => void;
   onInstallExtension: (ext: BrowserExtension) => void;
@@ -25,6 +26,7 @@ interface ExtensionsModalProps {
 
 export const ExtensionsModal: React.FC<ExtensionsModalProps> = ({
   extensions,
+  onNavigate,
   onToggleExtension,
   onToggleIncognitoExt,
   onInstallExtension,
@@ -58,11 +60,25 @@ export const ExtensionsModal: React.FC<ExtensionsModalProps> = ({
 
   const handleImportStoreUrl = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!storeUrlInput.trim()) return;
-    const ext = parseGlobalStoreUrl(storeUrlInput);
+    const input = storeUrlInput.trim();
+    if (!input) return;
+
+    // Opening a store page and installing an archive are different actions — be honest
+    // about which one happens instead of dropping the user into a fake "installed" state.
+    const isStorePage =
+      /^https?:\/\//i.test(input) &&
+      /(chromewebstore\.google\.com|addons\.mozilla\.org|greasyfork\.org|github\.com|openuserjs\.org)/i.test(input);
+
+    if (isStorePage) {
+      onClose();
+      onNavigate(input);
+      return;
+    }
+
+    const ext = parseGlobalStoreUrl(input);
     onInstallExtension(ext);
     setStoreUrlInput('');
-    flashNotice(`Imported "${ext.name}" (${ext.format})!`);
+    flashNotice(`Imported "${ext.name}" (${ext.format})`);
     setActiveTab('installed');
   };
 
