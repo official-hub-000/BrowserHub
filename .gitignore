@@ -42,3 +42,6 @@ build-tools/*.exe
 build-tools/android.jar
 build-tools/aapt2
 build-tools/zipalign
+
+# Local JDK for the standalone build (fetched, never committed)
+.jdk/

@@ -167,30 +167,87 @@ public class DownloadService extends Service {
                 return;
             }
 
-            // No progressive track: take both adaptive tracks and join them.
-            if (info.bestVideo == null) {
+            /*
+             * No combined file offered, so both tracks are needed. This is the
+             * `-f "<video>+bestaudio" --merge-output-format mp4` step: fetch the
+             * picture and the sound, then join them with the platform muxer.
+             *
+             * The two are downloaded to separate files and joined as real tracks,
+             * not concatenated. Concatenating produced a file that opened and played
+             * nothing, because a container's sample tables describe one file's
+             * layout and do not survive being pasted next to another's.
+             */
+            FormatSelector.Plan plan = FormatSelector.plan(info.all);
+            if (plan.mode != FormatSelector.Plan.MODE_MERGE) {
                 job.status = "failed";
-                job.message = "YouTube did not offer a video track for this one";
+                job.message = "YouTube did not offer both a picture and a sound track";
                 return;
             }
+
+            File videoPart = new File(getCacheDir(), "media/part-" + job.id + "-v.mp4");
+            File audioPart = new File(getCacheDir(), "media/part-" + job.id + "-a.m4a");
+            job.message = "Downloading picture and sound";
+            publishProgress(job, false);
+
+            boolean haveVideo = MediaGrabberDirect.fetch(
+                    plan.video.url, plan.video, videoPart, userAgent, cookie, job);
+            if (!haveVideo || job.cancel.get()) {
+                videoPart.delete();
+                audioPart.delete();
+                if (!job.cancel.get()) {
+                    job.status = "failed";
+                    if (job.message == null || job.message.length() == 0) {
+                        job.message = "The picture track could not be downloaded";
+                    }
+                } else {
+                    job.status = "cancelled";
+                    job.message = "Cancelled";
+                }
+                out.delete();
+                return;
+            }
+
+            boolean haveAudio = MediaGrabberDirect.fetch(
+                    plan.audio.url, plan.audio, audioPart, userAgent, cookie, job);
+            if (!haveAudio || job.cancel.get()) {
+                videoPart.delete();
+                audioPart.delete();
+                if (!job.cancel.get()) {
+                    job.status = "failed";
+                    job.message = "The sound track could not be downloaded";
+                } else {
+                    job.status = "cancelled";
+                    job.message = "Cancelled";
+                }
+                out.delete();
+                return;
+            }
+
             job.message = "Joining picture and sound";
             publishProgress(job, false);
 
-            java.util.List<DashManifest.SegmentRef> videoRefs = new java.util.ArrayList<>();
-            videoRefs.add(new DashManifest.SegmentRef(info.bestVideo.url, -1, -1));
-            java.util.List<DashManifest.SegmentRef> audioRefs = new java.util.ArrayList<>();
-            if (info.bestAudio != null) {
-                audioRefs.add(new DashManifest.SegmentRef(info.bestAudio.url, -1, -1));
-            }
+            java.util.List<File> parts = new java.util.ArrayList<>();
+            parts.add(videoPart);
+            parts.add(audioPart);
 
-            boolean ok = YouTubeTrackJoiner.join(info, videoRefs, audioRefs, out, userAgent, cookie, job);
+            boolean joined;
+            try {
+                joined = TrackWriter.assemble(plan, parts, out);
+            } catch (Throwable t) {
+                joined = false;
+            }
+            videoPart.delete();
+            audioPart.delete();
+
             if (job.cancel.get()) {
                 job.status = "cancelled";
                 job.message = "Cancelled";
                 out.delete();
                 return;
             }
-            if (!ok) {
+            if (!joined) {
+                job.status = "failed";
+                job.message = "The two tracks downloaded but could not be joined into one file";
                 out.delete();
                 return;
             }

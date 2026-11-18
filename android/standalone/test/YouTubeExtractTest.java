@@ -31,6 +31,7 @@ public final class YouTubeExtractTest {
         testSignatureCipher();
         testDirectApiShape();
         testResolverParsing();
+        testFormatSelection();
         testSigningIdentity();
         testCaptureCompletion();
 
@@ -170,6 +171,136 @@ public final class YouTubeExtractTest {
         check("a page with no player response is refused", !empty.ok);
         YouTubeExtractor.Result nul = YouTubeExtractor.parsePlayerResponse(null, new YouTubeExtractor.Result());
         check("null input is safe", !nul.ok);
+    }
+
+    // ------------------------------------------------------- format selection
+    private static void testFormatSelection() {
+        /*
+         * These are yt-dlp's rules, taken from the reference app's use of
+         * `-f "<video>+bestaudio" --merge-output-format mp4`. They decide whether a
+         * download produces a playable file or a silent one.
+         */
+        check("the string \"none\" means an absent track",
+                com.browserhub.app.media.FormatSelector.isNone("none"));
+        check("an empty codec means an absent track",
+                com.browserhub.app.media.FormatSelector.isNone(""));
+        check("a null codec means an absent track",
+                com.browserhub.app.media.FormatSelector.isNone(null));
+        check("a real codec is not absent",
+                !com.browserhub.app.media.FormatSelector.isNone("avc1.640028"));
+
+        String response = "{"
+                + "\"playabilityStatus\":{\"status\":\"OK\"},"
+                + "\"videoDetails\":{\"videoId\":\"dQw4w9WgXcQ\",\"title\":\"Sel\"},"
+                + "\"streamingData\":{\"adaptiveFormats\":["
+                // picture only, 1080p
+                + "{\"itag\":137,\"mimeType\":\"video/mp4; codecs=\\\"avc1.640028\\\"\","
+                + " \"qualityLabel\":\"1080p\",\"width\":1920,\"height\":1080,\"fps\":30,"
+                + " \"bitrate\":4000000,\"url\":\"https://rr1.googlevideo.com/videoplayback?itag=137&sig=V\"},"
+                // picture only, 720p
+                + "{\"itag\":136,\"mimeType\":\"video/mp4; codecs=\\\"avc1.4d401f\\\"\","
+                + " \"qualityLabel\":\"720p\",\"width\":1280,\"height\":720,\"fps\":30,"
+                + " \"bitrate\":2500000,\"url\":\"https://rr1.googlevideo.com/videoplayback?itag=136&sig=V\"},"
+                // sound only, AAC
+                + "{\"itag\":140,\"mimeType\":\"audio/mp4; codecs=\\\"mp4a.40.2\\\"\","
+                + " \"bitrate\":128000,\"audioSampleRate\":44100,"
+                + " \"url\":\"https://rr1.googlevideo.com/videoplayback?itag=140&sig=A\"},"
+                // sound only, Opus at a higher bitrate
+                + "{\"itag\":251,\"mimeType\":\"audio/webm; codecs=\\\"opus\\\"\","
+                + " \"bitrate\":160000,\"audioSampleRate\":48000,"
+                + " \"url\":\"https://rr1.googlevideo.com/videoplayback?itag=251&sig=O\"}"
+                + "]}}";
+
+        com.browserhub.app.media.YouTubeExtractor.Result r =
+                com.browserhub.app.media.YouTubeExtractor.parsePlayerResponse(response);
+        check("every offered format is kept", r.all.size() == 4);
+
+        // Codec strings must be split the yt-dlp way.
+        com.browserhub.app.media.YouTubeExtractor.Stream video1080 = null;
+        com.browserhub.app.media.YouTubeExtractor.Stream audioAac = null;
+        for (com.browserhub.app.media.YouTubeExtractor.Stream f : r.all) {
+            if (f.itag == 137) video1080 = f;
+            if (f.itag == 140) audioAac = f;
+        }
+        check("a video-only track reports an absent audio codec",
+                video1080 != null && com.browserhub.app.media.FormatSelector.isVideoOnly(video1080));
+        check("the video track's codec is kept",
+                video1080 != null && video1080.videoCodec.contains("avc1"));
+        check("the video track's dimensions are kept",
+                video1080 != null && video1080.height == 1080 && video1080.width == 1920);
+        check("an audio-only track reports an absent video codec",
+                audioAac != null && com.browserhub.app.media.FormatSelector.isAudioOnly(audioAac));
+        check("the audio track's codec is kept",
+                audioAac != null && audioAac.audioCodec.contains("mp4a"));
+
+        // The plan must be a merge of the best picture with the best sound.
+        com.browserhub.app.media.FormatSelector.Plan plan =
+                com.browserhub.app.media.FormatSelector.plan(r.all);
+        eq("a video-only site plans a merge", "2", String.valueOf(plan.mode));
+        eq("the plan takes the highest resolution", "1080p",
+                plan.video != null ? plan.video.qualityLabel : "");
+        check("the plan needs a sound track too", plan.audio != null);
+        check("the plan produces exactly two downloads",
+                plan.streams().size() == 2);
+        check("the plan prefers the AAC sound track, which needs no transcode",
+                com.browserhub.app.media.FormatSelector.isAac(plan.audio));
+        check("the plan does not pick the Opus track",
+                !com.browserhub.app.media.FormatSelector.isOpus(plan.audio));
+
+        // A combined format beats a merge, because it is one download.
+        String withCombined = "{"
+                + "\"playabilityStatus\":{\"status\":\"OK\"},"
+                + "\"videoDetails\":{\"videoId\":\"dQw4w9WgXcQ\"},"
+                + "\"streamingData\":{\"adaptiveFormats\":["
+                + "{\"itag\":22,\"mimeType\":\"video/mp4; codecs=\\\"avc1.64001F, mp4a.40.2\\\"\","
+                + " \"qualityLabel\":\"720p\",\"width\":1280,\"height\":720,\"bitrate\":2000000,"
+                + " \"url\":\"https://rr1.googlevideo.com/videoplayback?itag=22&sig=C\"},"
+                + "{\"itag\":137,\"mimeType\":\"video/mp4\",\"qualityLabel\":\"1080p\","
+                + " \"height\":1080,\"bitrate\":4000000,"
+                + " \"url\":\"https://rr1.googlevideo.com/videoplayback?itag=137&sig=V\"},"
+                + "{\"itag\":140,\"mimeType\":\"audio/mp4\",\"bitrate\":128000,"
+                + " \"url\":\"https://rr1.googlevideo.com/videoplayback?itag=140&sig=A\"}"
+                + "]}}";
+        com.browserhub.app.media.YouTubeExtractor.Result rc =
+                com.browserhub.app.media.YouTubeExtractor.parsePlayerResponse(withCombined);
+        com.browserhub.app.media.FormatSelector.Plan pc =
+                com.browserhub.app.media.FormatSelector.plan(rc.all);
+        eq("a combined format is chosen over a merge", "1", String.valueOf(pc.mode));
+        check("the combined format carries a picture codec",
+                pc.combined != null && !com.browserhub.app.media.FormatSelector.isNone(pc.combined.videoCodec));
+        check("the combined format carries a sound codec",
+                pc.combined != null && !com.browserhub.app.media.FormatSelector.isNone(pc.combined.audioCodec));
+        check("a combined plan downloads one file", pc.streams().size() == 1);
+
+        // Audio-only site: sound is the result, not a failure.
+        String audioOnly = "{"
+                + "\"playabilityStatus\":{\"status\":\"OK\"},"
+                + "\"videoDetails\":{\"videoId\":\"dQw4w9WgXcQ\"},"
+                + "\"streamingData\":{\"adaptiveFormats\":["
+                + "{\"itag\":140,\"mimeType\":\"audio/mp4\",\"bitrate\":128000,"
+                + " \"url\":\"https://rr1.googlevideo.com/videoplayback?itag=140&sig=A\"}"
+                + "]}}";
+        com.browserhub.app.media.FormatSelector.Plan pa = com.browserhub.app.media.FormatSelector
+                .plan(com.browserhub.app.media.YouTubeExtractor.parsePlayerResponse(audioOnly).all);
+        eq("an audio-only offer plans an audio download", "3", String.valueOf(pa.mode));
+        eq("an audio-only result is named .m4a", ".m4a",
+                com.browserhub.app.media.FormatSelector.outputExtension(pa));
+
+        // Nothing at all must not pretend to be a plan.
+        check("no formats means no plan",
+                !com.browserhub.app.media.FormatSelector
+                        .plan(new java.util.ArrayList<>()).ok());
+
+        // Absent metadata must not crash the height comparison.
+        com.browserhub.app.media.YouTubeExtractor.Stream bare =
+                new com.browserhub.app.media.YouTubeExtractor.Stream();
+        com.browserhub.app.media.YouTubeExtractor.Stream labelled =
+                new com.browserhub.app.media.YouTubeExtractor.Stream();
+        bare.qualityLabel = null;
+        labelled.qualityLabel = "720p";
+        check("a track with no height still compares",
+                com.browserhub.app.media.FormatSelector.plan(
+                        java.util.Arrays.asList(bare, labelled)) != null);
     }
 
     // ------------------------------------------------- the signing identity

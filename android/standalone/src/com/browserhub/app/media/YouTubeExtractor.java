@@ -44,6 +44,25 @@ public final class YouTubeExtractor {
         /** YouTube's format id; the key that matches a capture back to this entry. */
         public int itag;
         /**
+         * Codec strings, in yt-dlp's shape.
+         *
+         * The literal value "none" means the track is absent, and that convention
+         * is kept because it is what makes selection readable: a format is
+         * video-only when videoCodec is real and audioCodec is "none". Without
+         * these, choosing tracks means guessing from the mime type, which is how a
+         * silent video gets downloaded and reported as a success.
+         */
+        public String videoCodec;
+        public String audioCodec;
+        /** Pixel dimensions and frame rate, when the response states them. */
+        public int width;
+        public int height;
+        public int fps;
+        /** Audio sample rate in Hz. */
+        public int sampleRate;
+        /** The format id in yt-dlp's own naming. */
+        public String formatId;
+        /**
          * True when the entry arrived as `signatureCipher` rather than `url`: the
          * address is known but its signature is still scrambled, so downloading it
          * as-is returns 403. The scrambled value is kept so the page can transform
@@ -361,6 +380,40 @@ public final class YouTubeExtractor {
             s.contentLength = longField(objectJson, "contentLength");
             s.bitrate = longField(objectJson, "bitrate");
             s.itag = (int) longField(objectJson, "itag");
+            s.formatId = String.valueOf(s.itag);
+            s.width = (int) longField(objectJson, "width");
+            s.height = (int) longField(objectJson, "height");
+            s.fps = (int) longField(objectJson, "fps");
+            s.sampleRate = (int) longField(objectJson, "audioSampleRate");
+            /*
+             * Codec strings, split the way yt-dlp reports them. The response gives
+             * one combined "codecs" field ("avc1.640028, mp4a.40.2"); separating it
+             * here means every selection rule downstream can ask a plain question:
+             * does this format have sound?
+             */
+            String mime = s.mimeType.toLowerCase(Locale.US);
+            /*
+             * YouTube puts the codec list inside the mime type, like
+             *   video/mp4; codecs="avc1.640028, mp4a.40.2"
+             * so the field is read from there rather than from a "codecs" key,
+             * which the response does not contain. Reading the wrong place
+             * silently left every track with no codecs, and every track with no
+             * codecs looks video-only — which is how a combined file got planned
+             * as a two-track merge.
+             */
+            String codecList = codecListOf(s.mimeType);
+            if (codecList.length() == 0 && s.codecs.length() > 0) codecList = s.codecs;
+            String[] parts = codecList.split(",");
+            if (mime.startsWith("audio/")) {
+                s.videoCodec = "none";
+                s.audioCodec = parts.length > 0 && parts[0].trim().length() > 0
+                        ? parts[0].trim() : codecFromMime(mime);
+            } else if (mime.startsWith("video/")) {
+                s.videoCodec = parts.length > 0 && parts[0].trim().length() > 0
+                        ? parts[0].trim() : codecFromMime(mime);
+                s.audioCodec = parts.length > 1 && parts[1].trim().length() > 0
+                        ? parts[1].trim() : "none";
+            }
             s.audioOnly = s.mimeType.startsWith("audio/");
             s.videoOnly = s.mimeType.startsWith("video/") && s.audioOnly == false && !hasAudioCodec(objectJson);
 
@@ -573,6 +626,38 @@ public final class YouTubeExtractor {
         if (qualityLabel == null) return 0;
         Matcher m = Pattern.compile("^(\\d+)").matcher(qualityLabel);
         return m.find() ? Integer.parseInt(m.group(1)) : 0;
+    }
+
+    /**
+     * The codec list from a mime type.
+     *
+     * {@code video/mp4; codecs="avc1.640028, mp4a.40.2"} -> {@code avc1.640028, mp4a.40.2}
+     * Returns "" when the mime type carries none.
+     */
+    static String codecListOf(String mimeType) {
+        if (mimeType == null) return "";
+        String lower = mimeType.toLowerCase(Locale.US);
+        int at = lower.indexOf("codecs=");
+        if (at < 0) return "";
+        String rest = mimeType.substring(at + 7).trim();
+        if (rest.startsWith("\"")) {
+            int end = rest.indexOf('"', 1);
+            return end > 0 ? rest.substring(1, end).trim() : rest.substring(1).trim();
+        }
+        int semi = rest.indexOf(';');
+        return (semi > 0 ? rest.substring(0, semi) : rest).trim();
+    }
+
+    /** A codec family from a mime type, used when the response omits codecs. */
+    static String codecFromMime(String mime) {
+        if (mime == null) return "none";
+        if (mime.contains("mp4a")) return "mp4a.40.2";
+        if (mime.contains("opus")) return "opus";
+        if (mime.contains("avc1")) return "avc1";
+        if (mime.contains("hev1") || mime.contains("hvc1")) return "hvc1";
+        if (mime.contains("vp9")) return "vp9";
+        if (mime.contains("av01")) return "av01";
+        return "unknown";
     }
 
     private static boolean hasAudioCodec(String objectJson) {
