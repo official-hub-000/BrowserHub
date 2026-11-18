@@ -32,11 +32,20 @@ public final class NativeAiClient {
      * strongest reasoner reachable without a key, and the canonical id is the
      * one from Pollinations' own APIDOCS.md.
      */
-    private static final String[] MODELS = {
-            "deepseek/deepseek-v4-flash", "openai", "mistral", "llama", "openai-fast"};
+    private static final String[] MODELS = {"openai", "mistral", "llama", "openai-fast"};
 
     /** The model that answers alongside each provider, when it needs one. */
     private static final String DEEPSEEK_MODEL = "deepseek/deepseek-v4-flash";
+
+    /**
+     * Providers that send exactly one model of their own choosing, so the
+     * shared MODELS list must not be looped over for them.
+     */
+    private static final java.util.Set<String> PINNED_PROVIDERS =
+            new java.util.HashSet<String>(java.util.Arrays.asList("deepseek", "deepinfra"));
+
+    /** The single attempt a pinned provider gets. */
+    private static final String[] ONLY_ITS_OWN_MODEL = {""};
     private static final ConcurrentHashMap<String, String> RESULTS = new ConcurrentHashMap<String, String>();
 
     private NativeAiClient() {}
@@ -79,24 +88,88 @@ public final class NativeAiClient {
             {"https://ai.hackclub.com/chat/completions", "hackclub"},
     };
 
+    /**
+     * Total wall-clock budget. The JS layer polls for 16 s and gives up at 18 s,
+     * so this must stay under that: work that outlives the waiter is wasted, and
+     * the user is told "no model answered" while one was still trying.
+     */
+    private static final long TOTAL_BUDGET_MS = 15000L;
+
     private static String call(String userPrompt, String systemPrompt) {
-        String lastError = "no model answered";
-        long deadline = System.currentTimeMillis() + 22000L;
-        for (String[] provider : PROVIDERS) {
+        long deadline = System.currentTimeMillis() + TOTAL_BUDGET_MS;
+        deadlineAt = deadline;
+        StringBuilder why = new StringBuilder();
+        int tried = 0;
+        for (int p = 0; p < PROVIDERS.length; p++) {
             if (System.currentTimeMillis() >= deadline) break;
+            /*
+             * Each provider may spend at most a fair share of what is left, so
+             * one that hangs cannot consume the budget that the later, working
+             * ones needed. Reserving `left / providersRemaining` is what makes
+             * "provider 1 and 2 are down" survivable instead of fatal.
+             */
+            int providersLeft = PROVIDERS.length - p;
+            long left = deadline - System.currentTimeMillis();
+            providerBudgetAt = Math.max(1500L, left / providersLeft);
+            tried++;
+            String[] provider = PROVIDERS[p];
             String result = callProvider(provider[0], provider[1], userPrompt, systemPrompt);
             if (result.startsWith("{\"ok\":true")) return result;
-            lastError = provider[1] + ": " + result;
+            if (why.length() > 0) why.append("; ");
+            why.append(provider[1]).append(": ").append(shortReason(result));
         }
-        return error(lastError);
+        /*
+         * Say what actually happened. "No model answered" when three were tried
+         * and each returned 429 is a different problem from a dead network, and
+         * the user's next action differs.
+         */
+        return error(tried == 0
+                ? "ran out of time before any provider could be tried"
+                : why.toString());
     }
+
+    /** Turns an error envelope into the short phrase that matters to a person. */
+    private static String shortReason(String errorEnvelope) {
+        if (errorEnvelope == null) return "no reply";
+        if (errorEnvelope.contains("HTTP 429")) return "rate limited";
+        if (errorEnvelope.contains("HTTP 5")) return "server error";
+        if (errorEnvelope.contains("HTTP 4")) return "rejected";
+        if (errorEnvelope.contains("timed out") || errorEnvelope.contains("SocketTimeout"))
+            return "timed out";
+        if (errorEnvelope.contains("empty") || errorEnvelope.contains("no choices"))
+            return "empty reply";
+        return "unreachable";
+    }
+
+    private static long deadlineAt = Long.MAX_VALUE;
+    /** Ceiling for the provider currently being tried. */
+    private static long providerBudgetAt = Long.MAX_VALUE;
 
     private static String callProvider(
             String endpoint, String providerId, String userPrompt, String systemPrompt) {
         String lastError = "no model answered";
-        for (String model : MODELS) {
-            if (System.currentTimeMillis() >= 0 && Thread.currentThread().isInterrupted()) break;
-            String result = callOnce(endpoint, providerId, model, userPrompt, systemPrompt);
+        /*
+         * A provider that pins one concrete model must be tried exactly once.
+         * The old code looped over MODELS regardless, and because callOnce
+         * ignores the loop variable for a pinned provider, that meant the same
+         * request was re-sent up to five times — 18 s each, inside a 22 s
+         * budget. The JS layer only waits 9 s, so every question on device
+         * timed out before a single other provider was ever reached. That is
+         * why all models appeared broken at once, not just one.
+         */
+        String[] models = PINNED_PROVIDERS.contains(providerId) ? ONLY_ITS_OWN_MODEL : MODELS;
+        for (int i = 0; i < models.length; i++) {
+            String model = models[i];
+            if (Thread.currentThread().isInterrupted()) break;
+            // Whatever is left, divided between this attempt and the ones after
+            // it in this provider, so one slow model cannot starve the rest.
+            long providerEnd = Math.min(deadlineAt,
+                    System.currentTimeMillis() + (providerBudgetAt == Long.MAX_VALUE
+                            ? deadlineAt - System.currentTimeMillis() : providerBudgetAt));
+            long left = providerEnd - System.currentTimeMillis();
+            if (left < 800) break;
+            int share = (int) Math.max(900, left / (models.length - i));
+            String result = callOnce(endpoint, providerId, model, userPrompt, systemPrompt, share);
             if (result.startsWith("{\"ok\":true")) return result;
             lastError = result;
             // A 429 or a dead host will not improve by trying another model name
@@ -107,7 +180,8 @@ public final class NativeAiClient {
     }
 
     private static String callOnce(
-            String endpoint, String providerId, String model, String userPrompt, String systemPrompt) {
+            String endpoint, String providerId, String model, String userPrompt, String systemPrompt,
+            int attemptBudgetMs) {
         HttpURLConnection conn = null;
         try {
             JSONObject payload = new JSONObject();
@@ -136,8 +210,23 @@ public final class NativeAiClient {
             byte[] body = payload.toString().getBytes(StandardCharsets.UTF_8);
             conn = (HttpURLConnection) new URL(endpoint).openConnection();
             conn.setRequestMethod("POST");
-            conn.setConnectTimeout(6000);
-            conn.setReadTimeout(12000);
+            /*
+             * Sized so several providers fit inside one JS wait. A connect that
+             * has not completed in 3 s on mobile data is not going to; a read
+             * that takes over 9 s is a stalled gateway, and waiting longer only
+             * burns the budget that the next provider could have used.
+             */
+            /*
+             * The attempt gets a slice of the remaining budget rather than a
+             * fixed timeout. With a fixed 8 s, only two of four providers could
+             * ever be reached inside a 15 s budget, so a dead first and second
+             * provider meant the working third and fourth were never tried —
+             * which is indistinguishable from "all models are broken".
+             */
+            int connectMs = Math.max(1200, Math.min(2500, attemptBudgetMs / 3));
+            int readMs = Math.max(1500, attemptBudgetMs - connectMs);
+            conn.setConnectTimeout(connectMs);
+            conn.setReadTimeout(readMs);
             conn.setDoOutput(true);
             conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
             conn.setRequestProperty("Accept", "application/json");

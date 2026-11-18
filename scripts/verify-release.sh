@@ -90,6 +90,9 @@ npx tsx scripts/extension-runtime-test.mts | tail -1
 echo "== Viewport sync coalesced (no JNI call per frame or per render) =="
 npx tsx scripts/viewport-sync-test.mts | tail -1
 
+echo "== Live AI timing: can a reply arrive before the wait ends? =="
+npx tsx scripts/live-ai-timing-test.mts | tail -1
+
 echo "== DeepSeek: wired on every answer path, still zero-key =="
 npx tsx scripts/deepseek-engine-test.mts | tail -1
 

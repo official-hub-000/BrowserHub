@@ -103,9 +103,22 @@ for (const [file, label] of Object.entries(shells)) {
   if (!/MODELS\s*=/.test(src)) {
     problems.push(`${file}: no model list — single-model pinning is back (${label})`);
   }
-  const iterates = /for\s*\(\s*(?:String\s+)?model\s*:\s*MODELS\s*\)/.test(src) ||
+  /*
+   * The model list must still be driven by a loop — a single hardcoded model is
+   * what made one rate-limited model break every later question. The loop may
+   * now iterate a variable chosen per provider (pinned providers get exactly
+   * one attempt, the rest rotate), so accept either shape, but insist that the
+   * list itself is what gets looped over.
+   */
+  const iterates = /for\s*\(\s*(?:int\s+\w+\s*=\s*0\s*;\s*\w+\s*<\s*models\.length)/.test(src) ||
+    /models\s*=\s*[^;]*MODELS/.test(src) ||
+    /for\s*\(\s*(?:String\s+)?model\s*:\s*MODELS\s*\)/.test(src) ||
     /for\s*\(\s*model\s+in\s+MODELS\s*\)/.test(src);
   if (!iterates) problems.push(`${file}: MODELS is defined but never iterated (${label})`);
+  // A pinned provider must not multiply the same request.
+  if (/PINNED_PROVIDERS/.test(src) && !/ONLY_ITS_OWN_MODEL/.test(src)) {
+    problems.push(`${file}: pinned providers are declared but not given a single attempt (${label})`);
+  }
 
   if (!/callOnce/.test(src)) {
     problems.push(`${file}: no per-model attempt function (${label})`);

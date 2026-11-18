@@ -370,10 +370,21 @@ export function runLocalAiClient(input: LocalAiInput): LocalAiOutput {
           ? `3. **Turn on mobile data or Wi-Fi and ask again** — the search and page-reading above already work without it.\n\n`
           : `3. **Ask again in about 15 seconds** — the free model accepts roughly one question per 15 seconds.\n\n`) +
         `What I can do on-device right now: exact arithmetic (**"1270+23-10/80×18%100"**), email and message drafts, and a privacy check of the URL you're on.\n` +
-        `Page summaries and page Q&A need a page open — they read the real text, they are not guesses.`;
+        `Page summaries and page Q&A need a page open — they read the real text, they are not guesses.` +
+        /*
+         * Always name the attempts. The previous version only did this when the
+         * list was non-empty, so the one case a person most needs explained — no
+         * engine answered at all — produced the same paragraph every time with
+         * no clue why. "It shows the same message as before" is not a bug report
+         * anyone can act on; this makes the reply itself the diagnostic.
+         */
+        `\n\n**What I tried:** ${
+          lastAttempts.length
+            ? lastAttempts.slice(-3).join(' · ')
+            : 'no engine was reachable from this device at all'
+        }`;
       bullets = [
         'Tap Summarize after opening a page for an on-device answer from its real text',
-        ...(lastAttempts.length ? [`Why: ${lastAttempts.slice(-2).join(' · ')}`] : []),
       ];
     }
   } else {
@@ -550,20 +561,14 @@ const CHAT_PROVIDERS: ChatProvider[] = [
       parse: (data) => data?.choices?.[0]?.message?.content ?? null,
     }),
   },
-  {
-    id: 'pollinations-get',
-    label: 'Pollinations (GET)',
-    // The GET form is a different code path upstream and is sometimes served
-    // when the POST route is saturated.
-    build: (messages) => {
-      const user = [...messages].reverse().find((m) => m.role === 'user')?.content ?? '';
-      return {
-        url: `https://text.pollinations.ai/${encodeURIComponent(user.slice(0, 900))}`,
-        init: { method: 'GET' },
-        parse: (text: any) => (typeof text === 'string' ? text : null),
-      };
-    },
-  },
+  /*
+   * A 'pollinations-get' entry used to sit here, on the theory that the GET
+   * route is served independently of POST. It is the same host and therefore
+   * the same per-IP quota: when the gateway throttled a device, both entries
+   * failed, and each one still cost a full timeout before the next real
+   * provider was tried. Dropped, so the budget goes to providers that are
+   * actually independent.
+   */
 ];
 
 /**
@@ -590,13 +595,32 @@ async function askAnyProvider(
   };
   const ordered = [...CHAT_PROVIDERS].sort((a, b) => rank(a) - rank(b));
 
+  /*
+   * The whole rotation has a budget, not just each attempt. With a fixed
+   * per-provider timeout, five providers that each hang costs 30 s while the
+   * caller only waits 20 s — so the last provider could never be reached at
+   * all, and adding an engine only ever made slow answers slower.
+   *
+   * Each provider now gets the smaller of its own timeout and the time left,
+   * keeping a slice for the remainder. This is what makes "try DeepSeek first"
+   * safe: failing fast on DeepSeek hands the time to the next engine instead
+   * of spending the whole budget on it.
+   */
+  const deadline = Date.now() + Math.max(perProviderMs, 4500) * 3;
+  const remaining = () => deadline - Date.now();
+
   for (const provider of ordered) {
+    if (remaining() <= 600) {
+      noteAiAttempt('provider', `${provider.label}: skipped (out of time)`);
+      continue;
+    }
     if (!providerAvailable(provider.id)) {
       noteAiAttempt('provider', `${provider.label}: skipped (recently rate limited)`);
       continue;
     }
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), perProviderMs);
+    const budget = Math.min(perProviderMs, Math.max(1200, remaining() - 400));
+    const timer = setTimeout(() => controller.abort(), budget);
     try {
       const { url, init, parse } = provider.build(messages);
       const res = await fetch(url, { ...init, signal: controller.signal });
@@ -983,12 +1007,14 @@ export async function runSmartHybridAi(input: LocalAiInput): Promise<LocalAiOutp
 
   // Native worker thread (APK, no CORS, off the JS thread) gets first refusal.
   const nativeReply = await singleFlight(`native:${cacheKey}`, () =>
-    askViaNativeBridge(userPrompt, 9000)
+    // Must exceed NativeAiClient's 15 s budget, or a reply that is about to
+    // arrive is discarded and the next path starts from scratch.
+    askViaNativeBridge(userPrompt, 18000)
   );
   if (nativeReply) {
     markModelAnswered();
     noteNetworkSuccess();
-    return persist(liveReply(nativeReply));
+    return persist({ ...liveReply(nativeReply), engineLabel: 'Live AI (native)' });
   }
 
   /*
