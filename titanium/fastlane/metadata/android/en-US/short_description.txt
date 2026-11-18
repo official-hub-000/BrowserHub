@@ -1,1 +1,1 @@
-Private, secure, open-source Chromium-based browser with extension support
+Private, secure, open-source Chromium-based browser with support for extensions

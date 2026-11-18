@@ -1,78 +1,90 @@
 #!/bin/bash
-# Checks that the BrowserHub rebrand is complete and that the build scripts
-# still parse. Run before building; a failure here is cheap, a failure 3 hours
-# into a Chromium build is not.
+# Verifies this tree is stock Titanium plus a switchable feature layer, and
+# nothing else. Run before building.
+#
+# Two things must hold:
+#   1. With no features disabled, the build applies every Titanium edit.
+#   2. No BrowserHub identity or feature has leaked in.
 set -uo pipefail
 cd "$(dirname "$0")"
 
-pass=0
-fail=0
+pass=0; fail=0
 ok()   { pass=$((pass+1)); printf '  ok    %s\n' "$1"; }
 bad()  { fail=$((fail+1)); printf '  FAIL  %s\n' "$1"; }
 check(){ if eval "$2"; then ok "$1"; else bad "$1"; fi; }
 
-echo "== Identity =="
-check "package id is com.browserhub.app" \
-  'grep -q "chrome_public_manifest_package = \"com.browserhub.app\"" args.gn'
-check "no third-party package id remains" \
-  '! grep -q "io.github.jqssun" args.gn'
-check "launcher name is set in patch.sh" \
-  'grep -q ">BrowserHub<" patch.sh'
-check "Google LLC attribution is replaced" \
-  'grep -q "BrowserHub, based on Titanium Browser and Chromium" patch.sh'
-check "no leftover Titanium vendor line in patch.sh" \
-  '! grep -q "^# sed -i .*jqssun, Google LLC" patch.sh'
+echo "== Stock Titanium identity =="
+check "package id is Titanium's io.github.jqssun.helium" \
+  'grep -q "chrome_public_manifest_package = \"io.github.jqssun.helium\"" args.gn'
+check "no BrowserHub package id" \
+  '! grep -q "com.browserhub.app" args.gn'
+check "no BrowserHub name in the string edits" \
+  '! grep -rq "BrowserHub" patch.sh features/ --include="*.sh"'
+check "no Google LLC -> BrowserHub attribution rewrite" \
+  '! grep -rq "based on Titanium Browser and Chromium" patch.sh features/'
+check "launcher name left as Titanium/Chrome (upstream behaviour)" \
+  '! grep -rq ">BrowserHub<" patch.sh features/'
+check "upstream app icon restored" \
+  '! grep -q "BrowserHub" res/icon.svg'
+check "store listing is upstream text" \
+  '! grep -q "BrowserHub" fastlane/metadata/android/en-US/full_description.txt'
 
-echo "== Icon pipeline contract =="
-check "icon.svg is well-formed XML" \
-  'python3 -c "import xml.etree.ElementTree as E; E.parse(\"res/icon.svg\")"'
-check "icon.svg keeps the 512 viewBox icon.sh assumes" \
-  'grep -q "viewBox=\"0 0 512 512\"" res/icon.svg'
-check "exactly one scale(1) token for icon.sh to rewrite" \
-  '[ "$(grep -o "scale(1)" res/icon.svg | wc -l)" -eq 1 ]'
-for c in "#1c1c31" "#50507a" "#9393bf" "#23233b"; do
-  check "palette placeholder $c present" "grep -q '$c' res/icon.svg"
-done
+echo "== All Titanium features present =="
+check "22 feature fragments exist" \
+  '[ "$(ls features/*.sh 2>/dev/null | wc -l)" -eq 22 ]'
+check "every fragment is sourced by patch.sh" \
+  'grep -qF "for f in \"\$FEATURES_DIR\"/*.sh" patch.sh'
+check "features default to ON (stock Titanium)" \
+  'grep -q "!= \"0\"" patch.sh'
+check "core cannot be silently missing" \
+  '[ -f features/core.sh ]'
+check "manifest describes every feature" \
+  'python3 -c "
+import json,glob,os
+m=json.load(open(\"features/manifest.json\"))
+keys={x[\"key\"] for x in m}
+files={os.path.basename(p)[:-3] for p in glob.glob(\"features/*.sh\")}
+assert keys==files, (keys^files)
+"'
+check "every fragment has a non-empty description" \
+  'python3 -c "
+import json
+m=json.load(open(\"features/manifest.json\"))
+assert all(x[\"desc\"].strip() for x in m)
+"'
+
+echo "== Feature statements are intact =="
+check "fragment statements total 120 (upstream count)" \
+  'python3 -c "
+import glob
+n=0
+for p in glob.glob(\"features/*.sh\"):
+    for l in open(p):
+        s=l.strip()
+        if s and not s.startswith(\"#\"): n+=1
+assert n==120, n
+"'
+check "no fragment is empty" \
+  'python3 -c "
+import glob,sys
+for p in glob.glob(\"features/*.sh\"):
+    body=[l for l in open(p) if l.strip() and not l.lstrip().startswith(\"#\")]
+    assert body, p
+"'
 
 echo "== Scripts parse =="
-for f in build.sh common.sh patch.sh res/icon.sh; do
-  check "$f has valid bash syntax" "bash -n '$f'"
-done
-check "bundle.py is valid Python" \
-  'python3 -c "import ast; ast.parse(open(\"extensions/bundle.py\").read())"'
-check ".gclient is a valid gclient config" \
-  'python3 -c "import ast; ast.parse(open(\".gclient\").read())"'
-
-echo "== Build-safety changes =="
-check "missing signing keys are handled, not silently empty" \
-  'grep -q "SKIP_SIGNING" common.sh'
-check "build.sh has an unsigned output path" \
-  'grep -q "unsigned-" build.sh'
-check "bundle.py tolerates no extension URL" \
-  'grep -q "no bundle URL configured" extensions/bundle.py'
-
-echo "== Android only =="
-check "target_os is android" \
-  'grep -q "target_os = \"android\"" args.gn'
-check "no desktop/server build target in build.sh" \
-  '! grep -Eq "chrome_public_apk|chrome_public_bundle" <(grep -v "^#") || true'
-check "only the android public target is built" \
-  '! grep -E "autoninja" build.sh | grep -qvE "chrome_public_(apk|bundle)"'
-check "is_desktop_android is documented, not silently confusing" \
-  'grep -q "is_desktop_android" args.gn'
-check "AAB (Play upload only) is opt-in" \
-  'grep -q "BROWSERHUB_AAB" build.sh'
-check "ABI selection is validated" \
-  'grep -q "BROWSERHUB_ABI must be both, arm64 or arm" build.sh'
-check "32-bit arm pass is skippable" \
-  'grep -q "\$ABI\" = \"both\"" build.sh'
-check "workflow publishes artifacts it actually produced" \
-  'grep -q "^            \*.apk" .github/workflows/build.yml'
+check "patch.sh parses" 'bash -n patch.sh'
+check "feature-picker.sh parses" 'bash -n feature-picker.sh'
+check "build.sh parses" 'bash -n build.sh'
+check "every fragment parses" \
+  'for f in features/*.sh; do bash -n "$f" || exit 1; done'
+check "build.sh loads a saved selection" \
+  'grep -q "features/enabled.env" build.sh'
 
 echo
 if [ "$fail" -eq 0 ]; then
-  echo "identity: $pass checks pass — BrowserHub rebrand complete, scripts parse"
+  echo "verify: $pass checks pass — stock Titanium with a switchable feature layer"
   exit 0
 fi
-echo "identity: $pass passed, $fail FAILED"
+echo "verify: $pass passed, $fail FAILED"
 exit 1

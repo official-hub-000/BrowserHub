@@ -53,24 +53,11 @@ jobs:
 
       - name: Set
         run: |
-          # Collect whichever artifacts this build actually produced. The
-          # original assumed all three always exist and passed an empty
-          # argument to mv when one was missing, which fails the step.
-          cd chromium/src/out/release
-          for f in *.aab *.apk; do
-            [ -e "$f" ] || continue
-            # Strip the "-<abi>.<ext>" suffix to recover the version. Do NOT use
-            # ${f%-*}: the ABI names contain hyphens, so that strips only to the
-            # last one and yields "100.0.0.0-arm64".
-            base=$(echo "$f" | sed 's/-\(arm64-v8a\|armeabi-v7a\)\.\(apk\|aab\)$//')
-            abi=$(echo "$f"  | sed 's/.*-\(arm64-v8a\|armeabi-v7a\)\.\(apk\|aab\)$/\1/')
-            ext="${f##*.}"
-            new="$base-\${{ env.unix_time }}-${abi}.${ext}"
-            mv "$f" "$new"
-            echo "Moved $f -> $new"
-          done
-          export VERSION=$(ls *-arm64-v8a.apk *-armeabi-v7a.apk 2>/dev/null | head -1 | sed 's/-.*//')
+          export VERSION=$(find chromium/src/out/release -name '*arm64-v8a.apk' | sed 's/.*\///;s/\-arm64-v8a.apk$//')
           echo "VERSION=$VERSION" >> $GITHUB_ENV
+          mv $(find chromium/src/out/release -name '*arm64-v8a.aab') $VERSION-${{ env.unix_time }}-arm64-v8a.aab
+          mv $(find chromium/src/out/release -name '*arm64-v8a.apk') $VERSION-${{ env.unix_time }}-arm64-v8a.apk
+          mv $(find chromium/src/out/release -name '*armeabi-v7a.apk') $VERSION-${{ env.unix_time }}-armeabi-v7a.apk
 
       - name: Publish
         uses: softprops/action-gh-release@v2
@@ -78,14 +65,15 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           name: v${{ env.VERSION }}
           tag_name: v${{ env.VERSION }}
-          # Publish whatever exists rather than a fixed three-file list.
           files: |
-            *.aab
-            *.apk
+            ${{ env.VERSION }}-${{ env.unix_time }}-arm64-v8a.aab
+            ${{ env.VERSION }}-${{ env.unix_time }}-arm64-v8a.apk
+            ${{ env.VERSION }}-${{ env.unix_time }}-armeabi-v7a.apk
 
       - name: Attest
         uses: actions/attest-build-provenance@v4
         with:
           subject-path: |
-            *.aab
-            *.apk
+            ${{ env.VERSION }}-${{ env.unix_time }}-arm64-v8a.aab
+            ${{ env.VERSION }}-${{ env.unix_time }}-arm64-v8a.apk
+            ${{ env.VERSION }}-${{ env.unix_time }}-armeabi-v7a.apk

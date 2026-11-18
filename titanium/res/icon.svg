@@ -1,23 +1,4 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <!--
-    BrowserHub app mark.
-
-    Deliberately built to the same contract as the icon it replaces, so
-    res/icon.sh works untouched:
-      - viewBox 0 0 512 512
-      - a "disc" clip path at cx/cy 256, r 208 (the adaptive-icon safe area)
-      - exactly one "scale(one)" token, which icon.sh rewrites per icon layer
-      - the four palette placeholders (bg, core, mid and light), which icon.sh
-        recolours by sampling the themed launcher background
-
-    The literal tokens are written only in the geometry below, never in this
-    comment: icon.sh runs `sed` over the whole file, so a placeholder inside a
-    comment would be rewritten too and the comment would turn to noise.
-
-    The mark is a hub: a ring with three nodes on it and a centre — the
-    browser as the thing links pass through. Nothing here is copied from
-    another project's logo.
-  -->
   <defs>
     <clipPath id="disc"><circle cx="256" cy="256" r="208"/></clipPath>
   </defs>
@@ -26,13 +7,9 @@
       <rect x="-500" y="-500" width="1512" height="1512" fill="#1c1c31"/>
     </g>
     <g id="motif">
-      <!-- Outer hub ring -->
-      <circle cx="256" cy="256" r="156" fill="none" stroke="#50507a" stroke-width="12"/>
-      <!-- Centre disc -->
+      <ellipse cx="256" cy="256" rx="156" ry="78" fill="none" stroke="#50507a" stroke-width="12" transform="rotate(-30 256 256)"/>
       <circle cx="256" cy="256" r="94.5" fill="#23233b" stroke="#ffffff" stroke-width="19"/>
-      <!-- Three satellites on the ring: 12, 4 and 8 o'clock -->
-      <circle cx="256" cy="100" r="36" fill="#9393bf"/>
-      <circle cx="391" cy="334" r="36" fill="#9393bf"/>
+      <circle cx="391" cy="178" r="36" fill="#9393bf"/>
       <circle cx="121" cy="334" r="36" fill="#9393bf"/>
     </g>
   </g>

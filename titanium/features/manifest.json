@@ -1,0 +1,134 @@
+[
+  {
+    "key": "core",
+    "env": "ENABLE_CORE",
+    "desc": "Base Titanium build: icon reskin, extractNativeLibs, PDF intent, debloat, bundled-extension staging, flag unexpiring, omnibox site search, feature overrides, task manager, accessibility, devtools menu.",
+    "statements": 39
+  },
+  {
+    "key": "accessibility",
+    "env": "ENABLE_ACCESSIBILITY",
+    "desc": "Route accessibility checks through complex-user-interaction and touch-exploration state so TalkBack-style input behaves correctly.",
+    "statements": 2
+  },
+  {
+    "key": "dev",
+    "env": "ENABLE_DEV",
+    "desc": "Enable the Task Manager and DevTools entry points, including the version-gated branches.",
+    "statements": 8
+  },
+  {
+    "key": "dev-incognito",
+    "env": "ENABLE_DEV_INCOGNITO",
+    "desc": "Let DevTools attach to incognito tabs.",
+    "statements": 5
+  },
+  {
+    "key": "dev-viewport",
+    "env": "ENABLE_DEV_VIEWPORT",
+    "desc": "Make DevTools render usably on phone-sized screens.",
+    "statements": 4
+  },
+  {
+    "key": "playback",
+    "env": "ENABLE_PLAYBACK",
+    "desc": "Neutralise the Android media-playback-options guard so background/autoplay behaviour matches desktop.",
+    "statements": 1
+  },
+  {
+    "key": "ext-viewport",
+    "env": "ENABLE_EXT_VIEWPORT",
+    "desc": "Make chrome://extensions render usably on phone-sized screens.",
+    "statements": 5
+  },
+  {
+    "key": "ext-mv2",
+    "env": "ENABLE_EXT_MV2",
+    "desc": "Allow Manifest V2 extensions instead of hard-disabling them.",
+    "statements": 3
+  },
+  {
+    "key": "ext-off-store",
+    "env": "ENABLE_EXT_OFF_STORE",
+    "desc": "Allow installing extensions from non-Web-Store sources (Opera, Edge, and direct CRX).",
+    "statements": 2
+  },
+  {
+    "key": "ext-toolbar",
+    "env": "ENABLE_EXT_TOOLBAR",
+    "desc": "Add the extensions toolbar button and container to the phone toolbar.",
+    "statements": 10
+  },
+  {
+    "key": "ext-popup",
+    "env": "ENABLE_EXT_POPUP",
+    "desc": "Anchor extension popups correctly when there is no toolbar button view.",
+    "statements": 4
+  },
+  {
+    "key": "ext-fullscreen",
+    "env": "ENABLE_EXT_FULLSCREEN",
+    "desc": "Size extension popups to the phone viewport instead of auto-resizing.",
+    "statements": 4
+  },
+  {
+    "key": "ext-pin",
+    "env": "ENABLE_EXT_PIN",
+    "desc": "Hide the extensions menu button unless it is pinned.",
+    "statements": 2
+  },
+  {
+    "key": "ext-incognito",
+    "env": "ENABLE_EXT_INCOGNITO",
+    "desc": "Allow extensions to run in incognito and open incognito as a window.",
+    "statements": 2
+  },
+  {
+    "key": "ext-priority",
+    "env": "ENABLE_EXT_PRIORITY",
+    "desc": "Raise the process priority of extension renderers so they are not killed.",
+    "statements": 3
+  },
+  {
+    "key": "ext-settings",
+    "env": "ENABLE_EXT_SETTINGS",
+    "desc": "Expose extension settings on desktop_android.",
+    "statements": 1
+  },
+  {
+    "key": "ext-dialog",
+    "env": "ENABLE_EXT_DIALOG",
+    "desc": "Do not filter touch events for security in the extension install dialog.",
+    "statements": 1
+  },
+  {
+    "key": "ext-locale",
+    "env": "ENABLE_EXT_LOCALE",
+    "desc": "Fix locale handling for unpacked/content-URI extensions.",
+    "statements": 3
+  },
+  {
+    "key": "ext-ntp",
+    "env": "ENABLE_EXT_NTP",
+    "desc": "Respect NTP URL overrides when deciding whether a tab is the new tab page.",
+    "statements": 1
+  },
+  {
+    "key": "ext-app",
+    "env": "ENABLE_EXT_APP",
+    "desc": "Expose the legacy app API on desktop_android.",
+    "statements": 1
+  },
+  {
+    "key": "desktop-omnibox",
+    "env": "ENABLE_DESKTOP_OMNIBOX",
+    "desc": "Make omnibox zero-suggest and autocomplete behave desktop-style rather than mobile-style.",
+    "statements": 2
+  },
+  {
+    "key": "desktop-menu",
+    "env": "ENABLE_DESKTOP_MENU",
+    "desc": "Desktop-style app menu: multi-window management and incognito-window toggling.",
+    "statements": 17
+  }
+]

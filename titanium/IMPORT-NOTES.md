@@ -1,118 +1,125 @@
-# BrowserHub — Chromium build (from Titanium Browser)
+# Titanium Browser, with switchable features
 
-Upstream: https://github.com/jqssun/android-titanium-browser
-Imported commit: `bde250ae7c7d43a7a1827a44d07841132f6db7f4` (2026-11-12)
-License: GPLv2 (`LICENSE`, intact) · Vanadium pinned at `a8b304ef63b51f0158775a9d4f90106e8fc9a721`
+An exact clone of [Titanium Browser for Android](https://github.com/jqssun/android-titanium-browser)
+plus a control layer for turning Titanium's own feature blocks on and off.
 
-> **This is no longer a pristine import.** The 27 upstream files were imported
-> byte-identically, then rebranded to BrowserHub. The changes are identity and
-> build-robustness only — no capability was removed, nothing upstream does was
-> disabled. Everything below records exactly what changed.
+There are **no BrowserHub features here** and no BrowserHub identity. Upstream's
+package id, app icon and store listing are untouched.
 
-## What the build does
+## What it is
+
+Titanium is not an app's source code. It is a **patchset and build configuration
+for Chromium**:
 
 ```
 build.sh → clone Chromium at a pinned tag → ~200 Vanadium patches
-        → patch.sh edits → gn gen → ninja (arm + arm64)
-        → sign → out/release/<version>-{armeabi-v7a,arm64-v8a}.{apk,aab}
+        → patch.sh edits → gn gen → ninja (arm + arm64) → sign → .apk/.aab
 ```
 
-The browser — UI, tabs, omnibox, renderer — is Chromium, fetched at build time.
-These files *modify* it. Nothing here is Chromium's source.
+Every part of the browser UI — tabs, omnibox, renderer, settings — is Chromium,
+fetched at build time from `chromium.googlesource.com`. Nothing in this
+repository is that code.
 
-## Rebranding to BrowserHub
+## Turning features on and off
 
-| Change | File | Why it was needed |
-|---|---|---|
-| `chrome_public_manifest_package` → `com.browserhub.app` | `args.gn` | package id; was `io.github.jqssun.helium` |
-| Launcher name → **BrowserHub** | `patch.sh` | The visible app name comes from Chromium's `android_chrome_strings.grd`, **not** from `args.gn`. Upstream never changes it, so an upstream build installs as *"Chrome"*, next to the real Chrome. Four `sed` edits cover the Stable/Beta/Dev/Canary name variants. |
-| `Google LLC` attribution → `BrowserHub, based on Titanium Browser and Chromium` | `patch.sh` | A modified Chromium must not claim Google made it, and GPLv2 requires naming the origin. |
-| New app mark | `res/icon.svg` | Shipping another project's logo is a trademark problem. The new mark is drawn to the **same contract** `res/icon.sh` depends on: 512 viewBox, a `disc` clip at r=208, exactly one `scale(1)` token, and the four palette placeholders it recolours by sampling the themed launcher background. `icon.sh` is unmodified. |
-| Store listing text | `fastlane/...` | Said "Titanium Browser"; now says BrowserHub and credits Titanium + Chromium as required. |
+Upstream applied all its edits in one 185-line `patch.sh`. The same edits now
+live in `features/*.sh`, one file per feature area, and `patch.sh` sources the
+ones you have enabled.
 
-Verified by `./verify-identity.sh` — 21 checks covering the identity strings,
-the icon pipeline contract, and that every script still parses.
-
-## Build-robustness fixes
-
-Three upstream behaviours made a first build fail in confusing ways. All three
-are now explicit:
-
-1. **Missing signing keys.** `set_keys` decoded two empty env vars into empty
-   files and failed much later inside `apksigner`. It now detects the absence,
-   sets `SKIP_SIGNING`, and `build.sh` publishes `unsigned-*.apk` — so a local
-   build works without credentials.
-2. **Optional extension bundle.** `bundle.py` called `urlretrieve(url)` on a
-   hard-coded third-party release asset; a `None` URL raised and took the whole
-   gclient hook — and the whole build — down. It now stages nothing and exits 0.
-   (Verified: stages a `{}` index and returns success.)
-3. **Attribution/metadata drift** between `args.gn`, `patch.sh` and `fastlane`,
-   now consistent.
-
-## Android only
-
-The build is Android-only and always was: `target_os = "android"`, and the only
-targets ever built are `chrome_public_apk` / `chrome_public_bundle`. There is no
-desktop, Linux or ChromeOS target anywhere in this repository. What *was* being
-produced beyond what a phone needs:
-
-| Artifact | Needed by | Now |
-|---|---|---|
-| `*-armeabi-v7a.apk` (32-bit) | phones from before ~2015 | opt-in via `BROWSERHUB_ABI` |
-| `*-arm64-v8a.apk` (64-bit) | every phone since ~2015 | **default** |
-| `*-arm64-v8a.aab` | Play Store upload only — **Android cannot install a .aab** | off unless `BROWSERHUB_AAB=1` |
-
-Pick your target with one variable:
+**Stock Titanium is the default** — every feature on, no config file needed:
 
 ```bash
-BROWSERHUB_ABI=arm64 ./build.sh    # one APK, 64-bit; skips a whole 32-bit compile
-BROWSERHUB_ABI=both  ./build.sh    # default: two APKs, also covers old phones
-BROWSERHUB_ABI=arm   ./build.sh    # 32-bit only, for a specific old device
-BROWSERHUB_AAB=1     ./build.sh    # additionally produce the Play upload bundle
+./feature-picker.sh --list     # see all 22 features and their state
+./feature-picker.sh            # interactive toggle
+./feature-picker.sh ext-mv2=0  # specific changes
+./feature-picker.sh --reset    # back to stock (all on)
 ```
 
-The 32-bit pass is a **separate full Chromium compile**, not a flag on the same
-build, so `BROWSERHUB_ABI=arm64` roughly halves total build time.
+Choices are written to `features/enabled.env`, which `build.sh` loads
+automatically. You can also skip the picker entirely:
 
-### `is_desktop_android = true` is not desktop-only
+```bash
+ENABLE_EXT_MV2=0 ./build.sh
+```
 
-This reads like a desktop flag and it is the one setting in `args.gn` most likely
-to cause a wrong conclusion. It does **not** produce a desktop build. It selects
-Chromium's desktop-style Android UI — desktop-mode windowing, mouse/trackpad
-support, tablet and Chromebook form factors — which is what lets a phone browser
-handle a physical keyboard or DeX-style display. Removing it does not make the
-build "more Android"; it removes input and form-factor support. Left as upstream.
+A feature that is off contributes **nothing** — its file is not sourced.
 
-## Building it — measured blockers
+### The features
 
-**It cannot be built in this environment.** Verified, not assumed:
-
-| Requirement | This sandbox |
+| Key | What it does |
 |---|---|
-| Chromium source (~100 GB+) | `chromium.googlesource.com` → **unreachable** |
-| ~150 GB free disk | **20 GB** |
+| `core` | The base build: icon reskin, `extractNativeLibs`, PDF intent filter, AR Core debloat, bundled-extension staging and signature bypass, flag unexpiring, omnibox site search, feature overrides, task manager |
+| `accessibility` | Route accessibility through complex-user-interaction and touch-exploration state |
+| `dev` | Task Manager and DevTools entry points (version-gated) |
+| `dev-incognito` | DevTools on incognito tabs |
+| `dev-viewport` | DevTools usable on phone screens |
+| `playback` | Android media-playback guard neutralised |
+| `ext-viewport` | `chrome://extensions` usable on phone screens |
+| `ext-mv2` | Manifest V2 extensions allowed instead of hard-disabled |
+| `ext-off-store` | Install extensions from outside the Web Store |
+| `ext-toolbar` | Extensions toolbar button on the phone toolbar |
+| `ext-popup` | Extension popups anchored correctly |
+| `ext-fullscreen` | Extension popups sized to the viewport |
+| `ext-pin` | Menu button hidden unless pinned |
+| `ext-incognito` | Extensions in incognito; incognito as a window |
+| `ext-priority` | Extension renderers kept at IMPORTANT priority |
+| `ext-settings` | Extension settings on `desktop_android` |
+| `ext-dialog` | Touch events not filtered in the install dialog |
+| `ext-locale` | Locale handling for unpacked/content-URI extensions |
+| `ext-ntp` | NTP URL overrides respected |
+| `ext-app` | Legacy app API on `desktop_android` |
+| `desktop-omnibox` | Desktop-style omnibox zero-suggest behaviour |
+| `desktop-menu` | Desktop-style multi-window and incognito-window menu |
+
+## Verifying it is really stock Titanium
+
+```bash
+./verify-identity.sh
+```
+
+20 checks. They assert the package id is Titanium's, no BrowserHub identity
+survives anywhere, all 22 fragments exist and are non-empty, the fragment
+statements still total the upstream count, and every script parses.
+
+The split itself was verified by reconstruction: the fragments replayed in
+order produce **120 of 120 upstream statements, identical**. If you disable
+nothing, you get Titanium.
+
+## Building
+
+Unchanged from upstream, and **not buildable in this workspace**:
+
+| Requirement | Here |
+|---|---|
+| Chromium source (~100 GB+) | `chromium.googlesource.com` unreachable |
+| ~150 GB free disk | 20 GB |
 | `sudo` for `install-build-deps.sh` | uid 1001, no root |
 | Wall time | hours on a large runner |
 
-This is **source-verified, not build-verified**. To build for real
-(Linux x86_64, ~200 GB free, root):
+The workflow in `.github/workflows/build.yml` is upstream's and needs
+**self-hosted runners** plus `LOCAL_TEST_JKS` / `STORE_TEST_JKS`.
+
+To build for real, on Linux x86_64 with ~200 GB free and root:
 
 ```bash
 cd titanium
-git submodule update --init --recursive      # Vanadium; reachable, ~1 command
-export LOCAL_TEST_JKS=<base64 of local.properties>   # optional
-export STORE_TEST_JKS=<base64 of your .jks>          # optional
-./verify-identity.sh                          # 21 cheap checks first
-./build.sh                                    # hours
+git submodule update --init --recursive   # Vanadium; reachable, one command
+export LOCAL_TEST_JKS=<base64 of local.properties>
+export STORE_TEST_JKS=<base64 of your .jks>
+./feature-picker.sh --list                # confirm the feature set
+./build.sh                                # hours
 ```
-
-Upstream's `.github/workflows/build.yml` needs **self-hosted runners** and those
-two secrets; it is left intact for that reason.
 
 ## The `vanadium/` submodule is empty here
 
-`build.sh` needs Vanadium's `patches/`. That repository is reachable from this
-sandbox (`github.com/GrapheneOS/Vanadium` → 200) so it is one command locally.
-It is deliberately **not vendored**: it is a separate GPLv2 project, and copying
-it in would blur which code is Titanium's, which is Vanadium's, and which is
-BrowserHub's.
+`build.sh` needs Vanadium's `patches/` directory and reads the Chromium version
+from `vanadium/args.gn`. That repository is reachable from this sandbox, so it
+is one command locally. It is deliberately not vendored: it is a separate GPLv2
+project, and copying it in would blur which code is Titanium's, which is
+Vanadium's, and which is the build output.
+
+## Licence
+
+Titanium is GPLv2; `LICENSE` is the unmodified upstream text and upstream's
+`README.md` (with its attribution to Vanadium/GrapheneOS and Chromium) is
+preserved. Chromium is BSD-3-Clause, Vanadium GPLv2.
