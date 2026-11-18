@@ -186,6 +186,17 @@ public final class PageMediaFinder {
             return accept(result, jsonLd, "json-ld");
         }
 
+        // 2b. The media tags themselves, which is how yt-dlp's
+        //     _parse_html5_media_entries starts. A <video src> or a <source>
+        //     inside a <video> is the site stating the file, and it beats every
+        //     rule below. amp-video and dl8-video are the same tag with a prefix.
+        String tag = mediaTagSource(html, pageUrl);
+        if (tag != null) return accept(result, tag, "media-tag");
+
+        // 2c. Video.js: player.src([{src: "...", type: "video/mp4"}]).
+        String videoJs = videoJsSource(html, pageUrl);
+        if (videoJs != null) return accept(result, videoJs, "videojs");
+
         // 4. JW Player in a SWFObject: flashvars: "…file=http…"
         for (String candidate : findAll(html,
                 "flashvars[\"']?\\s*[:,]\\s*[\"'][^\"']*?file=(https?[^\"'&]*)")) {
@@ -283,6 +294,59 @@ public final class PageMediaFinder {
     }
 
     // ------------------------------------------------------------------ helpers
+
+    /**
+     * The source of a &lt;video&gt; or &lt;audio&gt; tag.
+     *
+     * Takes the tag's own src when it has one, otherwise the first
+     * &lt;source src&gt; inside it. A <source> without a type is skipped only
+     * when the tag declared a type of its own that disagrees — the same
+     * preference order yt-dlp uses.
+     */
+    static String mediaTagSource(String html, String pageUrl) {
+        // amp-video and dl8-video are the same element with a prefix.
+        Matcher tag = Pattern.compile(
+                "<(?:(?:amp|dl8(?:-live)?)-)?(video|audio)\\b([^>]*)>([\\s\\S]{0,4000}?)</\\1>",
+                Pattern.CASE_INSENSITIVE).matcher(html);
+        while (tag.find()) {
+            Matcher own = Pattern.compile("\\bsrc\\s*=\\s*[\"']([^\"']+)[\"']",
+                    Pattern.CASE_INSENSITIVE).matcher(tag.group(2));
+            if (own.find()) {
+                String url = absolute(unescape(own.group(1)), pageUrl);
+                if (isAcceptable(url)) return url;
+            }
+            Matcher source = Pattern.compile(
+                    "<source\\b[^>]*\\bsrc\\s*=\\s*[\"']([^\"']+)[\"']",
+                    Pattern.CASE_INSENSITIVE).matcher(tag.group(3));
+            while (source.find()) {
+                String url = absolute(unescape(source.group(1)), pageUrl);
+                if (isAcceptable(url)) return url;
+            }
+        }
+        // A self-closing or unclosed tag, which the regex above needs to pair.
+        Matcher alone = Pattern.compile(
+                "<(?:(?:amp|dl8(?:-live)?)-)?(?:video|audio)\\b[^>]*\\bsrc\\s*=\\s*[\"']([^\"']+)[\"']",
+                Pattern.CASE_INSENSITIVE).matcher(html);
+        while (alone.find()) {
+            String url = absolute(unescape(alone.group(1)), pageUrl);
+            if (isAcceptable(url)) return url;
+        }
+        return null;
+    }
+
+    /** The source of a video.js player.src([...]) call. */
+    static String videoJsSource(String html, String pageUrl) {
+        Matcher m = Pattern.compile(
+                "\\bvideojs\\s*\\([\\s\\S]{0,400}?\\.src\\s*\\(\\s*(\\[[\\s\\S]{0,2000}?\\]|\\{[\\s\\S]{0,2000}?\\})",
+                Pattern.CASE_INSENSITIVE).matcher(html);
+        while (m.find()) {
+            for (String src : findAll(m.group(1), "[\"']?src[\"']?\\s*:\\s*[\"']([^\"']+)[\"']")) {
+                String url = absolute(unescape(src), pageUrl);
+                if (isAcceptable(url)) return url;
+            }
+        }
+        return null;
+    }
 
     /** Reads a meta tag by property or name, in either attribute order. */
     public static String metaContentAnyOrder(String html, String key) {

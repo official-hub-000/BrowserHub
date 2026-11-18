@@ -47,6 +47,12 @@ public final class PageExtractTest {
         testQualityHint();
         testUnescaping();
         testEmbeddedThenFound();
+        testVideoTag();
+        testSourceInsideVideo();
+        testAmpAndDl8Video();
+        testVideoJs();
+        testAudioTag();
+        testMediaTagBeatsJwPlayer();
 
         System.out.println();
         if (failures.isEmpty()) {
@@ -262,6 +268,56 @@ public final class PageExtractTest {
         check("amp escape", "a&b".equals(PageMediaFinder.unescape("a&amp;b")));
         check("quote escape", "a\"b".equals(PageMediaFinder.unescape("a&quot;b")));
         check("unicode amp", "a&b".equals(PageMediaFinder.unescape("a\\u0026b")));
+    }
+
+    // yt-dlp's _parse_html5_media_entries: the tag itself is the statement.
+    private static void testVideoTag() {
+        String html = page("<video src=\"/media/clip.mp4\" controls></video>");
+        PageMediaFinder.Result r = PageMediaFinder.parse(html, "https://site.example.com/v");
+        check("video tag found", r.ok);
+        check("video tag absolute", "https://site.example.com/media/clip.mp4".equals(r.url));
+        check("video tag rule", "media-tag".equals(r.foundBy));
+    }
+
+    private static void testSourceInsideVideo() {
+        String html = page("<video controls>"
+                + "<source src=\"https://cdn.example.com/hd.webm\" type=\"video/webm\">"
+                + "<source src=\"https://cdn.example.com/hd.mp4\" type=\"video/mp4\">"
+                + "Your browser does not support video.</video>");
+        PageMediaFinder.Result r = PageMediaFinder.parse(html, "https://site.example.com/v");
+        check("source in video found", r.ok);
+        check("source in video url", "https://cdn.example.com/hd.webm".equals(r.url));
+    }
+
+    private static void testAmpAndDl8Video() {
+        String amp = page("<amp-video src=\"https://cdn.example.com/amp.mp4\"></amp-video>");
+        check("amp-video found", PageMediaFinder.parse(amp, "https://s.example.com/a").ok);
+        String dl8 = page("<dl8-video src=\"https://cdn.example.com/dl8.mp4\"></dl8-video>");
+        check("dl8-video found", PageMediaFinder.parse(dl8, "https://s.example.com/b").ok);
+    }
+
+    private static void testVideoJs() {
+        String html = page("<script>var p = videojs('my-video');"
+                + "p.src([{src: 'https://cdn.example.com/vjs.m3u8', type: 'application/x-mpegURL'}]);</script>");
+        PageMediaFinder.Result r = PageMediaFinder.parse(html, "https://site.example.com/v");
+        check("videojs found", r.ok);
+        check("videojs url", "https://cdn.example.com/vjs.m3u8".equals(r.url));
+        check("videojs is a manifest", r.isManifest);
+    }
+
+    private static void testAudioTag() {
+        String html = page("<audio controls src=\"https://cdn.example.com/podcast.mp3\"></audio>");
+        PageMediaFinder.Result r = PageMediaFinder.parse(html, "https://site.example.com/pod");
+        check("audio tag found", r.ok);
+        check("audio tag url", "https://cdn.example.com/podcast.mp3".equals(r.url));
+    }
+
+    // The tag is the site's own statement, so it wins over a player config.
+    private static void testMediaTagBeatsJwPlayer() {
+        String html = page("<video src=\"https://cdn.example.com/real.mp4\"></video>"
+                + "<script>jwplayer('p').setup({file: 'https://cdn.example.com/other.mp4'});</script>");
+        PageMediaFinder.Result r = PageMediaFinder.parse(html, "https://site.example.com/v");
+        check("tag beats player config", r.ok && r.url.endsWith("/real.mp4"));
     }
 
     // The follow-page path, without network: the inner page is parsed by the
