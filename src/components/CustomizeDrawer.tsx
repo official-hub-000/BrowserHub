@@ -20,6 +20,7 @@ import type {
 import { SEARCH_ENGINE_OPTIONS, THEME_PRESETS } from '../data/presets';
 import { SearchEngineIcon } from './VectorIcons';
 import { AndroidHybridBridge } from '../bridge/androidHybridBridge';
+import { useExitTransition } from '../utils/useExitTransition';
 
 interface CustomizeDrawerProps {
   customization: BrowserCustomization;
@@ -36,9 +37,11 @@ export const CustomizeDrawer: React.FC<CustomizeDrawerProps> = ({
   onOpenDevTools,
   onClose,
 }) => {
+  const exit = useExitTransition(onClose, 'bh-drawer-right', 'bh-drawer-right-out');
+
   return (
-    <div className="bh-overlay fixed inset-0 z-50 bg-black/75 flex justify-end" onClick={onClose}>
-      <div className="bh-drawer-right w-full max-w-md h-full bg-black border-l border-slate-800 flex flex-col shadow-2xl" onClick={(e) => e.stopPropagation()}>
+    <div className={`bh-overlay fixed inset-0 z-50 bg-black/75 flex justify-end${exit.isClosing ? ' bh-overlay-out' : ''}`} onClick={exit.requestClose}>
+      <div className={`${exit.className} w-full max-w-md h-full bg-black border-l border-slate-800 flex flex-col shadow-2xl`} onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-[#08080b]">
           <div className="flex items-center gap-2.5">
@@ -264,7 +267,7 @@ export const CustomizeDrawer: React.FC<CustomizeDrawerProps> = ({
                   </div>
                   <div className="h-1.5 rounded-full bg-[#121216] overflow-hidden">
                     <div
-                      className="h-full bg-gradient-to-r from-cyan-400 to-emerald-400 transition-all"
+                      className="bh-progress h-full bg-gradient-to-r from-cyan-400 to-emerald-400"
                       style={{ width: `${pct}%` }}
                     />
                   </div>

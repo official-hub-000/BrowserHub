@@ -6,6 +6,7 @@ import { AndroidHybridBridge } from '../bridge/androidHybridBridge';
 import { getLastAiAttempts } from '../utils/localAiEngine';
 import { RUNS_HERE, EXTENSION_CATALOGUE } from '../data/extensionCatalogue';
 import { WEB_GAMES } from '../data/games';
+import { useExitTransition } from '../utils/useExitTransition';
 
 interface AboutDiagnosticsModalProps {
   onClose: () => void;
@@ -77,13 +78,15 @@ export const AboutDiagnosticsModal: React.FC<AboutDiagnosticsModalProps> = ({ on
     </div>
   );
 
+  const motion = useExitTransition(onClose, 'bh-dialog', 'bh-dialog-out');
+
   return (
     <div
-      className="bh-overlay fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-3"
-      onClick={onClose}
+      className={`bh-overlay fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-3${motion.isClosing ? ' bh-overlay-out' : ''}`}
+      onClick={motion.requestClose}
     >
       <div
-        className="bh-dialog w-full max-w-md rounded-3xl bg-black border border-slate-800 shadow-2xl overflow-hidden flex flex-col max-h-[88vh]"
+        className={`${motion.className} w-full max-w-md rounded-3xl bg-black border border-slate-800 shadow-2xl overflow-hidden flex flex-col max-h-[88vh]`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="p-4 border-b border-slate-800 flex items-center justify-between">

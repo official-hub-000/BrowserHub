@@ -38,6 +38,7 @@ import type {
 } from '../types/browser';
 import { SEARCH_ENGINE_OPTIONS } from '../data/presets';
 import { SearchEngineIcon } from './VectorIcons';
+import { useExitTransition } from '../utils/useExitTransition';
 
 interface MenuHubModalProps {
   tab: BrowserTab;
@@ -125,14 +126,16 @@ export const MenuHubModal: React.FC<MenuHubModalProps> = ({
     fn();
   };
 
+  const motion = useExitTransition(onClose, 'bh-sheet', 'bh-sheet-out');
+
   return (
     <div
-      className="bh-overlay fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
+      className={`bh-overlay fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4${motion.isClosing ? ' bh-overlay-out' : ''}`}
       style={{ backgroundColor: 'rgba(0, 0, 0, 0.88)' }}
-      onClick={onClose}
+      onClick={motion.requestClose}
     >
       <div
-        className="bh-sheet w-full max-w-lg rounded-t-3xl sm:rounded-3xl border border-slate-800 shadow-2xl flex flex-col max-h-[88vh] overflow-hidden"
+        className={`${motion.className} w-full max-w-lg rounded-t-3xl sm:rounded-3xl border border-slate-800 shadow-2xl flex flex-col max-h-[88vh] overflow-hidden`}
         style={{ backgroundColor: '#000000' }}
         onClick={(e) => e.stopPropagation()}
       >

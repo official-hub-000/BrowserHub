@@ -1395,7 +1395,7 @@ export function App() {
 
       {/* Real feedback from the native offline translator */}
       {translateNotice && activeTab.translatedLang && (
-        <div className="px-2.5 py-1 bg-[#0a0a12] border-b border-indigo-500/40 text-[10px] text-indigo-200 flex items-center justify-between shrink-0">
+        <div className="bh-bar-open px-2.5 py-1 bg-[#0a0a12] border-b border-indigo-500/40 text-[10px] text-indigo-200 flex items-center justify-between shrink-0">
           <span className="inline-flex items-center gap-1.5">
             <Languages size={11} className="shrink-0" />
             <span>
@@ -1419,7 +1419,7 @@ export function App() {
       {/* Optional Find-in-Page Bar */}
       {showFindBar && (
         <div
-          className="px-3 py-2 border-b border-slate-800 flex items-center gap-2 shrink-0 z-20"
+          className="bh-bar-open px-3 py-2 border-b border-slate-800 flex items-center gap-2 shrink-0 z-20"
           style={{ backgroundColor: '#000000' }}
         >
           <Search size={15} className="text-amber-400 shrink-0" />

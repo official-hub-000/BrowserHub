@@ -282,6 +282,165 @@ button:not(:disabled):active,
     transform 120ms ease;
 }
 
+/* ==================================================================
+   Exit motion.
+   Every panel above animates in. Until now close was an instant unmount,
+   so a drawer slid open and then disappeared. These are the reversing
+   animations, run while the element is still mounted; the duration lives
+   in --bh-exit-ms so the JS timeout and the CSS can never disagree.
+   ================================================================== */
+
+:root {
+  --bh-exit-ms: 200ms;
+}
+
+@keyframes bhSheetDown {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(10%) scale(0.985);
+  }
+}
+
+@keyframes bhDialogOut {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+
+@keyframes bhDrawerOutRight {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(16%);
+  }
+}
+
+@keyframes bhDrawerOutLeft {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(-16%);
+  }
+}
+
+@keyframes bhFadeOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+.bh-sheet-out {
+  animation: bhSheetDown var(--bh-exit-ms) cubic-bezier(0.4, 0, 1, 1) both;
+}
+
+.bh-dialog-out {
+  animation: bhDialogOut var(--bh-exit-ms) cubic-bezier(0.4, 0, 1, 1) both;
+}
+
+.bh-drawer-right-out {
+  animation: bhDrawerOutRight var(--bh-exit-ms) cubic-bezier(0.4, 0, 1, 1) both;
+}
+
+.bh-drawer-left-out {
+  animation: bhDrawerOutLeft var(--bh-exit-ms) cubic-bezier(0.4, 0, 1, 1) both;
+}
+
+/* The scrim fades slightly faster than its panel so the panel never looks
+   orphaned on a black screen at the very end. */
+.bh-overlay-out {
+  animation: bhFadeOut calc(var(--bh-exit-ms) - 40ms) ease-in both;
+}
+
+/* Inline bars (find-in-page, translate notice) grow open rather than
+   appearing at full height, which is what made the layout jump.
+   max-height is animated because the bar's real height is content-driven;
+   it is a cheap property here because the element is small and the
+   animation runs once. */
+@keyframes bhBarOpen {
+  from {
+    opacity: 0;
+    max-height: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    max-height: 64px;
+    transform: translateY(0);
+  }
+}
+
+.bh-bar-open {
+  animation: bhBarOpen 200ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  overflow: hidden;
+}
+
+/* A card or row that arrives after a fetch. Short and subtle: this can
+   fire for dozens of rows, so it must stay cheap. */
+@keyframes bhItemIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.bh-item-in {
+  animation: bhItemIn 180ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* A progress or loading bar that fills smoothly instead of jumping in
+   five-percent steps. */
+.bh-progress {
+  transition: width 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Anything whose content appears after an async check. */
+.bh-reveal {
+  animation: bhFadeIn 220ms ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --bh-exit-ms: 1ms;
+  }
+  .bh-bar-open,
+  .bh-item-in,
+  .bh-reveal {
+    animation-duration: 1ms !important;
+  }
+  .bh-progress {
+    transition: none;
+  }
+  .bh-sheet-out,
+  .bh-dialog-out,
+  .bh-drawer-right-out,
+  .bh-drawer-left-out,
+  .bh-overlay-out {
+    animation-duration: 1ms !important;
+  }
+}
+
 /* Honour the platform accessibility setting. */
 @media (prefers-reduced-motion: reduce) {
   .bh-overlay,

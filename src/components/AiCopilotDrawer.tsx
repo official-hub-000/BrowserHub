@@ -21,6 +21,7 @@ import { getSearchEngineOption } from '../data/presets';
 import type { SearchEngineId } from '../types/browser';
 import { AiThinkingState } from './AiThinkingState';
 import { runSmartHybridAi } from '../utils/localAiEngine';
+import { useExitTransition } from '../utils/useExitTransition';
 
 interface AiCopilotDrawerProps {
   tab: BrowserTab;
@@ -291,10 +292,12 @@ export const AiCopilotDrawer: React.FC<AiCopilotDrawerProps> = ({
       ? { text: 'Reading this page\'s real text', tone: 'text-emerald-300' }
       : { text: 'Waiting for page text', tone: 'text-amber-300' };
 
+  const motion = useExitTransition(onClose, 'bh-drawer-right', 'bh-drawer-right-out');
+
   return (
-    <div className="bh-overlay fixed inset-0 z-50 flex justify-end" style={{ backgroundColor: 'rgba(0, 0, 0, 0.86)' }} onClick={onClose}>
+    <div className={`bh-overlay fixed inset-0 z-50 flex justify-end${motion.isClosing ? ' bh-overlay-out' : ''}`} style={{ backgroundColor: 'rgba(0, 0, 0, 0.86)' }} onClick={motion.requestClose}>
       <div
-        className="bh-drawer-right w-full max-w-md h-full border-l border-slate-800 flex flex-col shadow-2xl"
+        className={`${motion.className} w-full max-w-md h-full border-l border-slate-800 flex flex-col shadow-2xl`}
         style={{ backgroundColor: '#000000' }}
         onClick={(e) => e.stopPropagation()}
       >

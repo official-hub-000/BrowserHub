@@ -25,6 +25,7 @@ import {
 import { parseGlobalStoreUrl, unpackExtensionFile } from '../utils/extensionUnpacker';
 import { SiteIcon, StatusMark } from './VectorIcons';
 import { isExtensionEnforced } from '../utils/extensionEffects';
+import { useExitTransition } from '../utils/useExitTransition';
 
 interface ExtensionsModalProps {
   extensions: BrowserExtension[];
@@ -161,9 +162,11 @@ export const ExtensionsModal: React.FC<ExtensionsModalProps> = ({
     setActiveTab('installed');
   };
 
+  const exit = useExitTransition(onClose, 'bh-dialog', 'bh-dialog-out');
+
   return (
-    <div className="bh-overlay fixed inset-0 z-50 bg-black/75 flex items-center justify-center p-3" onClick={onClose}>
-      <div className="bh-dialog w-full max-w-2xl rounded-3xl bg-black border border-slate-800 shadow-2xl flex flex-col max-h-[90vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
+    <div className={`bh-overlay fixed inset-0 z-50 bg-black/75 flex items-center justify-center p-3${exit.isClosing ? ' bh-overlay-out' : ''}`} onClick={exit.requestClose}>
+      <div className={`${exit.className} w-full max-w-2xl rounded-3xl bg-black border border-slate-800 shadow-2xl flex flex-col max-h-[90vh] overflow-hidden`} onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-gradient-to-r from-[#0b0713] to-black">
           <div className="flex items-center gap-2.5">

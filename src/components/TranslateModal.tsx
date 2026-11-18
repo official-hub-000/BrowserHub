@@ -2,6 +2,7 @@ import React from 'react';
 import { Languages, X, Check } from 'lucide-react';
 import { SUPPORTED_LANGUAGES } from '../utils/translator';
 import { LangBadge } from './VectorIcons';
+import { useExitTransition } from '../utils/useExitTransition';
 
 interface TranslateModalProps {
   activeLang: string | null;
@@ -18,14 +19,16 @@ export const TranslateModal: React.FC<TranslateModalProps> = ({
   onToggleBilingual,
   onClose,
 }) => {
+  const motion = useExitTransition(onClose, 'bh-sheet', 'bh-sheet-out');
+
   return (
     <div
-      className="bh-overlay fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
+      className={`bh-overlay fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4${motion.isClosing ? ' bh-overlay-out' : ''}`}
       style={{ backgroundColor: 'rgba(0, 0, 0, 0.88)' }}
-      onClick={onClose}
+      onClick={motion.requestClose}
     >
       <div
-        className="bh-sheet w-full max-w-md rounded-t-3xl sm:rounded-3xl border border-slate-800 shadow-2xl overflow-hidden flex flex-col max-h-[82vh]"
+        className={`${motion.className} w-full max-w-md rounded-t-3xl sm:rounded-3xl border border-slate-800 shadow-2xl overflow-hidden flex flex-col max-h-[82vh]`}
         style={{ backgroundColor: '#000000' }}
         onClick={(e) => e.stopPropagation()}
       >

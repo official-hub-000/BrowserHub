@@ -11,6 +11,7 @@ import {
   Layers,
 } from 'lucide-react';
 import type { BrowserTab } from '../types/browser';
+import { useExitTransition } from '../utils/useExitTransition';
 
 interface TabsDrawerProps {
   tabs: BrowserTab[];
@@ -56,9 +57,11 @@ export const TabsDrawer: React.FC<TabsDrawerProps> = ({
     .filter((t) => t.isHibernated)
     .reduce((acc, t) => acc + t.memoryMb, 0);
 
+  const exit = useExitTransition(onClose, 'bh-dialog', 'bh-dialog-out');
+
   return (
-    <div className="bh-overlay fixed inset-0 z-50 bg-black/75 flex items-center justify-center p-3" onClick={onClose}>
-      <div className="bh-dialog w-full max-w-2xl rounded-3xl bg-black border border-slate-800 shadow-2xl flex flex-col max-h-[88vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
+    <div className={`bh-overlay fixed inset-0 z-50 bg-black/75 flex items-center justify-center p-3${exit.isClosing ? ' bh-overlay-out' : ''}`} onClick={exit.requestClose}>
+      <div className={`${exit.className} w-full max-w-2xl rounded-3xl bg-black border border-slate-800 shadow-2xl flex flex-col max-h-[88vh] overflow-hidden`} onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className="p-4 border-b border-slate-800 flex flex-wrap items-center justify-between gap-2 bg-[#08080b]">
           <div className="flex items-center gap-2">
