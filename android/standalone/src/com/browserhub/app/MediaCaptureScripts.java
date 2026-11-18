@@ -79,6 +79,19 @@ public final class MediaCaptureScripts {
             + "    return rmk.apply(navigator,arguments);};}}catch(e){}"
             + "}catch(e){}})();";
 
+    /*
+     * Two different signals were being conflated in the readback, and the
+     * difference matters:
+     *
+     *   a blob: video source -> MediaSource. This is how EVERY modern player
+     *       works, YouTube included. It is not evidence of encryption.
+     *   el.mediaKeys         -> a real EME key attached to the element. This is
+     *       DRM, and it is the only reliable evidence available from the page.
+     *
+     * Treating blob: as DRM put a red "This page uses DRM" banner on an ordinary
+     * video that was playing perfectly. Only mediaKeys, or the recorded key-system
+     * request, may raise the flag.
+     */
     public static final String READBACK =
             "(function(){try{"
             + "var out=[];var list=window.__bhMedia||[];"
@@ -97,8 +110,9 @@ public final class MediaCaptureScripts {
             + "  var dv=document.querySelectorAll('video');"
             + "  for(var m=0;m<dv.length;m++){"
             + "    var ds=dv[m].currentSrc||dv[m].src||'';"
-            + "    if(ds.indexOf('blob:')===0||dv[m].mediaKeys){drm=true;break;}}"
+            + "    if(dv[m].mediaKeys){drm=true;break;}}"
             + "}catch(e){}}"
             + "return JSON.stringify({items:out,mse:!!window.__bhUsesMse,drm:drm});"
-            + "}catch(e){return '{\"items\":[],\"mse\":false,\"drm\":false}';}})();";
+            + "}catch(e){return JSON.stringify({items:[],mse:false,drm:false,"
+            + "error:String(e&&e.message||e)});}})();";
 }

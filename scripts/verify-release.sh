@@ -98,11 +98,13 @@ ENGINE_DIR="$(mktemp -d)"
 "$JAVA" -jar build-tools/ecj-3.45.0.jar -8 -nowarn -cp build-tools/android.jar -d "$ENGINE_DIR" \
   $(find android/standalone/src/com/browserhub/app/media -name '*.java') \
   android/standalone/test/MediaEngineTest.java android/standalone/test/MediaMergeTest.java \
-  android/standalone/test/DashMergeTest.java || {
+  android/standalone/test/DashMergeTest.java android/standalone/test/YouTubeExtractTest.java || {
     echo "  FAIL the media engine does not compile"; exit 1; }
 "$JAVA" -cp "$ENGINE_DIR" MediaEngineTest | tail -1
 "$JAVA" -cp "$ENGINE_DIR" MediaMergeTest | tail -1
 "$JAVA" -cp "$ENGINE_DIR" DashMergeTest | tail -1
+echo "== YouTube: watch pages resolve to downloadable media =="
+"$JAVA" -cp "$ENGINE_DIR" YouTubeExtractTest | tail -1
 rm -rf "$ENGINE_DIR"
 
 echo "== Download queue: progress shown is progress that happened =="

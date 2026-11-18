@@ -292,7 +292,23 @@ public class MainActivity extends Activity {
             public void onPageStarted(WebView view, String url, android.graphics.Bitmap favicon) {
                 super.onPageStarted(view, url, favicon);
                 if (url == null) return;
-                if (url.startsWith("http://") || url.startsWith("https://")) return;
+                if (url.startsWith("http://") || url.startsWith("https://")) {
+                    /*
+                     * Install the media hooks at the earliest possible moment.
+                     *
+                     * They used to be installed when the sheet opened, which is
+                     * far too late: by then the player has already made every
+                     * request, so a correctly playing page reported "nothing
+                     * found". onPageStarted runs before the document is parsed,
+                     * so the hooks exist before any script on the page can call
+                     * fetch or XHR.
+                     */
+                    try {
+                        view.evaluateJavascript(MediaCaptureScripts.HOOK, null);
+                    } catch (Throwable ignored) {
+                    }
+                    return;
+                }
                 view.stopLoading();
                 openExternalUrl(url);
                 notifyShellUrlChanged(url, "App link");
@@ -570,6 +586,8 @@ public class MainActivity extends Activity {
                 ? com.browserhub.app.media.DownloadQueue.KIND_HLS
                 : "dash".equalsIgnoreCase(kind)
                 ? com.browserhub.app.media.DownloadQueue.KIND_DASH
+                : "youtube".equalsIgnoreCase(kind)
+                ? com.browserhub.app.media.DownloadQueue.KIND_YOUTUBE
                 : com.browserhub.app.media.DownloadQueue.KIND_FILE;
         String safeName = com.browserhub.app.media.DownloadQueue.filenameFor(filename, safeKind);
         com.browserhub.app.media.DownloadQueue.Job job =
@@ -597,6 +615,31 @@ public class MainActivity extends Activity {
                 try {
                     String ua = browserWebView != null
                             ? browserWebView.getSettings().getUserAgentString() : null;
+                    if (com.browserhub.app.media.YouTubeExtractor.handles(url)) {
+                        com.browserhub.app.media.YouTubeExtractor.Result yt =
+                                com.browserhub.app.media.YouTubeExtractor.resolve(url, ua, null);
+                        out.put("ok", yt.ok);
+                        out.put("kind", "youtube");
+                        if (!yt.ok) {
+                            out.put("reason", yt.error != null ? yt.error : "could not read the video");
+                        } else {
+                            boolean progressive = yt.progressive != null;
+                            out.put("parts", progressive ? 1 : 2);
+                            out.put("encrypted", false);
+                            out.put("sampleAes", false);
+                            out.put("seconds", yt.durationSeconds);
+                            out.put("bestResolution",
+                                    yt.progressive != null && yt.progressive.qualityLabel != null
+                                            ? yt.progressive.qualityLabel
+                                            : yt.bestVideo != null && yt.bestVideo.qualityLabel != null
+                                            ? yt.bestVideo.qualityLabel
+                                            : "");
+                            out.put("title", yt.title != null ? yt.title : "");
+                            out.put("track", progressive ? "one file" : "picture + sound");
+                        }
+                        streamProbe = out.toString();
+                        return;
+                    }
                     if (com.browserhub.app.media.Resolver.isDashPlaylist(url)) {
                         String xml = com.browserhub.app.media.MediaMerger.fetchText(url, ua, null);
                         com.browserhub.app.media.DashManifest dash =

@@ -14,6 +14,8 @@ import {
   EMPTY_PROBE,
   describeProbe,
   formatBytes,
+  formatDuration,
+  isYouTubeWatchUrl,
   parseDownloads,
   parseProbe,
   streamRefusal,
@@ -55,6 +57,34 @@ export const VideoGrabberModal: React.FC<VideoGrabberModalProps> = ({
   const [downloaded, setDownloaded] = useState<Record<string, boolean>>({});
   const [probes, setProbes] = useState<Record<string, StreamProbe | null>>({});
   const [jobs, setJobs] = useState<DownloadJob[]>([]);
+  const [youtubeProbe, setYoutubeProbe] = useState<StreamProbe | null>(null);
+  const [youtubeStarted, setYoutubeStarted] = useState(false);
+
+  /**
+   * YouTube is handled separately.
+   *
+   * On a watch page the media is not a network request the page makes — it is
+   * inside the player's JSON — so waiting for a captured URL shows "nothing
+   * found" on a video that plays perfectly. The page itself is the signal.
+   */
+  const onYouTube = isYouTubeWatchUrl(pageUrl);
+
+  useEffect(() => {
+    if (!onYouTube || !AndroidHybridBridge.hasJniBridge()) return;
+    AndroidHybridBridge.probeStream(pageUrl);
+    const timer = window.setInterval(() => {
+      const parsed = parseProbe(AndroidHybridBridge.getStreamProbe());
+      if (parsed) {
+        setYoutubeProbe(parsed);
+        window.clearInterval(timer);
+      }
+    }, 400);
+    const stop = window.setTimeout(() => window.clearInterval(timer), 25000);
+    return () => {
+      window.clearInterval(timer);
+      window.clearTimeout(stop);
+    };
+  }, [onYouTube, pageUrl]);
 
   /**
    * What the stream actually is, asked before the user commits.
@@ -236,7 +266,73 @@ export const VideoGrabberModal: React.FC<VideoGrabberModalProps> = ({
             </div>
           )}
 
-          {!scanning && items.length === 0 && (
+          {/*
+            The YouTube card. It is shown whenever the page is a watch page,
+            independent of what the network capture found, because on YouTube the
+            capture finds nothing by design — the media URL lives in the player's
+            own JSON, not in a request the page makes.
+          */}
+          {onYouTube && (
+            <div className="rounded-xl border border-cyan-500/40 bg-cyan-500/5 p-3 space-y-2">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="text-xs font-semibold text-white truncate">
+                    {youtubeProbe?.title?.trim() || 'YouTube video'}
+                  </div>
+                  <div className="text-[10px] text-slate-500 font-mono truncate">
+                    {youtubeProbe?.ok
+                      ? [
+                          youtubeProbe.bestResolution,
+                          youtubeProbe.seconds ? formatDuration(youtubeProbe.seconds) : '',
+                          youtubeProbe.track,
+                        ]
+                          .filter(Boolean)
+                          .join(' · ')
+                      : 'reading the video'}
+                  </div>
+                </div>
+              </div>
+
+              <p
+                className={`text-[11px] leading-relaxed ${
+                  youtubeProbe && !youtubeProbe.ok ? 'text-amber-200/80' : 'text-cyan-200/80'
+                }`}
+              >
+                {youtubeProbe && !youtubeProbe.ok
+                  ? (youtubeProbe.reason ?? 'This video could not be read.')
+                  : describeProbe(youtubeProbe)}
+              </p>
+
+              {(!youtubeProbe || youtubeProbe.ok) && (
+                <button
+                  onClick={() => {
+                    const title = youtubeProbe?.title?.trim() || pageTitle || 'YouTube video';
+                    const safe = title.replace(/[\\/:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim();
+                    const id = AndroidHybridBridge.startDownload(
+                      pageUrl,
+                      `${safe || 'video'}.mp4`,
+                      'youtube',
+                      title
+                    );
+                    if (id) {
+                      setYoutubeStarted(true);
+                      setDownloaded((prev) => ({ ...prev, [pageUrl]: true }));
+                    }
+                  }}
+                  className={`w-full flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-semibold cursor-pointer ${
+                    youtubeStarted
+                      ? 'bg-emerald-500/20 border border-emerald-500/40 text-emerald-300'
+                      : 'bg-cyan-500/20 border border-cyan-500/40 text-cyan-200 hover:bg-cyan-500/30'
+                  }`}
+                >
+                  <Download size={14} />
+                  {youtubeStarted ? 'Saved to your downloads' : 'Download this video'}
+                </button>
+              )}
+            </div>
+          )}
+
+          {!scanning && items.length === 0 && !onYouTube && (
             <div className="rounded-xl border border-slate-800 bg-[#060608] px-3.5 py-4 text-center">
               <ScanLine size={22} className="mx-auto text-slate-600 mb-2" />
               <div className="text-xs font-semibold text-slate-300">No video on this page yet</div>
@@ -384,6 +480,7 @@ export const VideoGrabberModal: React.FC<VideoGrabberModalProps> = ({
             <div className="text-[10px] font-bold text-slate-300 mb-1.5">What this can and cannot do</div>
             <ul className="text-[10px] text-slate-500 leading-relaxed space-y-1">
               <li>Finds video files the page actually requests while you watch.</li>
+              <li>Reads YouTube watch pages directly, joining picture and sound.</li>
               <li>Joins HLS and DASH streams into one file, picture and sound together.</li>
               <li>Decrypts AES-128 HLS streams while joining them.</li>
               <li>Keeps downloading in the background, with progress and cancel.</li>

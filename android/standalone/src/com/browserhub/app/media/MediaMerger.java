@@ -246,6 +246,67 @@ public final class MediaMerger {
         return (long) (p.totalDuration * 1000000L / 8L);
     }
 
+    /**
+     * Fetches text from a URL with an optional origin/referer, which YouTube's
+     * media hosts require: a bare GET of a googlevideo URL is refused with 403
+     * unless the request looks like it came from the player.
+     */
+    public static String fetchTextWithHeaders(String url, String userAgent, String cookie,
+                                              String referer, String origin) throws IOException {
+        HttpURLConnection conn = null;
+        InputStream in = null;
+        try {
+            conn = open(url, userAgent, cookie);
+            if (referer != null) conn.setRequestProperty("Referer", referer);
+            if (origin != null) conn.setRequestProperty("Origin", origin);
+            conn.setRequestProperty("Accept-Language", "en-US,en;q=0.9");
+            int code = conn.getResponseCode();
+            if (code >= 400) throw new IOException("HTTP " + code);
+            in = conn.getInputStream();
+            java.io.ByteArrayOutputStream buf = new java.io.ByteArrayOutputStream();
+            byte[] chunk = new byte[16384];
+            int n;
+            while ((n = in.read(chunk)) > 0) buf.write(chunk, 0, n);
+            return buf.toString("UTF-8");
+        } finally {
+            try { if (in != null) in.close(); } catch (Throwable ignored) {}
+            if (conn != null) conn.disconnect();
+        }
+    }
+
+    /** POST helper for YouTube's playback challenge endpoint. */
+    public static String postJson(String url, String body, String userAgent, String referer)
+            throws IOException {
+        HttpURLConnection conn = null;
+        InputStream in = null;
+        try {
+            conn = (HttpURLConnection) new URL(url).openConnection();
+            conn.setConnectTimeout(CONNECT_TIMEOUT);
+            conn.setReadTimeout(READ_TIMEOUT);
+            conn.setRequestMethod("POST");
+            conn.setDoOutput(true);
+            conn.setRequestProperty("Content-Type", "application/json");
+            conn.setRequestProperty("Accept", "application/json");
+            if (userAgent != null) conn.setRequestProperty("User-Agent", userAgent);
+            if (referer != null) conn.setRequestProperty("Referer", referer);
+            conn.setRequestProperty("Origin", "https://www.youtube.com");
+            java.io.OutputStream os = conn.getOutputStream();
+            os.write(body.getBytes("UTF-8"));
+            os.close();
+            int code = conn.getResponseCode();
+            if (code >= 400) throw new IOException("HTTP " + code);
+            in = conn.getInputStream();
+            java.io.ByteArrayOutputStream buf = new java.io.ByteArrayOutputStream();
+            byte[] chunk = new byte[8192];
+            int n;
+            while ((n = in.read(chunk)) > 0) buf.write(chunk, 0, n);
+            return buf.toString("UTF-8");
+        } finally {
+            try { if (in != null) in.close(); } catch (Throwable ignored) {}
+            if (conn != null) conn.disconnect();
+        }
+    }
+
     public static String fetchText(String url, String userAgent, String cookie) throws IOException {
         HttpURLConnection conn = null;
         InputStream in = null;
@@ -293,7 +354,8 @@ public final class MediaMerger {
         }
     }
 
-    private static HttpURLConnection open(String url, String userAgent, String cookie) throws IOException {
+    /** Opens a connection with the standard media headers, for reuse by callers. */
+    public static HttpURLConnection open(String url, String userAgent, String cookie) throws IOException {
         String scheme = Resolver.scheme(url);
         if (!"http".equalsIgnoreCase(scheme) && !"https".equalsIgnoreCase(scheme)) {
             throw new IOException("refusing a non-web URL");

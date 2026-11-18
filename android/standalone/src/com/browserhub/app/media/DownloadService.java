@@ -98,6 +98,78 @@ public class DownloadService extends Service {
 
         long lastShown = 0L;
 
+        if (DownloadQueue.KIND_YOUTUBE.equals(kind)) {
+            /*
+             * YouTube needs its own path: the media URL is not in the page's
+             * network traffic, it is inside the player's JSON. Resolve that first,
+             * then hand the result to the same merger the other streams use.
+             */
+            job.message = "Reading the video information";
+            publishProgress(job, false);
+
+            YouTubeExtractor.Result info = YouTubeExtractor.resolve(url, userAgent, cookie);
+            if (!info.ok) {
+                job.status = "failed";
+                job.message = info.error != null ? info.error : "YouTube did not offer this video";
+                return;
+            }
+            if (info.title != null && info.title.length() > 0) {
+                job.title = info.title;
+            }
+
+            if (info.progressive != null) {
+                // One file with picture and sound: nothing to join.
+                job.message = "Downloading " + info.progressive.qualityLabel;
+                publishProgress(job, false);
+                boolean ok = MediaGrabberDirect.fetch(info.progressive.url, out, userAgent, cookie, job);
+                if (job.cancel.get()) {
+                    job.status = "cancelled";
+                    job.message = "Cancelled";
+                    out.delete();
+                    return;
+                }
+                if (!ok) {
+                    if (job.message == null || job.message.length() == 0) {
+                        job.message = "Download failed";
+                    }
+                    out.delete();
+                    return;
+                }
+                finish(job, out, filename, "video/mp4", title);
+                return;
+            }
+
+            // No progressive track: take both adaptive tracks and join them.
+            if (info.bestVideo == null) {
+                job.status = "failed";
+                job.message = "YouTube did not offer a video track for this one";
+                return;
+            }
+            job.message = "Joining picture and sound";
+            publishProgress(job, false);
+
+            java.util.List<DashManifest.SegmentRef> videoRefs = new java.util.ArrayList<>();
+            videoRefs.add(new DashManifest.SegmentRef(info.bestVideo.url, -1, -1));
+            java.util.List<DashManifest.SegmentRef> audioRefs = new java.util.ArrayList<>();
+            if (info.bestAudio != null) {
+                audioRefs.add(new DashManifest.SegmentRef(info.bestAudio.url, -1, -1));
+            }
+
+            boolean ok = YouTubeTrackJoiner.join(info, videoRefs, audioRefs, out, userAgent, cookie, job);
+            if (job.cancel.get()) {
+                job.status = "cancelled";
+                job.message = "Cancelled";
+                out.delete();
+                return;
+            }
+            if (!ok) {
+                out.delete();
+                return;
+            }
+            finish(job, out, filename, "video/mp4", title);
+            return;
+        }
+
         if (DownloadQueue.KIND_DASH.equals(kind)) {
             MediaMerger.Result result = DashMerger.merge(url, out, 0, userAgent, cookie,
                     new MediaMerger.Listener() {

@@ -428,6 +428,58 @@ console.log(`video capture: ${passed} checks pass — real media is found, impos
   }
   check('asking for a key system marks the page as DRM-protected', drmFlagged);
 
+  /*
+   * Regression: a blob: video source means MediaSource — which is how EVERY
+   * modern player works, YouTube included — not DRM. Treating it as DRM produced
+   * a red "This page uses DRM" banner on an ordinary page that was playing
+   * perfectly, which is what a user saw on a YouTube watch page.
+   */
+  let falseDrm = false;
+  try {
+    const mseWindow: any = { __bhMedia: [] };
+    const mseVideo = { currentSrc: 'blob:https://www.youtube.com/1234-5678', src: '', mediaKeys: null };
+    const mseDocument = {
+      createElement: () => el,
+      // Answer each selector honestly: only the video query returns a video, the
+      // og:video query returns no meta tags. A stub that returns a video for the
+      // meta query makes readback throw and silently report "no DRM".
+      querySelectorAll: (sel: string) => (sel.includes('og:video') ? [] : [mseVideo]),
+    };
+    new Function(
+      'window', 'document', 'XMLHttpRequest', 'URL', 'HTMLMediaElement',
+      'Promise', 'Object', 'String', 'navigator', hookJs
+    )(mseWindow, mseDocument, FakeXHR, sandbox.URL, stubMediaProtoCtor, Promise, Object, String, {});
+    const env = new Function('window', 'document', 'navigator', `return ${readJs}`)(
+      mseWindow, mseDocument, {}
+    );
+    falseDrm = JSON.parse(env).drm === true;
+  } catch {
+    falseDrm = false;
+  }
+  check('a blob:/MediaSource video is NOT reported as DRM', falseDrm === false);
+
+  // A video element that really has media keys IS DRM.
+  let realDrm = false;
+  try {
+    const drmWindow: any = { __bhMedia: [] };
+    const drmVideo = { currentSrc: 'blob:x', src: '', mediaKeys: { keySystem: 'com.widevine.alpha' } };
+    const drmDocument = {
+      createElement: () => el,
+      querySelectorAll: (sel: string) => (sel.includes('og:video') ? [] : [drmVideo]),
+    };
+    new Function(
+      'window', 'document', 'XMLHttpRequest', 'URL', 'HTMLMediaElement',
+      'Promise', 'Object', 'String', 'navigator', hookJs
+    )(drmWindow, drmDocument, FakeXHR, sandbox.URL, stubMediaProtoCtor, Promise, Object, String, {});
+    const env = new Function('window', 'document', 'navigator', `return ${readJs}`)(
+      drmWindow, drmDocument, {}
+    );
+    realDrm = JSON.parse(env).drm === true;
+  } catch {
+    realDrm = false;
+  }
+  check('a video with media keys IS reported as DRM', realDrm === true);
+
   check('READBACK reports MediaSource usage', (() => {
     try {
       return 'mse' in JSON.parse(envelope);

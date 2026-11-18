@@ -124,6 +124,41 @@ if (/catch\(e\)\{\}/.test(scripts) && /__bhCaptureOn/.test(scripts)) {
   bad.push('page hooks are not guarded against breaking the page');
 }
 
+// 6b. The emitted page scripts must be valid JavaScript.
+//
+// This is checked properly by video-capture-test.mts, which extracts the real
+// strings out of this file and executes them against a stub page. A weaker second
+// check lives here so a broken script fails the release even if that test is ever
+// run in isolation.
+{
+  const extract = (name) => {
+    const at = scripts.indexOf(name + ' =');
+    if (at < 0) return '';
+    const rest = scripts.slice(at);
+    const term = rest.indexOf('";\n');
+    const seg = term >= 0 ? rest.slice(0, term + 1) : rest;
+    return [...seg.matchAll(/"((?:[^"\\]|\\.)*)"/g)]
+      .map((m) => m[1])
+      .join('')
+      .replace(/\\\\/g, '\\');
+  };
+  const problems = [];
+  for (const name of ['HOOK', 'READBACK']) {
+    const js = extract(name);
+    if (!js) {
+      problems.push(`${name} could not be extracted`);
+      continue;
+    }
+    try {
+      new Function(`return ${js}`);
+    } catch (e) {
+      problems.push(`${name} is not valid JavaScript (${e.message})`);
+    }
+  }
+  if (problems.length) problems.forEach((p) => bad.push(p));
+  else ok.push('both injected page scripts are valid JavaScript');
+}
+
 // 7. The bridge must actually expose the download to the shell.
 for (const m of ['collectPageMedia', 'getPageMedia', 'downloadPageMedia', 'hasNativeDownloader']) {
   if (!bridge.includes(m)) bad.push(`bridge does not expose ${m}`);

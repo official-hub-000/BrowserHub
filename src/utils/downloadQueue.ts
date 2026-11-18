@@ -33,6 +33,12 @@ export interface StreamProbe {
   sampleAes?: boolean;
   seconds?: number;
   bestResolution?: string;
+  /** Which engine answered: a stream playlist, or YouTube's player data. */
+  kind?: string;
+  /** The real video title, when the source reported one. */
+  title?: string;
+  /** "one file" or "picture + sound" — what has to be joined. */
+  track?: string;
 }
 
 export const EMPTY_PROBE: StreamProbe = { ok: false };
@@ -91,6 +97,9 @@ export function parseProbe(raw: string): StreamProbe | null {
       sampleAes: Boolean(p.sampleAes),
       seconds: typeof p.seconds === 'number' ? p.seconds : undefined,
       bestResolution: typeof p.bestResolution === 'string' ? p.bestResolution : undefined,
+      kind: typeof p.kind === 'string' ? p.kind : undefined,
+      title: typeof p.title === 'string' ? p.title : undefined,
+      track: typeof p.track === 'string' ? p.track : undefined,
     };
   } catch {
     return null;
@@ -139,7 +148,27 @@ export function describeProbe(probe: StreamProbe | null): string {
   if (probe.parts) bits.push(`${probe.parts} parts`);
   if (probe.seconds) bits.push(formatDuration(probe.seconds));
   if (probe.encrypted) bits.push('AES-128 encrypted');
-  return bits.length ? `Ready to join: ${bits.join(' · ')}` : 'Ready to join.';
+  if (probe.kind === 'youtube' && probe.track) bits.push(probe.track);
+  return bits.length ? `Ready to download: ${bits.join(' · ')}` : 'Ready to download.';
+}
+
+/**
+ * True when this URL is a YouTube watch page.
+ *
+ * YouTube gets its own path because the video is not a request the page makes —
+ * it arrives inside the player's JSON, so a "grab what the page requested"
+ * approach finds nothing on a perfectly working page.
+ */
+export function isYouTubeWatchUrl(url: string): boolean {
+  if (!url) return false;
+  const lower = url.toLowerCase();
+  if (lower.includes('/embed')) return false;
+  return (
+    lower.includes('youtube.com/watch') ||
+    lower.includes('youtu.be/') ||
+    lower.includes('m.youtube.com/watch') ||
+    lower.includes('youtube.com/shorts/')
+  );
 }
 
 /** Why a stream must not be offered, or null when it can be. */

@@ -22,6 +22,7 @@ public final class DownloadQueue {
     public static final String KIND_FILE = "file";
     public static final String KIND_HLS = "hls";
     public static final String KIND_DASH = "dash";
+    public static final String KIND_YOUTUBE = "youtube";
 
     /** One download. Fields are read by the UI thread and written by a worker. */
     public static final class Job {
@@ -29,7 +30,8 @@ public final class DownloadQueue {
         public final String url;
         public final String filename;
         public final String kind;
-        public final String title;
+        /** Mutable: YouTube only reports the real title after the player data is read. */
+        public volatile String title;
         public volatile String status = "queued"; // queued|running|done|failed|cancelled
         public volatile int percent;
         public volatile long bytes;
@@ -140,6 +142,7 @@ public final class DownloadQueue {
         if (base.length() == 0) base = "video";
         String ext = KIND_HLS.equals(kind) ? ".ts"
                 : KIND_DASH.equals(kind) ? ".mp4"
+                : KIND_YOUTUBE.equals(kind) ? ".mp4"
                 : guessExt(base);
         if (!base.toLowerCase(Locale.US).endsWith(ext)) base = base + ext;
         return base;
