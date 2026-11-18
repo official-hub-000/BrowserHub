@@ -86,6 +86,19 @@ public class BrowserHubBridge {
     }
 
     /**
+     * Injects a sideloaded WebExtension's content scripts into the live page.
+     *
+     * `css` and `js` are already matched to this URL by the shell's runtime, so
+     * the native side only has to apply them. Kept separate from
+     * setUserScripts so a package's code can be cleared independently of a
+     * user-authored script.
+     */
+    @JavascriptInterface
+    public void applyExtensionRuntime(String css, String js) {
+        activity.applyExtensionRuntime(css, js);
+    }
+
+    /**
      * Real haptic feedback.
      *
      * This is the single biggest reason a WebView-based browser feels like a web

@@ -20,6 +20,17 @@ const enforced = [...(effects.match(/ENFORCED_EFFECT_KEYS[\s\S]*?\]\)/) || [''])
 );
 
 const effectsHelper = fs.readFileSync('src/utils/extensionEffects.ts', 'utf8');
+const runtimeEngine = fs.readFileSync('src/utils/webextensionRuntime.ts', 'utf8');
+const unpacker = fs.readFileSync('src/utils/extensionUnpacker.ts', 'utf8');
+
+/*
+ * Runtime-assigned keys. These are never hardcoded into a catalogue because
+ * they are attached to whatever package the user sideloads — the effect depends
+ * on the package's own manifest, not on a preset we shipped. They are still
+ * held to the same standard: the key must be produced somewhere real and must
+ * reach a code path that executes it.
+ */
+const runtimeAssigned = new Set(['webextension']);
 
 // Each enforced effect must reach real code. Some are matched by their
 // effectKey string, others through a dedicated helper in extensionEffects.ts.
@@ -32,6 +43,7 @@ const consumer = {
   'custom-css': [effectsHelper + app + nativeJava],
   'custom-script': [effectsHelper + app + nativeJava],
   'bg-play': [effectsHelper + app + nativeJava],
+  webextension: [runtimeEngine + unpacker + effectsHelper + app + nativeJava],
 };
 const wiring = {
   'custom-css': ['hasCustomCss', '__bh_user_css'],
@@ -41,7 +53,20 @@ const wiring = {
 
 const bad = [];
 for (const key of enforced) {
-  if (!keys.includes(key)) bad.push(`enforced key '${key}' is not offered by any extension`);
+  if (!keys.includes(key) && !runtimeAssigned.has(key)) {
+    bad.push(`enforced key '${key}' is not offered by any extension`);
+  }
+  if (runtimeAssigned.has(key)) {
+    // Must be produced by the unpacker and executed through the runtime engine.
+    const produced = unpacker.includes(`'${key}'`);
+    // Require a call site, not just an import or a type reference: the import
+    // name survives any refactor that stops calling the function.
+    const executed =
+      /function buildInjection|const buildInjection/.test(runtimeEngine) &&
+      /buildExtensionInjection\s*\(/.test(app);
+    if (!produced) bad.push(`runtime key '${key}' is never assigned by the unpacker`);
+    if (!executed) bad.push(`runtime key '${key}' is assigned but never executed`);
+  }
   const sources = consumer[key] || [];
   const needles = [key, ...(wiring[key] || [])];
   if (sources.length === 0) bad.push(`'${key}' has no consumer mapped`);

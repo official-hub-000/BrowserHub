@@ -81,7 +81,17 @@ export interface BrowserExtension {
     | 'bitwarden'
     | 'privacy-badger'
     | 'custom-script'
-    | 'custom-css';
+    | 'custom-css'
+    /**
+     * A sideloaded WebExtension whose own content scripts run through the
+     * BrowserHub runtime (see utils/webextensionRuntime.ts).
+     */
+    | 'webextension';
+  /**
+   * Present on packages imported through the runtime: exactly what will run on
+   * a page, and what cannot. Never inferred — produced by reading the package.
+   */
+  runtime?: import('../utils/webextensionRuntime').PackageReport;
   customJs?: string;
   customCss?: string;
   rating?: string;

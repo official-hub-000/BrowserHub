@@ -51,6 +51,8 @@ export interface AndroidJniBridge {
   openExternalUrl?: (url: string) => boolean;
   /** 0 = light tick, 1 = key tap, 2 = confirm. No-op outside the APK. */
   haptic?: (strength: number) => void;
+  /** Applies a sideloaded WebExtension's matched content scripts to the page. */
+  applyExtensionRuntime?: (css: string, js: string) => void;
 }
 
 declare global {

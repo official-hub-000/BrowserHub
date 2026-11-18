@@ -426,3 +426,31 @@ export const SiteIcon: React.FC<EngineIconProps> = ({ id, size = 18, className =
       );
   }
 };
+
+/** Small status glyph for capability lists: what a package will and will not do. */
+export const StatusMark: React.FC<{ kind: 'ok' | 'no' | 'warn'; size?: number; className?: string }> = ({
+  kind,
+  size = 12,
+  className = '',
+}) => {
+  if (kind === 'ok') {
+    return (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
+        <path d="M5 12.8l4.2 4.2L19 7.2" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    );
+  }
+  if (kind === 'no') {
+    return (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
+        <path d="M6.5 6.5l11 11M17.5 6.5l-11 11" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" />
+      </svg>
+    );
+  }
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
+      <path d="M12 4.5v10.5" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" />
+      <circle cx="12" cy="19.2" r="1.6" fill="currentColor" />
+    </svg>
+  );
+};

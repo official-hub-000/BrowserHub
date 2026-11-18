@@ -193,6 +193,24 @@ public class MainActivity extends Activity {
         bwSettings.setMediaPlaybackRequiresUserGesture(false);
         bwSettings.setMixedContentMode(WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE);
 
+        /*
+         * Scrolling smoothness on the real page.
+         *
+         * A WebView that is not pre-rasterised repaints on every scroll frame;
+         * `setOffscreenPreRaster(true)` lets it prepare tiles before they enter
+         * the viewport, which is the single biggest scroll-jank win available
+         * without changing the renderer. API 23+, and this app targets 26+.
+         */
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            bwSettings.setOffscreenPreRaster(true);
+        }
+        // Let the compositor carry the fling instead of driving it from JS/layout.
+        browserWebView.setOverScrollMode(View.OVER_SCROLL_NEVER);
+        browserWebView.setVerticalScrollBarEnabled(false);
+        browserWebView.setHorizontalScrollBarEnabled(false);
+        // Hardware layers keep the WebView on the GPU instead of a software bitmap.
+        browserWebView.setLayerType(View.LAYER_TYPE_HARDWARE, null);
+
         CookieManager cm = CookieManager.getInstance();
         cm.setAcceptCookie(true);
         cm.setAcceptThirdPartyCookies(browserWebView, false);
@@ -512,6 +530,57 @@ public class MainActivity extends Activity {
                         "try{\n" + code + "\n}catch(__bhUserScriptError){}",
                         null
                 );
+            }
+        });
+    }
+
+    /**
+     * Applies a sideloaded WebExtension's content scripts to the real page.
+     *
+     * Ordering matters: CSS first so the page never flashes unstyled content,
+     * then JS. A `<style>` element is appended rather than mutating existing
+     * rules, so removing the extension (empty strings) is a clean no-op on the
+     * next navigation. Injected code is wrapped so one broken extension cannot
+     * take down the page's own scripts.
+     */
+    public void applyExtensionRuntime(final String css, final String js) {
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                if (browserWebView == null || browserWebView.getVisibility() != View.VISIBLE) return;
+                String safeCss = css != null ? css : "";
+                String safeJs = js != null ? js : "";
+
+                if (!safeCss.isEmpty()) {
+                    try {
+                        // JSON-encode so quotes/newlines in CSS cannot break out.
+                        String encoded = org.json.JSONObject.quote(safeCss);
+                        browserWebView.evaluateJavascript(
+                                "(function(){try{"
+                                        + "var id='__bh_ext_css';"
+                                        + "var old=document.getElementById(id);"
+                                        + "if(old&&old.parentNode){old.parentNode.removeChild(old);}"
+                                        + "var s=document.createElement('style');"
+                                        + "s.id=id;s.type='text/css';"
+                                        + "s.appendChild(document.createTextNode(" + encoded + "));"
+                                        + "(document.head||document.documentElement).appendChild(s);"
+                                        + "}catch(e){}})();",
+                                null
+                        );
+                    } catch (Throwable ignored) {
+                        // Encoding failure means no CSS this run, never a crash.
+                    }
+                }
+
+                if (!safeJs.isEmpty()) {
+                    // Wrapped so an extension's error cannot escape into the page.
+                    browserWebView.evaluateJavascript(
+                            "(function(){try{\n" + safeJs + "\n}catch(__bhExtError){"
+                                    + "try{console.warn('[BrowserHub extension]',__bhExtError);}catch(e){}"
+                                    + "}})();",
+                            null
+                    );
+                }
             }
         });
     }

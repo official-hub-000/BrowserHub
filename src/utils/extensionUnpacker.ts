@@ -1,4 +1,5 @@
 import JSZip from 'jszip';
+import { analysePackage } from './webextensionRuntime';
 import type { BrowserExtension } from '../types/browser';
 
 /**
@@ -69,6 +70,29 @@ export async function unpackExtensionFile(file: File): Promise<BrowserExtension>
     const manifestEntry = zip.file('manifest.json');
     if (manifestEntry) {
       const manifestRaw = await manifestEntry.async('string');
+
+      // Load every file the manifest can reference, so analysis is synchronous.
+      const loadedFiles = new Map<string, string>();
+      {
+        const parsed = JSON.parse(manifestRaw) as {
+          content_scripts?: Array<{ js?: string[]; css?: string[] }>;
+        };
+        const wanted = new Set<string>();
+        for (const cs of parsed.content_scripts ?? []) {
+          for (const path of [...(cs.js ?? []), ...(cs.css ?? [])]) wanted.add(path);
+        }
+        for (const path of wanted) {
+          const entry = zip.file(path);
+          if (!entry) continue;
+          try {
+            // 2 MB per file is a generous ceiling; anything larger is not a
+            // content script, and injecting it would stall the page.
+            loadedFiles.set(path, (await entry.async('string')).slice(0, 2_000_000));
+          } catch {
+            // Unreadable file: analysis simply treats it as absent.
+          }
+        }
+      }
       const manifest = JSON.parse(manifestRaw) as {
         name?: string;
         version?: string;
@@ -79,18 +103,26 @@ export async function unpackExtensionFile(file: File): Promise<BrowserExtension>
         content_scripts?: Array<{ js?: string[]; css?: string[] }>;
       };
 
-      // Extract first CSS/JS content script if present so it can run live!
-      let extractedCss = '';
-      let extractedJs = '';
-      if (manifest.content_scripts && manifest.content_scripts.length > 0) {
-        const firstCs = manifest.content_scripts[0];
-        if (firstCs.css?.[0] && zip.file(firstCs.css[0])) {
-          extractedCss = await zip.file(firstCs.css[0])!.async('string');
+      /*
+       * Real WebExtension runtime.
+       *
+       * The old code read only content_scripts[0].js and [0].css, and gave up
+       * after 8 KB. An extension with several content scripts, or one whose
+       * first script is a loader, therefore half-worked or silently did nothing.
+       * analysePackage() walks the whole manifest, resolves every declared js
+       * and css file out of the archive, honours match patterns, and reports
+       * what it cannot run instead of dropping it.
+       */
+      const report = analysePackage(
+        manifest as unknown as Parameters<typeof analysePackage>[0],
+        (path) => {
+          const entry = zip.file(path);
+          if (!entry) return null;
+          // Synchronously-required reader: JSZip files are resolved above, so
+          // this reads only what was already loaded by preload() below.
+          return loadedFiles.get(path) ?? null;
         }
-        if (firstCs.js?.[0] && zip.file(firstCs.js[0])) {
-          extractedJs = (await zip.file(firstCs.js[0])!.async('string')).slice(0, 8000);
-        }
-      }
+      );
 
       const rawName =
         manifest.name && !manifest.name.startsWith('__MSG_')
@@ -102,6 +134,7 @@ export async function unpackExtensionFile(file: File): Promise<BrowserExtension>
         ...(manifest.host_permissions || []),
       ].slice(0, 6);
 
+      const canRun = report.status !== 'cannot-run';
       return {
         id: `ext-pkg-${Date.now()}`,
         name: rawName,
@@ -112,17 +145,16 @@ export async function unpackExtensionFile(file: File): Promise<BrowserExtension>
             : manifest.author?.name || `${format} Package Author`,
         source: 'sideload-file',
         format,
-        description:
-          manifest.description && !manifest.description.startsWith('__MSG_')
-            ? manifest.description
-            : `Unpacked ${format} WebExtension archive (${Object.keys(zip.files).length} files verified).`,
+        description: report.description
+          ? report.description.slice(0, 240)
+          : `Unpacked ${format} WebExtension archive (${Object.keys(zip.files).length} files).`,
         icon: format === 'XPI' ? 'firefox' : 'puzzle',
         enabled: true,
         allowIncognito: false,
         permissions: perms.length > 0 ? perms : ['storage', 'activeTab'],
-        effectKey: extractedCss ? 'custom-css' : extractedJs ? 'custom-script' : undefined,
-        customCss: extractedCss || undefined,
-        customJs: extractedJs || undefined,
+        // A package with real content scripts runs through the runtime key.
+        effectKey: canRun ? ('webextension' as const) : undefined,
+        runtime: canRun ? report : undefined,
       };
     }
   } catch {

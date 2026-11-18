@@ -5,8 +5,10 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
-JAVA_BIN="${1:-}"
+JAVA_BIN="${1:-${JAVA_BIN:-}}"
 JAVA="$JAVA_BIN/java"; [ -n "$JAVA_BIN" ] || JAVA="java"
+# Child `node -e` gates read this, so it must be visible in their environment.
+export JAVA
 
 echo "== CSS compatibility =="
 node scripts/css-compat-check.mjs
@@ -82,6 +84,12 @@ node scripts/vpn-and-visual-check.mjs | tail -1
 echo "== Screenshot failures (page text, offline claim, summary) =="
 npx tsx scripts/screenshot-failures-test.mts | tail -1
 
+echo "== WebExtension runtime (packages parse, match and execute) =="
+npx tsx scripts/extension-runtime-test.mts | tail -1
+
+echo "== Viewport sync coalesced (no JNI call per frame or per render) =="
+npx tsx scripts/viewport-sync-test.mts | tail -1
+
 echo "== URL safety (intent:// can never reach the WebView) =="
 npx tsx scripts/url-safety-test.mts | tail -1
 
@@ -149,8 +157,30 @@ console.log("  no emoji icons left in any UI surface");
 '
 
 echo "== APK signature =="
-"$JAVA" -jar build-tools/apksigner.jar verify -v release/BrowserHub-v1.0.0-release.apk 2>/dev/null \
-  | grep -E "^Verifies|v2 scheme|v3 scheme|Number of signers"
+node -e '
+const { execSync } = require("child_process");
+let out = "";
+try {
+  out = execSync(`"${process.env.JAVA}" -jar build-tools/apksigner.jar verify -v release/BrowserHub-v1.0.0-release.apk`,
+    { stdio: ["ignore", "pipe", "ignore"] }).toString();
+} catch (e) {
+  console.error("  FAIL apksigner could not verify the APK (" + e.message.split("\n")[0] + ")");
+  process.exit(1);
+}
+const need = [
+  [/^Verifies$/m, "APK verifies"],
+  [/v2 scheme \(APK Signature Scheme v2\): true/, "v2 signature present"],
+  [/v3 scheme \(APK Signature Scheme v3\): true/, "v3 signature present"],
+];
+let bad = 0;
+for (const [re, label] of need) {
+  if (re.test(out)) console.log("  ok " + label);
+  else { console.error("  FAIL " + label); bad = 1; }
+}
+const signers = /Number of signers: (\d+)/.exec(out);
+if (signers) console.log("  signers: " + signers[1]);
+process.exit(bad);
+'
 
 echo "== APK contents =="
 node -e '

@@ -23,7 +23,7 @@ import {
 } from '../data/extensionCatalogue';
 
 import { parseGlobalStoreUrl, unpackExtensionFile } from '../utils/extensionUnpacker';
-import { SiteIcon } from './VectorIcons';
+import { SiteIcon, StatusMark } from './VectorIcons';
 import { isExtensionEnforced } from '../utils/extensionEffects';
 
 interface ExtensionsModalProps {
@@ -67,8 +67,29 @@ export const ExtensionsModal: React.FC<ExtensionsModalProps> = ({
     const file = e.target.files?.[0];
     if (!file) return;
     const unpacked = await unpackExtensionFile(file);
+    if (!unpacked) return;
+
+    /*
+     * Tell the user what the package will actually DO, not just that a file was
+     * opened. A package with content scripts runs through the WebExtension
+     * runtime; one with only a background worker cannot, and saying "installed"
+     * without that distinction is what made every earlier attempt feel fake.
+     */
     onInstallExtension(unpacked);
-    flashNotice(`Installed "${unpacked.name}" (${unpacked.format})!`);
+    const runtime = unpacked.runtime;
+    if (runtime && runtime.status !== 'cannot-run') {
+      flashNotice(
+        `Installed "${unpacked.name}" — ${runtime.capabilities[0] ?? 'runtime active'}` +
+          (runtime.unsupported.length
+            ? `. ${runtime.unsupported.length} feature(s) cannot run here.`
+            : '.')
+      );
+    } else {
+      flashNotice(
+        `"${unpacked.name}" has nothing this browser can execute (no content scripts or host rules). ` +
+          `It is listed for inspection only.`
+      );
+    }
     setActiveTab('installed');
     e.target.value = '';
   };
@@ -212,6 +233,56 @@ export const ExtensionsModal: React.FC<ExtensionsModalProps> = ({
                       <span className="text-[10px] text-slate-500">v{ext.version}</span>
                     </div>
                     <p className="text-[11px] text-slate-400 leading-relaxed">{ext.description}</p>
+
+                    {/*
+                      Sideloaded packages report what they will actually do on a
+                      page. This is the difference between an extension engine and
+                      a list entry: the capabilities, the host patterns and the
+                      unsupported features all come from reading the package.
+                    */}
+                    {ext.runtime && (
+                      <div className="mt-1 rounded-lg border border-slate-800 bg-[#060608] p-2 space-y-1">
+                        <div className="flex items-center gap-1.5">
+                          <span
+                            className={`text-[9px] px-1.5 py-0.5 rounded font-bold ${
+                              ext.runtime.status === 'runs'
+                                ? 'bg-emerald-500/20 text-emerald-300'
+                                : ext.runtime.status === 'partial'
+                                  ? 'bg-amber-500/20 text-amber-300'
+                                  : 'bg-rose-500/20 text-rose-300'
+                            }`}
+                          >
+                            {ext.runtime.status === 'runs'
+                              ? 'RUNS HERE'
+                              : ext.runtime.status === 'partial'
+                                ? 'RUNS PARTLY'
+                                : 'CANNOT RUN'}
+                          </span>
+                          <span className="text-[9px] text-slate-500 font-mono">
+                            MV{ext.runtime.manifestVersion} · {Math.round(ext.runtime.codeBytes / 1024)} KB
+                          </span>
+                        </div>
+                        {ext.runtime.capabilities.map((cap: string) => (
+                          <div key={cap} className="text-[10px] text-emerald-200/90 leading-snug flex gap-1">
+                            <StatusMark kind="ok" size={11} className="text-emerald-400 shrink-0 mt-[3px]" />
+                            <span>{cap}</span>
+                          </div>
+                        ))}
+                        {ext.runtime.unsupported.map((item: string) => (
+                          <div key={item} className="text-[10px] text-amber-200/80 leading-snug flex gap-1">
+                            <StatusMark kind="no" size={11} className="text-amber-400 shrink-0 mt-[3px]" />
+                            <span>Not supported: {item}</span>
+                          </div>
+                        ))}
+                        {ext.runtime.warnings.map((w: string) => (
+                          <div key={w} className="text-[10px] text-rose-200/80 leading-snug flex gap-1">
+                            <StatusMark kind="warn" size={11} className="text-rose-400 shrink-0 mt-[3px]" />
+                            <span>{w}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
                     <div className="flex flex-wrap items-center gap-2 pt-0.5">
                       <button
                         onClick={() => onToggleIncognitoExt(ext.id)}

@@ -1,4 +1,5 @@
 import type { BrowserExtension } from '../types/browser';
+import { buildInjection as buildRuntimeInjection } from './webextensionRuntime';
 
 /**
  * Which extension behaviours are genuinely executed by this build.
@@ -21,6 +22,8 @@ export const ENFORCED_EFFECT_KEYS = new Set([
   'custom-css',
   'custom-script',
   'bg-play',
+  // Sideloaded WebExtensions execute their own content scripts.
+  'webextension',
 ]);
 
 export function isExtensionEnforced(ext: Pick<BrowserExtension, 'effectKey'>): boolean {
@@ -64,4 +67,27 @@ export function collectInjectedAssets(extensions: BrowserExtension[]): {
       .filter(Boolean)
       .join('\n;\n'),
   };
+}
+
+/**
+ * Combines every enabled sideloaded WebExtension that applies to this page.
+ *
+ * Each package's own content scripts are matched against the URL by the runtime,
+ * so an extension scoped to `*://*.youtube.com/*` never runs on another site.
+ * Returns empty strings when nothing applies, which the caller treats as a no-op.
+ */
+export function buildExtensionInjection(
+  extensions: BrowserExtension[],
+  pageUrl: string
+): { css: string; js: string } {
+  let css = '';
+  let js = '';
+  for (const ext of extensions) {
+    if (!ext.enabled || ext.effectKey !== 'webextension' || !ext.runtime) continue;
+    const injection = buildRuntimeInjection(ext.runtime, pageUrl);
+    if (!injection) continue;
+    css += `\n/* --- ${ext.name} --- */\n${injection.css}`;
+    js += `\n/* --- ${ext.name} --- */\n${injection.js}`;
+  }
+  return { css, js };
 }

@@ -55,10 +55,12 @@ import { SearchEngineIcon } from './components/VectorIcons';
 import { getPhraseDictionary } from './utils/translator';
 import {
   collectInjectedAssets,
+  buildExtensionInjection,
   hasCustomCss,
   hasUserScript,
   isBackgroundPlayEnabled,
 } from './utils/extensionEffects';
+import { makeViewportGate } from './utils/viewportSync';
 
 function deriveTitleFromUrl(url: string): string {
   if (url === 'browserhub://start') return 'New Tab';
@@ -395,6 +397,13 @@ export function App() {
   };
   const lastSentTranslateLang = useRef<string | null>(null);
   const lastSentUserScript = useRef<string>('');
+  /** Last URL the WebExtension runtime injected into, so one nav = one run. */
+  const lastRuntimeUrl = useRef('');
+  /**
+   * Decides whether a viewport sync is worth a JNI crossing at all. See
+   * `utils/viewportSync.ts` — the logic is a tested unit, not an inline rule.
+   */
+  const viewportGateRef = useRef(makeViewportGate());
   const nativeSyncRef = useRef(nativeSyncInputs);
   nativeSyncRef.current = nativeSyncInputs;
 
@@ -428,6 +437,23 @@ export function App() {
       );
     const { css: customCss, js: customJs } = collectInjectedAssets(inputs.extensions);
 
+    /*
+     * Sideloaded WebExtensions execute here.
+     *
+     * Every enabled package is matched against the current page URL; if any of
+     * its content scripts apply, the combined CSS and JS are sent to the real
+     * page. Keyed by URL so it fires once per navigation rather than on every
+     * layout pass — re-running a content script on each resize would duplicate
+     * DOM nodes and is exactly the kind of thing that makes an app feel heavy.
+     */
+    if (shouldShowNativeWeb && inputs.url !== lastRuntimeUrl.current) {
+      lastRuntimeUrl.current = inputs.url;
+      const injection = buildExtensionInjection(inputs.extensions, inputs.url);
+      window.BrowserHubNative.applyExtensionRuntime?.(injection.css, injection.js);
+    } else if (!shouldShowNativeWeb && lastRuntimeUrl.current) {
+      lastRuntimeUrl.current = '';
+    }
+
     // User scripts are sent once per change; the native side injects them into
     // the real page so "Userscript" actually runs instead of just being stored.
     if (
@@ -450,11 +476,51 @@ export function App() {
       );
     }
 
+    /*
+     * The call below is expensive: seventeen arguments marshalled across the
+     * JNI boundary into the Android view layer, which then re-lays-out the
+     * native WebView that hosts the page. Its inputs change rarely — a
+     * navigation, a zoom step, a toggle, a rotation — but it used to run on
+     * every frame, on a 900 ms timer for the whole session, and after every
+     * render (once per token while an AI answer streamed). Skip the crossing
+     * when nothing it receives actually changed.
+     */
+    const height = Math.max(1, window.innerHeight);
+    const blockTrackers = inputs.shields.enabled && inputs.shields.blockTrackers;
+    const antiFingerprinting = inputs.shields.enabled && inputs.shields.antiFingerprinting;
+    const httpsEverywhere = inputs.shields.enabled && inputs.shields.httpsEverywhere;
+    const backgroundPlay = isBackgroundPlayEnabled(inputs.extensions);
+    const customCssEnabled = hasCustomCss(inputs.extensions);
+
+    if (
+      !viewportGateRef.current.shouldSync({
+        url: inputs.url,
+        topCss,
+        bottomCss,
+        height,
+        isDesktop: inputs.isDesktop,
+        adblockOn,
+        darkReaderOn,
+        cookieKillerOn,
+        customCss,
+        zoom: inputs.zoom,
+        findQuery: inputs.findQuery,
+        showNativeWeb: shouldShowNativeWeb,
+        blockTrackers,
+        antiFingerprinting,
+        httpsEverywhere,
+        backgroundPlay,
+        hasCustomCss: customCssEnabled,
+      })
+    ) {
+      return;
+    }
+
     window.BrowserHubNative.syncWebViewport?.(
       inputs.url,
       topCss,
       bottomCss,
-      Math.max(1, window.innerHeight),
+      height,
       inputs.isDesktop,
       adblockOn,
       darkReaderOn,
@@ -463,17 +529,30 @@ export function App() {
       inputs.zoom,
       inputs.findQuery,
       shouldShowNativeWeb,
-      inputs.shields.enabled && inputs.shields.blockTrackers,
-      inputs.shields.enabled && inputs.shields.antiFingerprinting,
-      inputs.shields.enabled && inputs.shields.httpsEverywhere,
-      isBackgroundPlayEnabled(inputs.extensions),
-      hasCustomCss(inputs.extensions)
+      blockTrackers,
+      antiFingerprinting,
+      httpsEverywhere,
+      backgroundPlay,
+      customCssEnabled
     );
   };
 
   // Keep a stable handle so listeners/intervals are registered exactly once.
   const syncViewportRef = useRef(syncNativeViewport);
   syncViewportRef.current = syncNativeViewport;
+
+  /*
+   * The native viewport sync is a JNI call with seventeen arguments that
+   * crosses into the Android view layer. It used to run on every animation
+   * frame, on a 900 ms interval forever, AND after every single React render
+   * (that effect had no dependency array, so a streaming AI answer fired it
+   * once per token). That is the stutter: the WebView was competing with the
+   * UI thread for work whose inputs almost never change.
+   *
+   * Now it is coalesced to one call per frame and only fires when the measured
+   * geometry differs from the last call. Real changes are still caught by
+   * ResizeObserver, resize, orientation and a slower safety net.
+   */
 
   useEffect(() => {
     if (!AndroidHybridBridge.hasJniBridge()) return;
@@ -493,10 +572,10 @@ export function App() {
     if (ro && el) ro.observe(el);
     window.addEventListener('resize', schedule);
     window.addEventListener('orientationchange', schedule);
-    // Safety net: even if a layout shift happens without a resize event
-    // (soft keyboard, OEM gesture bar), the native rect can never stay stale
-    // for more than a second and steal taps from the app chrome.
-    const safety = window.setInterval(schedule, 900);
+    // Safety net for a layout shift that emits no resize event at all (an OEM
+    // gesture bar appearing). Two seconds is still imperceptible, and now
+    // costs one deduped call instead of an unbounded stream of them.
+    const safety = window.setInterval(schedule, 2000);
 
     return () => {
       if (frame) cancelAnimationFrame(frame);
@@ -506,13 +585,6 @@ export function App() {
       clearInterval(safety);
     };
   }, []);
-
-  // Re-sync after every render: any state change (suggestion list, find bar,
-  // dev tools, sheets) may move the viewport out from under the native view.
-  useEffect(() => {
-    if (!AndroidHybridBridge.hasJniBridge()) return;
-    syncViewportRef.current();
-  });
 
   // Live callbacks from the native page (URL / title / ad-blocked counters).
   //
