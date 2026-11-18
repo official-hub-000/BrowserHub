@@ -110,6 +110,24 @@ export STORE_TEST_JKS=<base64 of your .jks>
 ./build.sh                                # hours
 ```
 
+## Why no prebuilt APK could be delivered
+
+The goal is a Titanium clone. Upstream publishes signed APKs, and delivering one
+was attempted through every route available — all measured, none viable:
+
+| Route | Result |
+|---|---|
+| GitHub release asset (`releases/download/...`) | 302 → `objects.githubusercontent.com` → **blocked** (`000`) |
+| GitHub API asset endpoint with auth | 302 → same blocked storage host |
+| `codeload.github.com` repo tarball | **works**, but nothing over git's 100 MB blob cap can be pushed through it |
+| `api.github.com` binary blobs | capped at **100 MB**; the smallest of 61 releases' APKs is **179.6 MB**, the current arm64 is **320.1 MB** |
+| Google Drive (connected app) | `googleapis`/`drive.google.com` unreachable (`000`) — the connector cannot move bytes the sandbox cannot reach |
+| `gh release upload` back to GitHub | fails: `uploads.github.com` unreachable |
+
+So a 179–320 MB prebuilt APK cannot cross into this workspace, and a Chromium
+build cannot run in it. `build-elsewhere.md` covers the four ways to get one
+built, including a Dockerfile.
+
 ## The `vanadium/` submodule is empty here
 
 `build.sh` needs Vanadium's `patches/` directory and reads the Chromium version

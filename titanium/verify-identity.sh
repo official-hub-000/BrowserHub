@@ -81,6 +81,16 @@ check "every fragment parses" \
 check "build.sh loads a saved selection" \
   'grep -q "features/enabled.env" build.sh'
 
+echo "== Build kit is actually committed =="
+# Upstream's .gitignore excludes keys/, so anything placed there never ships.
+# Check every deliverable is tracked rather than silently missing.
+for f in build-elsewhere.md Dockerfile.build local.properties.example \
+         verify-identity.sh feature-picker.sh; do
+    check "$f is not gitignored" "! git check-ignore -q '$f' 2>/dev/null"
+done
+check "signing template matches names sign_apk reads" \
+  'grep -q "^storePassword=" local.properties.example && grep -q "^keyPassword=" local.properties.example && grep -q "^keyAlias=" local.properties.example'
+
 echo
 if [ "$fail" -eq 0 ]; then
   echo "verify: $pass checks pass — stock Titanium with a switchable feature layer"
