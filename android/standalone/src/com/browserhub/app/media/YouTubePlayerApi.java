@@ -137,6 +137,14 @@ public final class YouTubePlayerApi {
         if (result.videoId == null || result.videoId.length() == 0) {
             result.videoId = videoId;
         }
+        /*
+         * Stamp every stream with the identity that won it. The urls are signed for
+         * this client, and googlevideo checks the User-Agent on fetch — downloading
+         * as anybody else is refused with 403 no matter how valid the signature is.
+         */
+        for (YouTubeExtractor.Stream stream : result.all) {
+            stream.userAgent = client.userAgent;
+        }
         return result;
     }
 

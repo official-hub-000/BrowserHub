@@ -53,9 +53,17 @@ public final class YouTubeTrackJoiner {
             // Video first, then audio. A fragmented MP4 with two tracks is valid in
             // this order, and it means an interrupted file still has all the
             // picture and the start of the sound rather than half of each.
+            // Each track is signed for whichever client won it; the video and audio
+            // can come back from different clients, so the identity travels with the
+            // track rather than being assumed once for the whole job.
+            String videoUa = info.bestVideo != null && info.bestVideo.userAgent != null
+                    ? info.bestVideo.userAgent : userAgent;
+            String audioUa = info.bestAudio != null && info.bestAudio.userAgent != null
+                    ? info.bestAudio.userAgent : userAgent;
+
             for (DashManifest.SegmentRef ref : videoRefs) {
                 if (job.cancel.get()) return false;
-                byte[] data = MediaMerger.fetchBytes(ref.url, ref.start, ref.length, userAgent, cookie);
+                byte[] data = MediaMerger.fetchBytes(ref.url, ref.start, ref.length, videoUa, cookie);
                 os.write(data);
                 written += data.length;
                 update(job, written, total, "picture");
@@ -63,7 +71,7 @@ public final class YouTubeTrackJoiner {
 
             for (DashManifest.SegmentRef ref : audioRefs) {
                 if (job.cancel.get()) return false;
-                byte[] data = MediaMerger.fetchBytes(ref.url, ref.start, ref.length, userAgent, cookie);
+                byte[] data = MediaMerger.fetchBytes(ref.url, ref.start, ref.length, audioUa, cookie);
                 os.write(data);
                 written += data.length;
                 update(job, written, total, "sound");

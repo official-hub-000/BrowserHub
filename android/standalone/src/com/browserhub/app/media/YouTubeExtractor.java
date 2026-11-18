@@ -54,6 +54,17 @@ public final class YouTubeExtractor {
         public String cipherSignature;
         /** The query parameter the transformed signature belongs in (usually `sig`). */
         public String cipherParam;
+        /**
+         * The client identity this url was signed for.
+         *
+         * googlevideo validates the User-Agent against the client that requested
+         * the url, and refuses with 403 when they disagree. A url won through the
+         * Android VR client must therefore be fetched AS that client — sending the
+         * browser's own User-Agent is the difference between a working download
+         * and an instant 403. Null means "use whatever the caller has", which is
+         * right for urls captured from the page itself.
+         */
+        public String userAgent;
     }
 
     public static final class Result {
@@ -136,9 +147,20 @@ public final class YouTubeExtractor {
         Result fromPage = resolveFromPage(watchUrl, userAgent, cookie, id);
         if (fromPage.ok) return fromPage;
 
-        // Both routes failed. The API's reason is usually the more specific one.
+        /*
+         * Both app-side routes failed. A resolution service is the last resort —
+         * not because it is clever, but because it runs the same lookup from a
+         * different network, which is the one difference that matters when this
+         * device's own requests are being refused. What it returns is still an
+         * ordinary media url, downloaded the ordinary way.
+         */
+        Result fromService = YouTubeResolverService.resolve(id);
+        if (fromService.ok) return fromService;
+
+        // Nothing worked. Report the most specific reason available.
         if (direct.error != null && direct.error.length() > 0) return direct;
-        return fromPage;
+        if (fromPage.error != null && fromPage.error.length() > 0) return fromPage;
+        return fromService;
     }
 
     /**

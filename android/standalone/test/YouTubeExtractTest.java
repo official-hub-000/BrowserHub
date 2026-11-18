@@ -30,6 +30,8 @@ public final class YouTubeExtractTest {
         testTrackJoining();
         testSignatureCipher();
         testDirectApiShape();
+        testResolverParsing();
+        testSigningIdentity();
         testCaptureCompletion();
 
         System.out.println();
@@ -170,6 +172,94 @@ public final class YouTubeExtractTest {
         check("null input is safe", !nul.ok);
     }
 
+    // ------------------------------------------------- the signing identity
+    private static void testSigningIdentity() {
+        /*
+         * The bug that made every download fail: a googlevideo url is signed for the
+         * client that requested it, and the server compares the User-Agent on fetch.
+         * Sending the browser's own agent gets a 403 no matter how valid the url is.
+         * So the identity has to travel with the stream.
+         */
+        com.browserhub.app.media.YouTubePlayerApi.Client client =
+                com.browserhub.app.media.YouTubePlayerApi.CLIENTS[0];
+        check("the client states a user agent",
+                client.userAgent != null && client.userAgent.length() > 20);
+        check("the user agent names the client version",
+                client.userAgent.contains(client.version));
+
+        com.browserhub.app.media.YouTubeExtractor.Stream stream =
+                new com.browserhub.app.media.YouTubeExtractor.Stream();
+        stream.url = "https://rr1.googlevideo.com/videoplayback?itag=18&sig=X";
+        check("a fresh stream has no identity until one is stamped", stream.userAgent == null);
+        stream.userAgent = client.userAgent;
+        check("the identity is carried with the stream", stream.userAgent.equals(client.userAgent));
+    }
+
+    // ------------------------------------------------------- resolver parsing
+    private static void testResolverParsing() {
+        /*
+         * The resolver's reply is untrusted input. It must be able to contribute a
+         * media url and nothing else — no other scheme, no host of its choosing.
+         */
+        String reply = "<html><head><title>Supertramp - The Logical Song | Download</title></head>"
+                + "<body><div class=\"links\">"
+                + "<a href=\"https://rr5.googlevideo.com/videoplayback?itag=18&amp;sig=ABC\">360p MP4 12.4 MB</a>"
+                + "<a href=\"https:" + BSLASH + "/" + BSLASH + "/rr5.googlevideo.com" + BSLASH
+                + "/videoplayback?itag=137&amp;sig=DEF\">1080p</a>"
+                + "</div></body></html>";
+        com.browserhub.app.media.YouTubeExtractor.Result r =
+                com.browserhub.app.media.YouTubeResolverService.parse(reply, "dQw4w9WgXcQ");
+        check("a resolver reply yields a downloadable file", r.ok);
+        check("the resolver's links are found", r.all.size() >= 1);
+        check("a resolver result needs no signature work",
+                r.progressive != null && !r.progressive.needsSignature);
+        check("a resolver result carries no client identity, so none is claimed",
+                r.progressive != null && r.progressive.userAgent == null);
+        check("the html-escaped ampersand is decoded",
+                r.progressive != null && r.progressive.url.indexOf("&sig=") > 0);
+        check("the escaped-slash form is decoded",
+                r.progressive != null && !r.progressive.url.contains("\\/"));
+
+        // Higher quality is chosen when both are offered.
+        eq("the higher quality link wins", "1080p",
+                r.progressive != null ? r.progressive.qualityLabel : "");
+
+        // The title must not keep the service's own suffix.
+        check("the title is cleaned of the service suffix",
+                r.title != null && !r.title.toLowerCase().contains("download"));
+
+        // Hostile replies must contribute nothing.
+        String hostile = "<a href=\"javascript:alert(1)\">x</a>"
+                + "<a href=\"file:///data/data/x\">x</a>"
+                + "<a href=\"intent://evil#Intent;end\">x</a>"
+                + "<a href=\"data:text/html,evil\">x</a>"
+                + "<a href=\"https://evil.example.com/malware.exe\">x</a>";
+        com.browserhub.app.media.YouTubeExtractor.Result bad =
+                com.browserhub.app.media.YouTubeResolverService.parse(hostile, "dQw4w9WgXcQ");
+        check("a hostile reply yields nothing downloadable", !bad.ok);
+        eq("no unsafe url survives", "0", String.valueOf(bad.all.size()));
+
+        check("javascript: is refused",
+                !com.browserhub.app.media.YouTubeResolverService
+                        .isSafeMediaUrl("javascript:alert(1)"));
+        check("a non-media https url is refused",
+                !com.browserhub.app.media.YouTubeResolverService
+                        .isSafeMediaUrl("https://evil.example.com/malware.exe"));
+        check("a real media url is accepted",
+                com.browserhub.app.media.YouTubeResolverService
+                        .isSafeMediaUrl("https://rr1.googlevideo.com/videoplayback?itag=18&mime=video%2Fmp4"));
+
+        // An HTTP error must read like a sentence, not a stack trace.
+        check("403 from the resolver is explained",
+                com.browserhub.app.media.YouTubeResolverService
+                        .describe(new java.io.IOException("HTTP 403"))
+                        .toLowerCase().contains("refused"));
+        check("429 from the resolver is explained",
+                com.browserhub.app.media.YouTubeResolverService
+                        .describe(new java.io.IOException("HTTP 429"))
+                        .toLowerCase().contains("rate limit"));
+    }
+
     // ----------------------------------------------------- direct player API
     private static void testDirectApiShape() {
         /*
@@ -273,6 +363,8 @@ public final class YouTubeExtractTest {
         check("a combined stream means no merge step",
                 com.browserhub.app.media.YouTubePlayerApi.hasCombined(api));
     }
+
+    private static final String BSLASH = "\\";
 
     private static boolean balancedBraces(String s) {
         int depth = 0;

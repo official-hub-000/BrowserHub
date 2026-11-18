@@ -33,6 +33,21 @@ public final class MediaGrabberDirect {
      */
     public static boolean fetch(String url, File out, String userAgent, String cookie,
                                 DownloadQueue.Job job) {
+        return fetch(url, null, out, userAgent, cookie, job);
+    }
+
+    /**
+     * Downloads using the exact identity a media url was issued to.
+     *
+     * A signed googlevideo url is bound to the client that requested it: the
+     * server compares the User-Agent on fetch and answers 403 when it differs.
+     * Passing the identity through here is what makes a url won through the player
+     * API actually downloadable, and the extra headers are the same ones the
+     * player sends when it streams.
+     */
+    public static boolean fetch(String url, com.browserhub.app.media.YouTubeExtractor.Stream stream,
+                                File out, String userAgent, String cookie,
+                                DownloadQueue.Job job) {
         HttpURLConnection conn = null;
         InputStream in = null;
         OutputStream os = null;
@@ -49,8 +64,17 @@ public final class MediaGrabberDirect {
             conn.setReadTimeout(READ_TIMEOUT);
             conn.setInstanceFollowRedirects(true);
             conn.setRequestProperty("Accept", "*/*");
-            if (userAgent != null && userAgent.length() > 0) {
-                conn.setRequestProperty("User-Agent", userAgent);
+            // The stream's own identity wins over the caller's: the url is signed
+            // for the client that won it, not for the browser it was requested from.
+            String effectiveUa = stream != null && stream.userAgent != null
+                    && stream.userAgent.length() > 0 ? stream.userAgent : userAgent;
+            if (effectiveUa != null && effectiveUa.length() > 0) {
+                conn.setRequestProperty("User-Agent", effectiveUa);
+            }
+            if (stream != null && stream.userAgent != null && stream.userAgent.length() > 0) {
+                conn.setRequestProperty("Origin", "https://www.youtube.com");
+                conn.setRequestProperty("Referer", "https://www.youtube.com/");
+                conn.setRequestProperty("Accept-Language", "en-US,en;q=0.9");
             }
             if (cookie != null && cookie.length() > 0) {
                 conn.setRequestProperty("Cookie", cookie);

@@ -41,3 +41,20 @@ generate a new key and Android would refuse to install an update over the old AP
 
 Current signer SHA-256: `9b3f6d8482c63984f4cd087ce2c4d2495d50747ab92565171dff4241fab349c8`
 Keep that keystore backed up — Play Store updates must be signed with the same key.
+
+## Where the JDK lives
+
+The compiler above needs a JDK. `jdk4py` installs one under `/tmp`, which is
+wiped between sessions, so copy the whole `java-runtime` directory somewhere
+persistent and pass its `bin` directory as argument 1:
+
+```bash
+python3 -m venv /tmp/v && /tmp/v/bin/pip install -q jdk4py
+cp -a /tmp/v/lib/python3.*/site-packages/jdk4py/java-runtime /home/user/.jdk
+./scripts/build-standalone-apk.sh /home/user/.jdk/bin
+```
+
+Copy the directory, not just `bin/`: the launcher resolves `libjli.so` relative
+to its own location, and a `bin/`-only copy fails with "cannot open shared
+object file". `build-tools/*.jar` is gitignored, so `fetch-apk-tools.sh` is
+needed after any `/tmp` reset as well.

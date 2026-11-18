@@ -148,7 +148,8 @@ public class DownloadService extends Service {
                 // One file with picture and sound: nothing to join.
                 job.message = "Downloading " + info.progressive.qualityLabel;
                 publishProgress(job, false);
-                boolean ok = MediaGrabberDirect.fetch(info.progressive.url, out, userAgent, cookie, job);
+                boolean ok = MediaGrabberDirect.fetch(
+                        info.progressive.url, info.progressive, out, userAgent, cookie, job);
                 if (job.cancel.get()) {
                     job.status = "cancelled";
                     job.message = "Cancelled";
