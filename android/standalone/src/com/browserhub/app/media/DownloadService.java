@@ -108,9 +108,36 @@ public class DownloadService extends Service {
             publishProgress(job, false);
 
             YouTubeExtractor.Result info = YouTubeExtractor.resolve(url, userAgent, cookie);
+
+            /*
+             * Complete any scrambled stream with the URLs the page already fetched
+             * for itself. This is tried BEFORE asking the page to transform a
+             * signature, because the capture costs nothing: those requests already
+             * happened, and they carry a signature the player computed itself.
+             */
+            if (info.all != null && info.scrambledCount > 0 && job.captured != null
+                    && job.captured.size() > 0) {
+                YouTubeExtractor.applyCaptures(info, job.captured);
+            }
+
             if (!info.ok) {
                 job.status = "failed";
                 job.message = info.error != null ? info.error : "YouTube did not offer this video";
+                return;
+            }
+
+            // Whatever is still scrambled needs the page's own JavaScript. This
+            // runs on the UI thread against the live player, which is where the
+            // transform function actually exists.
+            if (info.scrambledCount > 0 && pendingSignatures(info)) {
+                job.message = "Asking the player for the video address";
+                publishProgress(job, false);
+                resolveSignatures(info);
+            }
+
+            if (info.bestVideo == null && info.progressive == null) {
+                job.status = "failed";
+                job.message = "YouTube did not offer a playable stream for this video";
                 return;
             }
             if (info.title != null && info.title.length() > 0) {
@@ -271,6 +298,39 @@ public class DownloadService extends Service {
         if (total > 0) return (int) Math.min(100, (done * 100) / total);
         if (segTotal > 0) return (int) Math.min(100, (segDone * 100) / segTotal);
         return 0;
+    }
+
+    /** True when any stream that would actually be downloaded still lacks a signature. */
+    private static boolean pendingSignatures(YouTubeExtractor.Result info) {
+        YouTubeExtractor.Stream[] wanted = new YouTubeExtractor.Stream[] {
+                info.progressive, info.bestVideo, info.bestAudio
+        };
+        for (YouTubeExtractor.Stream s : wanted) {
+            if (s != null && s.needsSignature) return true;
+        }
+        return false;
+    }
+
+    /**
+     * Asks the page to sign the streams that are still scrambled.
+     *
+     * The transform lives in the player's own JavaScript, so it is called there
+     * rather than reimplemented here: the player already contains it, and a copy
+     * would be wrong the next time YouTube changes it. The call must happen on the
+     * UI thread because that is the only thread with access to the live page.
+     */
+    private void resolveSignatures(YouTubeExtractor.Result info) {
+        YouTubeExtractor.Stream[] wanted = new YouTubeExtractor.Stream[] {
+                info.progressive, info.bestVideo, info.bestAudio
+        };
+        for (YouTubeExtractor.Stream stream : wanted) {
+            if (stream == null || !stream.needsSignature) continue;
+            String signature = SignatureSolver.Holder.solve(stream.cipherSignature);
+            if (signature != null && signature.length() > 0) {
+                stream.url = YouTubeExtractor.urlWithSignature(stream, signature);
+                stream.needsSignature = false;
+            }
+        }
     }
 
     private void finish(DownloadQueue.Job job, File file, String filename, String mime, String title) {

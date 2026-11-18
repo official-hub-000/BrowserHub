@@ -30,6 +30,16 @@ public final class DownloadQueue {
         public final String url;
         public final String filename;
         public final String kind;
+        /**
+         * URLs the page was observed requesting, for YouTube only.
+         *
+         * The player signs its own media URLs before requesting them, so its own
+         * requests are the shortest path to a working address. Passed explicitly
+         * rather than read from a global so the job is reproducible from its
+         * fields alone.
+         */
+        public java.util.List<String> captured = new java.util.ArrayList<>();
+
         /** Mutable: YouTube only reports the real title after the player data is read. */
         public volatile String title;
         public volatile String status = "queued"; // queued|running|done|failed|cancelled

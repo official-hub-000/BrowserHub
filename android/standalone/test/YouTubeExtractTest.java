@@ -28,6 +28,8 @@ public final class YouTubeExtractTest {
         testJsonRobustness();
         testThrottleHandling();
         testTrackJoining();
+        testSignatureCipher();
+        testCaptureCompletion();
 
         System.out.println();
         if (!failures.isEmpty()) {
@@ -165,6 +167,150 @@ public final class YouTubeExtractTest {
         check("a page with no player response is refused", !empty.ok);
         YouTubeExtractor.Result nul = YouTubeExtractor.parsePlayerResponse(null, new YouTubeExtractor.Result());
         check("null input is safe", !nul.ok);
+    }
+
+    // ------------------------------------------------------ signature cipher
+    private static void testSignatureCipher() {
+        /*
+         * A scrambled entry: no "url", a "signatureCipher" holding the address
+         * with its s= still raw. Reading only "url" made these invisible, which is
+         * how a perfectly watchable video got reported as having no stream.
+         */
+        String response = "{"
+                + "\"playabilityStatus\":{\"status\":\"OK\"},"
+                + "\"videoDetails\":{\"videoId\":\"dQw4w9WgXcQ\",\"title\":\"Scrambled\"},"
+                + "\"streamingData\":{\"adaptiveFormats\":["
+                + "{\"itag\":137,\"mimeType\":\"video/mp4; codecs=\\\"avc1.640028\\\"\","
+                + " \"qualityLabel\":\"1080p\",\"bitrate\":4000000,\"contentLength\":\"90000000\","
+                + " \"signatureCipher\":\"s=SCRAMBLEDVALUE&sp=sig&url=https%3A%2F%2Frr1.googlevideo.com%2Fvideoplayback%3Fitag%3D137%26id%3DdQw4w9WgXcQ%26expire%3D99\"},"
+                + "{\"itag\":140,\"mimeType\":\"audio/mp4; codecs=\\\"mp4a.40.2\\\"\","
+                + " \"qualityLabel\":\"\",\"bitrate\":128000,\"contentLength\":\"3000000\","
+                + " \"signatureCipher\":\"s=AUDIOSCRAMBLE&sp=sig&url=https%3A%2F%2Frr1.googlevideo.com%2Fvideoplayback%3Fitag%3D140%26id%3DdQw4w9WgXcQ%26expire%3D99\"}"
+                + "]}}";
+
+        com.browserhub.app.media.YouTubeExtractor.Result r =
+                com.browserhub.app.media.YouTubeExtractor.parsePlayerResponse(response);
+        check("a video whose every stream is scrambled is still an offer", r.ok);
+        eq("scrambled entries are counted", "2", String.valueOf(r.scrambledCount));
+        check("a scrambled video track is selected", r.bestVideo != null);
+        eq("the scrambled track is marked as needing a signature", "true",
+                String.valueOf(r.bestVideo != null && r.bestVideo.needsSignature));
+        eq("the scrambled signature is kept verbatim",
+                "SCRAMBLEDVALUE", r.bestVideo != null ? r.bestVideo.cipherSignature : "");
+        eq("the base address is decoded exactly once",
+                "https://rr1.googlevideo.com/videoplayback?itag=137&id=dQw4w9WgXcQ&expire=99",
+                r.bestVideo != null ? r.bestVideo.url : "");
+        check("the parameter name comes from the cipher",
+                r.bestVideo != null && "sig".equals(r.bestVideo.cipherParam));
+
+        // A transformed signature goes into the address as its own parameter.
+        String signed = com.browserhub.app.media.YouTubeExtractor.urlWithSignature(r.bestVideo, "GOODSIG");
+        eq("the signature is appended as a query parameter",
+                "https://rr1.googlevideo.com/videoplayback?itag=137&id=dQw4w9WgXcQ&expire=99&sig=GOODSIG",
+                signed);
+
+        // A signed entry and a scrambled entry of the same resolution: take signed.
+        String both = "{"
+                + "\"playabilityStatus\":{\"status\":\"OK\"},"
+                + "\"videoDetails\":{\"videoId\":\"dQw4w9WgXcQ\",\"title\":\"Both\"},"
+                + "\"streamingData\":{\"adaptiveFormats\":["
+                + "{\"itag\":137,\"mimeType\":\"video/mp4\",\"qualityLabel\":\"1080p\","
+                + " \"bitrate\":4000000,\"url\":\"https://rr1.googlevideo.com/videoplayback?itag=137&sig=OK\"},"
+                + "{\"itag\":137,\"mimeType\":\"video/mp4\",\"qualityLabel\":\"1080p\",\"bitrate\":4000000,"
+                + " \"signatureCipher\":\"s=X&sp=sig&url=https%3A%2F%2Frr1.googlevideo.com%2Fvideoplayback%3Fitag%3D137\"}"
+                + "]}}";
+        com.browserhub.app.media.YouTubeExtractor.Result b =
+                com.browserhub.app.media.YouTubeExtractor.parsePlayerResponse(both);
+        check("a signed entry is preferred over a scrambled one at the same resolution",
+                b.bestVideo != null && !b.bestVideo.needsSignature);
+
+        // Resolution beats convenience: never silently drop quality.
+        String mixed = "{"
+                + "\"playabilityStatus\":{\"status\":\"OK\"},"
+                + "\"videoDetails\":{\"videoId\":\"dQw4w9WgXcQ\",\"title\":\"Mixed\"},"
+                + "\"streamingData\":{\"adaptiveFormats\":["
+                + "{\"itag\":18,\"mimeType\":\"video/mp4\",\"qualityLabel\":\"360p\","
+                + " \"bitrate\":500000,\"url\":\"https://rr1.googlevideo.com/videoplayback?itag=18&sig=OK\"},"
+                + "{\"itag\":137,\"mimeType\":\"video/mp4\",\"qualityLabel\":\"1080p\",\"bitrate\":4000000,"
+                + " \"signatureCipher\":\"s=X&sp=sig&url=https%3A%2F%2Frr1.googlevideo.com%2Fvideoplayback%3Fitag%3D137\"}"
+                + "]}}";
+        com.browserhub.app.media.YouTubeExtractor.Result m =
+                com.browserhub.app.media.YouTubeExtractor.parsePlayerResponse(mixed);
+        eq("the higher resolution wins even when it needs a signature", "1080p",
+                m.bestVideo != null ? m.bestVideo.qualityLabel : "");
+    }
+
+    // ---------------------------------------------------- completing captures
+    private static void testCaptureCompletion() {
+        String response = "{"
+                + "\"playabilityStatus\":{\"status\":\"OK\"},"
+                + "\"videoDetails\":{\"videoId\":\"dQw4w9WgXcQ\",\"title\":\"Cap\"},"
+                + "\"streamingData\":{\"adaptiveFormats\":["
+                + "{\"itag\":137,\"mimeType\":\"video/mp4\",\"qualityLabel\":\"1080p\",\"bitrate\":4000000,"
+                + " \"signatureCipher\":\"s=X&sp=sig&url=https%3A%2F%2Frr1.googlevideo.com%2Fvideoplayback%3Fitag%3D137%26id%3DdQw4w9WgXcQ\"},"
+                + "{\"itag\":140,\"mimeType\":\"audio/mp4\",\"qualityLabel\":\"\",\"bitrate\":128000,"
+                + " \"signatureCipher\":\"s=Y&sp=sig&url=https%3A%2F%2Frr1.googlevideo.com%2Fvideoplayback%3Fitag%3D140%26id%3DdQw4w9WgXcQ\"}"
+                + "]}}";
+        com.browserhub.app.media.YouTubeExtractor.Result r =
+                com.browserhub.app.media.YouTubeExtractor.parsePlayerResponse(response);
+
+        // The page fetching its own media is the capture we want: already signed.
+        java.util.List<String> captured = new java.util.ArrayList<>();
+        captured.add("https://rr1.googlevideo.com/videoplayback?itag=137&id=dQw4w9WgXcQ&sig=SIGNEDVIDEO");
+        captured.add("https://rr1.googlevideo.com/videoplayback?itag=140&id=dQw4w9WgXcQ&sig=SIGNEDAUDIO");
+
+        int done = com.browserhub.app.media.YouTubeExtractor.applyCaptures(r, captured);
+        eq("both scrambled streams are completed by the page's own requests", "2",
+                String.valueOf(done));
+        check("the completed streams no longer need signing",
+                r.bestVideo != null && !r.bestVideo.needsSignature && !r.bestAudio.needsSignature);
+        check("the completed url is the one the page actually used",
+                r.bestVideo != null && r.bestVideo.url.contains("sig=SIGNEDVIDEO"));
+        eq("a completed video and audio pair is downloadable", "true", String.valueOf(r.ok));
+
+        // Wrong video: a capture from another video must not be borrowed.
+        com.browserhub.app.media.YouTubeExtractor.Result r2 =
+                com.browserhub.app.media.YouTubeExtractor.parsePlayerResponse(response);
+        java.util.List<String> other = new java.util.ArrayList<>();
+        other.add("https://rr1.googlevideo.com/videoplayback?itag=137&id=AAAAAAAAAAA&sig=SIGNEDVIDEO");
+        eq("a capture from a different video is not used", "0",
+                String.valueOf(com.browserhub.app.media.YouTubeExtractor.applyCaptures(r2, other)));
+
+        // Wrong itag: a 360p capture must not stand in for the 1080p stream.
+        com.browserhub.app.media.YouTubeExtractor.Result r3 =
+                com.browserhub.app.media.YouTubeExtractor.parsePlayerResponse(response);
+        java.util.List<String> wrongItag = new java.util.ArrayList<>();
+        wrongItag.add("https://rr1.googlevideo.com/videoplayback?itag=18&id=dQw4w9WgXcQ&sig=X");
+        eq("a capture of a different format is not used", "0",
+                String.valueOf(com.browserhub.app.media.YouTubeExtractor.applyCaptures(r3, wrongItag)));
+
+        // A capture list may contain other media; only matching itags count.
+        com.browserhub.app.media.YouTubeExtractor.Result r5 =
+                com.browserhub.app.media.YouTubeExtractor.parsePlayerResponse(response);
+        java.util.List<String> noisy = new java.util.ArrayList<>();
+        noisy.add("https://example.com/other.mp4");
+        noisy.add("");
+        noisy.add("https://rr1.googlevideo.com/videoplayback?itag=140&id=dQw4w9WgXcQ&sig=AUDIOONLY");
+        eq("only the matching format is completed from a noisy capture list", "1",
+                String.valueOf(com.browserhub.app.media.YouTubeExtractor.applyCaptures(r5, noisy)));
+        check("the audio stream is the one completed, not the video",
+                r5.bestAudio != null && !r5.bestAudio.needsSignature
+                        && r5.bestVideo != null && r5.bestVideo.needsSignature);
+
+        // With no page available, solving must fail softly, not throw: a desktop
+        // run, or a service with no activity, must degrade to the capture path.
+        eq("solving with no solver registered returns empty, not an exception", "",
+                com.browserhub.app.media.SignatureSolver.Holder.solve("SCRAMBLED"));
+        eq("solving a null signature is safe", "",
+                com.browserhub.app.media.SignatureSolver.Holder.solve(null));
+
+        // Unsigned capture: same 403 as before, must be refused rather than tried.
+        com.browserhub.app.media.YouTubeExtractor.Result r4 =
+                com.browserhub.app.media.YouTubeExtractor.parsePlayerResponse(response);
+        java.util.List<String> unsigned = new java.util.ArrayList<>();
+        unsigned.add("https://rr1.googlevideo.com/videoplayback?itag=137&id=dQw4w9WgXcQ");
+        eq("an unsigned capture is not accepted", "0",
+                String.valueOf(com.browserhub.app.media.YouTubeExtractor.applyCaptures(r4, unsigned)));
     }
 
     // ------------------------------------------------------- throttle handling

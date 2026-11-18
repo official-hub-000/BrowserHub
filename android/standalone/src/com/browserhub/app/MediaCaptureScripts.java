@@ -26,6 +26,10 @@ public final class MediaCaptureScripts {
             + "  if(u.indexOf('blob:')===0||u.indexOf('data:')===0)return false;"
             + "  var p=u.split('#')[0].toLowerCase();"
             + "  if(c&&/(video\\/|audio\\/|mpegurl|dash\\+xml)/.test(c))return true;"
+            // googlevideo serves media from /videoplayback with no file extension, so
+            // an extension test throws away exactly the URLs the player has already
+            // signed for itself. Those are the good ones.
+            + "  if(p.indexOf('/videoplayback')>=0)return true;"
             + "  return /\\.(mp4|webm|m4v|mov|mkv|m3u8|mpd|ts|m4s|m4a|mp3|aac|ogg|opus)(\\?|$)/.test(p);"
             + "}"
             + "function add(u,c,len){"

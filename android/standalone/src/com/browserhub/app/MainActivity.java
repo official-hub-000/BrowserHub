@@ -43,6 +43,63 @@ import java.util.Map;
 import java.util.Set;
 
 public class MainActivity extends Activity {
+
+    /**
+     * The live activity, weakly held.
+     *
+     * The download service runs in the background but the player's JavaScript only
+     * exists in the page, which only the activity owns. A weak reference lets the
+     * service ask the page to sign a stream without keeping a destroyed activity
+     * (and its whole WebView) alive.
+     */
+    private static java.lang.ref.WeakReference<MainActivity> live = null;
+
+    /** The current activity, or null when the app is not on screen. */
+    public static MainActivity current() {
+        return live == null ? null : live.get();
+    }
+
+    /**
+     * Runs a snippet in the page and returns its result.
+     *
+     * Must be called from a background thread: it blocks on the UI thread, and
+     * calling it from the UI thread would deadlock the very thread it waits for.
+     */
+    public String evaluateInPage(final String script, long timeoutMs) {
+        final String[] holder = new String[1];
+        final Object lock = new Object();
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    if (browserWebView != null) {
+                        browserWebView.evaluateJavascript(script, new android.webkit.ValueCallback<String>() {
+                            @Override
+                            public void onReceiveValue(String value) {
+                                synchronized (lock) {
+                                    holder[0] = value;
+                                    lock.notifyAll();
+                                }
+                            }
+                        });
+                        return;
+                    }
+                } catch (Throwable ignored) {
+                }
+                synchronized (lock) {
+                    lock.notifyAll();
+                }
+            }
+        });
+        synchronized (lock) {
+            try {
+                lock.wait(timeoutMs);
+            } catch (InterruptedException ignored) {
+                Thread.currentThread().interrupt();
+            }
+        }
+        return holder[0];
+    }
     private static final int REQ_VPN_PREPARE = 9101;
     private static final String VIRTUAL_HOST = "appassets.browserhub.local";
 
@@ -102,6 +159,20 @@ public class MainActivity extends Activity {
     @SuppressLint({"SetJavaScriptEnabled", "AddJavascriptInterface"})
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        live = new java.lang.ref.WeakReference<MainActivity>(this);
+        /*
+         * The player's JavaScript is the only place the signature transform
+         * exists, so the activity is the only component that can produce it. The
+         * engine asks through this interface rather than importing an Activity,
+         * which keeps the engine testable without a device.
+         */
+        com.browserhub.app.media.SignatureSolver.Holder.set(
+                new com.browserhub.app.media.SignatureSolver() {
+                    @Override
+                    public String evaluate(String script, long timeoutMs) {
+                        return evaluateInPage(script, timeoutMs);
+                    }
+                });
         super.onCreate(savedInstanceState);
 
         Window win = getWindow();
@@ -592,9 +663,50 @@ public class MainActivity extends Activity {
         String safeName = com.browserhub.app.media.DownloadQueue.filenameFor(filename, safeKind);
         com.browserhub.app.media.DownloadQueue.Job job =
                 com.browserhub.app.media.DownloadQueue.enqueue(url, safeName, safeKind, title);
+
+        /*
+         * Hand the job every media URL the page has been observed requesting. For
+         * YouTube these carry a signature the player computed itself, which is the
+         * cheapest possible way to complete a scrambled stream: the request has
+         * already happened, and reusing it needs no JavaScript at all.
+         */
+        job.captured = capturedMediaUrls();
         String ua = browserWebView != null ? browserWebView.getSettings().getUserAgentString() : null;
         com.browserhub.app.media.DownloadService.start(this, job, safeKind, ua);
         return job.id;
+    }
+
+    /**
+     * Asks the page for the media URLs it has requested so far.
+     *
+     * Runs on the UI thread from evaluateJavascript's callback, but is called from
+     * a background thread here, so it blocks briefly on a latch. The cap matches
+     * the page-side capture limit.
+     */
+    private java.util.List<String> capturedMediaUrls() {
+        java.util.List<String> urls = new java.util.ArrayList<>();
+        try {
+            String json = evaluateInPage(
+                    "(function(){try{var o=[];var l=window.__bhMedia||[];"
+                    + "for(var i=0;i<l.length;i++){if(l[i]&&l[i].url)o.push(l[i].url);}"
+                    + "return JSON.stringify(o);}catch(e){return '[]';}})();",
+                    1500);
+            if (json == null) return urls;
+            String trimmed = json.trim();
+            // evaluateJavascript hands back a JSON string, which encodes the inner
+            // array as a quoted string: unwrap one layer when that is what arrived.
+            if (trimmed.startsWith("\"") && trimmed.endsWith("\"")) {
+                trimmed = com.browserhub.app.media.YouTubeExtractor.unescape(
+                        trimmed.substring(1, trimmed.length() - 1));
+            }
+            org.json.JSONArray array = new org.json.JSONArray(trimmed);
+            for (int i = 0; i < array.length(); i++) {
+                String value = array.optString(i, "");
+                if (value.length() > 0) urls.add(value);
+            }
+        } catch (Throwable ignored) {
+        }
+        return urls;
     }
 
     public String getDownloadsJson() {
