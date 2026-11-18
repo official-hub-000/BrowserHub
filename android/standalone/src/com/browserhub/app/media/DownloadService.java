@@ -98,6 +98,46 @@ public class DownloadService extends Service {
 
         long lastShown = 0L;
 
+        if (DownloadQueue.KIND_DASH.equals(kind)) {
+            MediaMerger.Result result = DashMerger.merge(url, out, 0, userAgent, cookie,
+                    new MediaMerger.Listener() {
+                        @Override
+                        public void onProgress(long done, long total, int segmentsDone, int segmentsTotal) {
+                            job.bytes = done;
+                            job.totalBytes = total;
+                            job.percent = progressPercent(done, total, segmentsDone, segmentsTotal);
+                            job.message = segmentsDone + " of " + segmentsTotal + " parts";
+                            publishProgress(job, false);
+                        }
+
+                        @Override
+                        public void onStage(String message) {
+                            job.message = message;
+                            publishProgress(job, false);
+                        }
+
+                        @Override
+                        public boolean shouldCancel() {
+                            return job.cancel.get();
+                        }
+                    });
+
+            if (job.cancel.get()) {
+                job.status = "cancelled";
+                job.message = "Cancelled";
+                MediaMerger.discard(out);
+                return;
+            }
+            if (!result.ok) {
+                job.status = "failed";
+                job.message = result.error != null ? result.error : "Download failed";
+                MediaMerger.discard(out);
+                return;
+            }
+            finish(job, result.file, filename, "video/mp4", title);
+            return;
+        }
+
         if (DownloadQueue.KIND_HLS.equals(kind)) {
             MediaMerger.Result result = MediaMerger.merge(url, out, 0, userAgent, cookie,
                     new MediaMerger.Listener() {

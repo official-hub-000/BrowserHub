@@ -64,7 +64,7 @@ export const VideoGrabberModal: React.FC<VideoGrabberModalProps> = ({
    * front is the difference between a download and a trick.
    */
   useEffect(() => {
-    const streams = items.filter((i) => i.kind === 'hls');
+    const streams = items.filter((i) => i.kind === 'hls' || i.kind === 'dash');
     if (!streams.length || !AndroidHybridBridge.hasJniBridge()) return;
     for (const stream of streams) {
       AndroidHybridBridge.probeStream(stream.url);
@@ -145,8 +145,8 @@ export const VideoGrabberModal: React.FC<VideoGrabberModalProps> = ({
   const handleDownload = (media: CapturedMedia) => {
     const filename = suggestedFilename(media, pageTitle);
     // A stream goes through the merger; a direct file streams straight to disk.
-    if (media.kind === 'hls') {
-      const id = AndroidHybridBridge.startDownload(media.url, filename, 'hls', pageTitle);
+    if (media.kind === 'hls' || media.kind === 'dash') {
+      const id = AndroidHybridBridge.startDownload(media.url, filename, media.kind, pageTitle);
       if (id) setDownloaded((prev) => ({ ...prev, [media.url]: true }));
       return;
     }
@@ -384,9 +384,10 @@ export const VideoGrabberModal: React.FC<VideoGrabberModalProps> = ({
             <div className="text-[10px] font-bold text-slate-300 mb-1.5">What this can and cannot do</div>
             <ul className="text-[10px] text-slate-500 leading-relaxed space-y-1">
               <li>Finds video files the page actually requests while you watch.</li>
-              <li>Joins HLS streams into one file, including AES-128 encrypted ones.</li>
+              <li>Joins HLS and DASH streams into one file, picture and sound together.</li>
+              <li>Decrypts AES-128 HLS streams while joining them.</li>
               <li>Keeps downloading in the background, with progress and cancel.</li>
-              <li>Refuses DASH and DRM video, which this build cannot turn into a playable file.</li>
+              <li>Refuses DRM (Widevine/PlayReady) video, which is encrypted by the site.</li>
               <li>No ads, no interstitials, no unlock timers, no account.</li>
             </ul>
           </div>

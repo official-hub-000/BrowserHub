@@ -135,6 +135,12 @@ public final class Resolver {
         return slash >= 0 ? p.substring(slash + 1) : p;
     }
 
+    /** True when the URL looks like a DASH manifest. */
+    public static boolean isDashPlaylist(String url) {
+        String p = path(url).toLowerCase(java.util.Locale.US);
+        return p.endsWith(".mpd");
+    }
+
     /** True when the URL looks like a playlist rather than a media file. */
     public static boolean isPlaylist(String url) {
         String p = path(url).toLowerCase(java.util.Locale.US);

@@ -21,6 +21,7 @@ public final class DownloadQueue {
 
     public static final String KIND_FILE = "file";
     public static final String KIND_HLS = "hls";
+    public static final String KIND_DASH = "dash";
 
     /** One download. Fields are read by the UI thread and written by a worker. */
     public static final class Job {
@@ -137,7 +138,9 @@ public final class DownloadQueue {
         base = base.replaceAll("[\\\\/:*?\"<>|\\p{Cntrl}]+", " ").replaceAll("\\s+", " ").trim();
         if (base.length() > 80) base = base.substring(0, 80).trim();
         if (base.length() == 0) base = "video";
-        String ext = KIND_HLS.equals(kind) ? ".ts" : guessExt(base);
+        String ext = KIND_HLS.equals(kind) ? ".ts"
+                : KIND_DASH.equals(kind) ? ".mp4"
+                : guessExt(base);
         if (!base.toLowerCase(Locale.US).endsWith(ext)) base = base + ext;
         return base;
     }

@@ -246,7 +246,7 @@ public final class MediaMerger {
         return (long) (p.totalDuration * 1000000L / 8L);
     }
 
-    private static String fetchText(String url, String userAgent, String cookie) throws IOException {
+    public static String fetchText(String url, String userAgent, String cookie) throws IOException {
         HttpURLConnection conn = null;
         InputStream in = null;
         try {
@@ -266,7 +266,7 @@ public final class MediaMerger {
     }
 
     /** Fetches one segment, honouring an optional byte range. */
-    static byte[] fetchBytes(String url, long rangeStart, long rangeLength,
+    public static byte[] fetchBytes(String url, long rangeStart, long rangeLength,
                              String userAgent, String cookie) throws IOException {
         HttpURLConnection conn = null;
         InputStream in = null;

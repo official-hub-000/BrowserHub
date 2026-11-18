@@ -568,6 +568,8 @@ public class MainActivity extends Activity {
         if (url == null || url.length() == 0) return "";
         String safeKind = "hls".equalsIgnoreCase(kind)
                 ? com.browserhub.app.media.DownloadQueue.KIND_HLS
+                : "dash".equalsIgnoreCase(kind)
+                ? com.browserhub.app.media.DownloadQueue.KIND_DASH
                 : com.browserhub.app.media.DownloadQueue.KIND_FILE;
         String safeName = com.browserhub.app.media.DownloadQueue.filenameFor(filename, safeKind);
         com.browserhub.app.media.DownloadQueue.Job job =
@@ -595,6 +597,29 @@ public class MainActivity extends Activity {
                 try {
                     String ua = browserWebView != null
                             ? browserWebView.getSettings().getUserAgentString() : null;
+                    if (com.browserhub.app.media.Resolver.isDashPlaylist(url)) {
+                        String xml = com.browserhub.app.media.MediaMerger.fetchText(url, ua, null);
+                        com.browserhub.app.media.DashManifest dash =
+                                com.browserhub.app.media.DashManifest.parse(xml, url);
+                        if (!dash.ok) {
+                            out.put("ok", false);
+                            out.put("reason", dash.error != null ? dash.error : "unreadable stream");
+                        } else {
+                            com.browserhub.app.media.DashManifest.Track v = dash.bestVideo();
+                            com.browserhub.app.media.DashManifest.Track a = dash.bestAudio();
+                            out.put("ok", true);
+                            out.put("parts", (v != null ? v.segments.size() : 0)
+                                    + (a != null ? a.segments.size() : 0));
+                            out.put("encrypted", dash.encrypted);
+                            out.put("sampleAes", dash.encrypted);
+                            out.put("seconds", Math.round(dash.totalDuration));
+                            out.put("bestResolution", v != null ? v.resolution() : "");
+                            out.put("kind", "dash");
+                            out.put("drm", dash.drmSystem != null ? dash.drmSystem : "");
+                        }
+                        streamProbe = out.toString();
+                        return;
+                    }
                     com.browserhub.app.media.HlsPlaylist playlist =
                             com.browserhub.app.media.MediaMerger.loadPlaylist(url, ua, null);
                     if (playlist.error != null) {

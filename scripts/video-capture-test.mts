@@ -117,13 +117,20 @@ check('does not flag a plain url', !looksSigned('https://c.example.com/v.mp4'));
       .actionable === false
   );
 
-  // DASH is still refused: joining it needs a remuxer this build does not have.
+  // DASH is now joined by the native engine, video and audio together.
   const dash = classifyMediaUrl('https://cdn.example.com/stream.mpd', '')!;
   const dashAssessed = assessMedia(dash, page(), 'https://cdn.example.com/watch', true, {
     canMergeStreams: true,
   });
-  check('DASH is refused even with the merger', dashAssessed.actionable === false);
-  check('DASH reason names the missing remuxer', /remux/i.test(dashAssessed.reason));
+  check('DASH is offered when the merger exists', dashAssessed.actionable === true);
+  check('DASH is labelled mergeable', dashAssessed.verdict === 'mergeable');
+  check('the DASH reason mentions both tracks', /picture|sound|track/i.test(dashAssessed.reason));
+
+  // Without the native engine it must still not pretend.
+  const dashWeb = assessMedia(dash, page(), 'https://cdn.example.com/watch', false, {
+    canMergeStreams: true,
+  });
+  check('DASH is not offered in the web build', dashWeb.actionable === false);
 }
 {
   const mp4 = classifyMediaUrl('https://cdn.example.com/clip.mp4', '')!;

@@ -221,13 +221,23 @@ export function assessMedia(
   }
 
   if (media.kind === 'dash') {
+    if (canMerge) {
+      return {
+        media,
+        verdict: 'mergeable',
+        actionable: true,
+        reason:
+          'A DASH stream. BrowserHub fetches the picture and the sound as separate tracks and ' +
+          'joins both into one video.',
+      };
+    }
     return {
       media,
       verdict: 'needs-merge',
       actionable: false,
       reason:
-        'This is a DASH manifest. Joining DASH needs a remuxer this build does not include, so ' +
-        'it is not offered rather than producing a broken file.',
+        'This is a DASH manifest, a list of parts rather than a video file. Joining it needs the ' +
+        'Android build, which does it natively.',
     };
   }
 
