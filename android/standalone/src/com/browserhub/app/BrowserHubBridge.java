@@ -160,4 +160,36 @@ public class BrowserHubBridge {
     public String pollAiResult(String requestId) {
         return com.browserhub.app.ai.NativeAiClient.poll(requestId);
     }
+
+    // ------------------------------------------------------------------
+    //  Video capture: what the page is playing right now.
+    // ------------------------------------------------------------------
+
+    /**
+     * Installs the media hooks in the real page and returns what it has already
+     * seen. Returning the current list in the same call means the first open of
+     * the sheet is never empty just because the hooks landed a moment ago.
+     */
+    @JavascriptInterface
+    public String collectPageMedia() {
+        return activity.collectPageMedia();
+    }
+
+    /** Last capture set, for immediate paint while a fresh scan runs. */
+    @JavascriptInterface
+    public String getPageMedia() {
+        return activity.getLastPageMedia();
+    }
+
+    /** Downloads a captured media URL through the platform (no page CORS). */
+    @JavascriptInterface
+    public void downloadPageMedia(String url, String filename) {
+        activity.downloadPageMedia(url, filename);
+    }
+
+    /** True when the platform downloader is available (Android build only). */
+    @JavascriptInterface
+    public boolean hasNativeDownloader() {
+        return true;
+    }
 }

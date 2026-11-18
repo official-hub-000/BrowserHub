@@ -39,4 +39,62 @@ if (hits.length) {
   hits.forEach((h) => console.error(`  FAIL ${h}`));
   process.exit(1);
 }
+
+/*
+ * "Totally ad free" is the easiest claim in this file to make and the easiest to
+ * quietly break: one analytics SDK, one mediation library, one upsell webview and
+ * it stops being true. So it is enforced as a code property, not a sentence.
+ *
+ * The only permitted occurrences of these names are inside the blocking lists
+ * that are used to REFUSE ad requests — those are checked separately below.
+ */
+const AD_SDK = [
+  { re: /com\.google\.android\.gms\.ads/, why: 'Google Mobile Ads SDK' },
+  { re: /com\.facebook\.ads/, why: 'Meta Audience Network' },
+  { re: /com\.applovin/, why: 'AppLovin SDK' },
+  { re: /com\.unity3d\.ads|com\.unity3d\.services\.ads/, why: 'Unity Ads' },
+  { re: /com\.ironsource|com\.supersonic/, why: 'ironSource / LevelPlay' },
+  { re: /com\.adcolony/, why: 'AdColony' },
+  { re: /com\.chartboost/, why: 'Chartboost' },
+  { re: /com\.mopub|com\.vungle|com\.inmobi|com\.startapp/, why: 'another ad network' },
+  { re: /admob|adsense/i, why: 'an ad network reference outside a block list' },
+];
+
+const adFiles = [];
+const walkAd = (dir) => {
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const full = `${dir}/${entry.name}`;
+    if (entry.isDirectory()) {
+      if (['node_modules', '.git', 'dist'].includes(entry.name)) continue;
+      walkAd(full);
+    } else if (/\.(java|kt|tsx?|jsx?|json|gradle|xml)$/.test(entry.name)) {
+      adFiles.push(full);
+    }
+  }
+};
+walkAd('android');
+walkAd('src');
+
+const adHits = [];
+for (const file of adFiles) {
+  // package.json / build files must not depend on an ad library either.
+  const src = fs.readFileSync(file, 'utf8');
+  const inBlockList = /AD_DOMAINS|blocked|BLOCK|block/i.test(src);
+  for (const rule of AD_SDK) {
+    if (!rule.re.test(src)) continue;
+    // A blocking list naming an ad host is the opposite of shipping that SDK.
+    if (inBlockList && !/com\.[a-z]+\.(ads|applovin|unity3d)/.test(src)) continue;
+    adHits.push(`${file}: ${rule.why}`);
+  }
+}
+const pkg = fs.readFileSync('package.json', 'utf8');
+for (const bad of ['admob', 'applovin', 'ironsource', 'unity-ads', 'react-native-google-mobile-ads']) {
+  if (pkg.toLowerCase().includes(bad)) adHits.push(`package.json depends on ${bad}`);
+}
+if (adHits.length) {
+  adHits.forEach((h) => console.error(`  FAIL ad SDK present: ${h}`));
+  process.exit(1);
+}
+
 console.log('  no fake engine / VPN / runtime claims in the UI');
+console.log('  no ad SDK anywhere: the "ad-free" claim is a code property, not a promise');

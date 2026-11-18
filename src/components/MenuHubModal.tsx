@@ -9,6 +9,7 @@ import {
   Monitor,
   BookOpen,
   Languages,
+  Film,
   Search,
   Columns2,
   ZoomIn,
@@ -58,6 +59,7 @@ interface MenuHubModalProps {
   onToggleDesktop: () => void;
   onToggleReader: () => void;
   onOpenTranslate: () => void;
+  onOpenVideoGrabber: () => void;
   onOpenFind: () => void;
   onToggleSplit: () => void;
   onChangeZoom: (nextZoom: number) => void;
@@ -101,6 +103,7 @@ export const MenuHubModal: React.FC<MenuHubModalProps> = ({
   onToggleDesktop,
   onToggleReader,
   onOpenTranslate,
+  onOpenVideoGrabber,
   onOpenFind,
   onToggleSplit,
   onChangeZoom,
@@ -294,6 +297,19 @@ export const MenuHubModal: React.FC<MenuHubModalProps> = ({
                     {tab.translatedLang}
                   </span>
                 )}
+              </button>
+
+              <button
+                onClick={() => runAndClose(onOpenVideoGrabber)}
+                className="p-3 rounded-xl bg-black hover:bg-[#121216] border border-slate-800 text-left flex items-center justify-between cursor-pointer"
+              >
+                <span className="flex items-center gap-2 min-w-0 text-[11px] font-semibold text-slate-200">
+                  <Film size={16} className="text-cyan-400" />
+                  <span>Download Video</span>
+                </span>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 font-bold">
+                  AD-FREE
+                </span>
               </button>
 
               <button

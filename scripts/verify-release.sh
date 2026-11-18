@@ -90,6 +90,15 @@ npx tsx scripts/extension-runtime-test.mts | tail -1
 echo "== Viewport sync coalesced (no JNI call per frame or per render) =="
 npx tsx scripts/viewport-sync-test.mts | tail -1
 
+echo "== Video grabber (finds real media, refuses the impossible) =="
+npx tsx scripts/video-capture-test.mts | tail -1
+
+echo "== Video grabber: download path survives scoped storage =="
+node scripts/media-download-check.mjs | tail -1
+
+echo "== Video grabber: no ad SDK anywhere (the ad-free guarantee) =="
+node scripts/honesty-check.mjs | tail -1
+
 echo "== URL safety (intent:// can never reach the WebView) =="
 npx tsx scripts/url-safety-test.mts | tail -1
 

@@ -53,6 +53,14 @@ export interface AndroidJniBridge {
   haptic?: (strength: number) => void;
   /** Applies a sideloaded WebExtension's matched content scripts to the page. */
   applyExtensionRuntime?: (css: string, js: string) => void;
+  /** Installs the media hooks in the real page and returns what it has seen. */
+  collectPageMedia?: () => string;
+  /** Last capture set, for painting the sheet before a fresh scan lands. */
+  getPageMedia?: () => string;
+  /** Downloads a captured media URL through the platform (not page CORS). */
+  downloadPageMedia?: (url: string, filename: string) => void;
+  /** Present only in the Android build, where the platform downloader exists. */
+  hasNativeDownloader?: () => boolean;
 }
 
 declare global {
@@ -119,6 +127,49 @@ export const AndroidHybridBridge = {
 
   hasJniBridge(): boolean {
     return typeof window !== 'undefined' && Boolean(window.BrowserHubNative);
+  },
+
+  // ------------------------------------------------------------------
+  //  Video capture. Every method degrades to "nothing found" outside the
+  //  APK — the sheet then explains that instead of showing an empty list.
+  // ------------------------------------------------------------------
+
+  /** True when downloads run through the platform rather than page fetch. */
+  hasNativeDownloader(): boolean {
+    try {
+      return Boolean(this.hasJniBridge() && window.BrowserHubNative?.hasNativeDownloader?.());
+    } catch {
+      return false;
+    }
+  },
+
+  /** Hooks the page and returns its raw capture envelope, or '' on failure. */
+  collectPageMedia(): string {
+    try {
+      if (!this.hasJniBridge() || !window.BrowserHubNative?.collectPageMedia) return '';
+      return window.BrowserHubNative.collectPageMedia() ?? '';
+    } catch {
+      return '';
+    }
+  },
+
+  getPageMedia(): string {
+    try {
+      if (!this.hasJniBridge() || !window.BrowserHubNative?.getPageMedia) return '';
+      return window.BrowserHubNative.getPageMedia() ?? '';
+    } catch {
+      return '';
+    }
+  },
+
+  downloadPageMedia(url: string, filename: string): boolean {
+    try {
+      if (!this.hasJniBridge() || !window.BrowserHubNative?.downloadPageMedia) return false;
+      window.BrowserHubNative.downloadPageMedia(url, filename);
+      return true;
+    } catch {
+      return false;
+    }
   },
 
   isNativeAndroid(): boolean {

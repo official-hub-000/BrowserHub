@@ -49,6 +49,7 @@ import { DevToolsPanel } from './components/DevToolsPanel';
 import { AboutDiagnosticsModal } from './components/AboutDiagnosticsModal';
 import { MenuHubModal } from './components/MenuHubModal';
 import { TranslateModal } from './components/TranslateModal';
+import { VideoGrabberModal } from './components/VideoGrabberModal';
 import { AndroidHybridBridge } from './bridge/androidHybridBridge';
 import { classifyUrl } from './utils/urlSafety';
 import { SearchEngineIcon } from './components/VectorIcons';
@@ -258,6 +259,7 @@ export function App() {
   const [showMenuHub, setShowMenuHub] = useState(false);
   const [showEnginePicker, setShowEnginePicker] = useState(false);
   const [showTranslateModal, setShowTranslateModal] = useState(false);
+  const [showVideoGrabber, setShowVideoGrabber] = useState(false);
   const [showShields, setShowShields] = useState(false);
   const [showVpn, setShowVpn] = useState(false);
   const [showExtensions, setShowExtensions] = useState(false);
@@ -320,6 +322,7 @@ export function App() {
   }, [activeTab.url, omniboxFocused]);
 
   const anyModalOpen =
+    showVideoGrabber ||
     showMenuHub ||
     showEnginePicker ||
     showTranslateModal ||
@@ -701,6 +704,7 @@ export function App() {
       setShowMenuHub(false);
       setShowEnginePicker(false);
       setShowTranslateModal(false);
+      setShowVideoGrabber(false);
       setShowShields(false);
       setShowVpn(false);
       setShowExtensions(false);
@@ -1676,6 +1680,7 @@ export function App() {
             updateTab(activeTab.id, (t) => ({ ...t, isReaderMode: !t.isReaderMode }))
           }
           onOpenTranslate={() => setShowTranslateModal(true)}
+          onOpenVideoGrabber={() => setShowVideoGrabber(true)}
           onOpenFind={() => setShowFindBar(true)}
           onToggleSplit={() => {
             if (splitTabId) {
@@ -1734,6 +1739,14 @@ export function App() {
             updateTab(activeTab.id, (t) => ({ ...t, bilingualTranslate: val }))
           }
           onClose={() => setShowTranslateModal(false)}
+        />
+      )}
+
+      {showVideoGrabber && (
+        <VideoGrabberModal
+          pageUrl={activeTab.url}
+          pageTitle={activeTab.title}
+          onClose={() => setShowVideoGrabber(false)}
         />
       )}
 

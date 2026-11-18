@@ -84,6 +84,9 @@ public class MainActivity extends Activity {
     private volatile boolean customCssActive = false;
     private volatile String extractedPageText = "";
 
+    /** Latest media capture set as JSON, so the sheet paints instantly. */
+    private volatile String lastPageMedia = "{\"items\":[],\"mse\":false,\"drm\":false}";
+
     private String lastLoadedUrl = "";
     private boolean lastDesktopState = false;
     private int lastTopPx = -1;
@@ -299,6 +302,8 @@ public class MainActivity extends Activity {
             public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);
                 lastLoadedUrl = url;
+                // A new document means the old captures are meaningless.
+                lastPageMedia = "{\"items\":[],\"mse\":false,\"drm\":false}";
                 String title = view.getTitle() != null ? view.getTitle() : url;
                 notifyShellUrlChanged(url, title);
                 injectExtensionsAndExtractText(view);
@@ -499,6 +504,52 @@ public class MainActivity extends Activity {
 
     public String getExtractedPageText() {
         return extractedPageText;
+    }
+
+    // ========================================================================
+    //  VIDEO CAPTURE
+    //
+    //  Watching the page's own network requests is how every downloader in this
+    //  category works, and it is legitimate: it surfaces a file the page is
+    //  already playing. What it cannot do is invent a file out of a DRM stream
+    //  or turn an HLS playlist into a movie — the shell is told the truth about
+    //  both and refuses the download rather than producing a broken file.
+    // ========================================================================
+
+    /** Hooks XHR/fetch/media setters in the real page, then reads back captures. */
+    public String collectPageMedia() {
+        final WebView view = browserWebView;
+        if (view == null) return lastPageMedia;
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    view.evaluateJavascript(MediaCaptureScripts.HOOK, null);
+                    view.evaluateJavascript(MediaCaptureScripts.READBACK, new ValueCallback<String>() {
+                        @Override
+                        public void onReceiveValue(String value) {
+                            if (value != null && value.length() > 4 && !"null".equals(value)) {
+                                lastPageMedia = value;
+                            }
+                        }
+                    });
+                } catch (Throwable t) {
+                    // A capture failure must never break the page or the sheet.
+                }
+            }
+        });
+        return lastPageMedia;
+    }
+
+    public String getLastPageMedia() {
+        return lastPageMedia;
+    }
+
+    /** Hands an approved URL to the platform downloader. */
+    public void downloadPageMedia(String url, String filename) {
+        if (url == null || url.length() == 0) return;
+        String ua = browserWebView != null ? browserWebView.getSettings().getUserAgentString() : null;
+        MediaGrabber.download(this, url, filename, ua, null);
     }
 
     /** Copies text via the Android clipboard service. */

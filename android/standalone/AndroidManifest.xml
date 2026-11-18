@@ -9,6 +9,15 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <!--
+      Only needed on Android 9 and below, where a finished download is copied
+      into the public Movies folder. Android 10+ publishes through MediaStore,
+      which requires no storage permission at all. Declaring it with
+      maxSdkVersion keeps the app from asking modern devices for access to files
+      it does not touch.
+    -->
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="28" />
 
     <application
         android:allowBackup="false"
