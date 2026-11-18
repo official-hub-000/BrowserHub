@@ -128,13 +128,30 @@ So a 179–320 MB prebuilt APK cannot cross into this workspace, and a Chromium
 build cannot run in it. `build-elsewhere.md` covers the four ways to get one
 built, including a Dockerfile.
 
-## The `vanadium/` submodule is empty here
+## The `vanadium/` submodule
 
-`build.sh` needs Vanadium's `patches/` directory and reads the Chromium version
-from `vanadium/args.gn`. That repository is reachable from this sandbox, so it
-is one command locally. It is deliberately not vendored: it is a separate GPLv2
-project, and copying it in would blur which code is Titanium's, which is
-Vanadium's, and which is the build output.
+`build.sh` needs two things from it: the Chromium version on line 4
+(`grep ... vanadium/args.gn`) and the patch stack it applies. Both are absent
+until the submodule is checked out, so this is the first command after cloning:
+
+```bash
+git submodule update --init
+```
+
+It is pinned to `a8b304ef63b51f0158775a9d4f90106e8fc9a721`, the same commit as
+upstream, and was **verified working** from a fresh clone: it checks out that
+exact commit and delivers 322 files, 304 of them patches, after which line 4 of
+`build.sh` resolves `VERSION=157.0.8103.78`.
+
+Note the mapping lives in a `.gitmodules` at the **root of this repository**,
+with `path = titanium/vanadium`. Upstream's `.gitmodules` says `path = vanadium`
+because `titanium/` is upstream's repo root; here it is a subdirectory, and git
+ignores a `.gitmodules` that sits in a subdirectory when resolving submodule
+paths.
+
+The submodule is deliberately not vendored: it is a separate GPLv2 project, and
+copying it in would blur which code is Titanium's, which is Vanadium's, and
+which is the build output.
 
 ## Licence
 

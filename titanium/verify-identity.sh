@@ -81,6 +81,17 @@ check "every fragment parses" \
 check "build.sh loads a saved selection" \
   'grep -q "features/enabled.env" build.sh'
 
+echo "== Submodule pin =="
+# The vanadium gitlink is easy to lose: copying the tree with tar --exclude
+# .git drops it silently, and .gitmodules alone is not enough. build.sh reads
+# vanadium/args.gn on line 4, so without it the build fails immediately.
+check "vanadium gitlink is committed at upstream's pin" \
+  'git ls-files -s vanadium 2>/dev/null | grep -q "^160000 a8b304ef63b51f0158775a9d4f90106e8fc9a721"'
+check "git recognises the submodule mapping" \
+  '! git submodule status 2>&1 | grep -q "no submodule mapping"'
+check ".gitmodules is at the repository root" \
+  '[ -f ../.gitmodules ]'
+
 echo "== Build kit is actually committed =="
 # Upstream's .gitignore excludes keys/, so anything placed there never ships.
 # Check every deliverable is tracked rather than silently missing.
