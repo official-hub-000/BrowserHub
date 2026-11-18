@@ -6,7 +6,24 @@ for icon in $(find chrome/android/java/res_titanium_base -type f -name '*.png');
 sed -i 's|<application |<application android:extractNativeLibs="false" |' chrome/android/java/AndroidManifest.xml
 sed -i 's|<data android:mimeType="message/rfc822"/>|<data android:mimeType="message/rfc822"/><data android:mimeType="application/pdf"/>|' chrome/android/java/AndroidManifest.xml
 sed -i '/com.google.ar.core.min_apk_version/d' third_party/arcore-android-sdk-client/AndroidManifest_basesplit.xml
-# sed -i 's|Google LLC|jqssun, Google LLC|' chrome/browser/ui/android/strings/android_chrome_strings.grd
+
+# ---------------------------------------------------------------------------
+# BrowserHub identity.
+#
+# The package id is set in args.gn, but the NAME ON THE LAUNCHER does not come
+# from there: it comes from this .grd, and upstream leaves it alone, so an
+# upstream build installs as "Chrome" next to the real Chrome. These edits set
+# the visible name and the vendor attribution. They change strings only — no
+# behaviour, no capability.
+# ---------------------------------------------------------------------------
+GRD=chrome/browser/ui/android/strings/android_chrome_strings.grd
+sed -i 's|>Chrome<|>BrowserHub<|g' "$GRD"
+sed -i 's|>Chrome Beta<|>BrowserHub<|g' "$GRD"
+sed -i 's|>Chrome Dev<|>BrowserHub<|g' "$GRD"
+sed -i 's|>Chrome Canary<|>BrowserHub<|g' "$GRD"
+# Attribution: the app must not claim to be made by Google, and must name where
+# it came from, because this is a modified Chromium distributed under GPLv2.
+sed -i 's|Google LLC|BrowserHub, based on Titanium Browser and Chromium|g' "$GRD"
 
 cp -r $SCRIPT_DIR/extensions/dist titanium/
 cp $SCRIPT_DIR/extensions/stage_bundled_extensions.inc titanium/dist/

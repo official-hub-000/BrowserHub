@@ -27,6 +27,16 @@ if not os.path.exists(build_path):
 
 crx = f"{name}.crx"
 path = os.path.join(folder, crx)
+
+# A bundle URL is optional. When none is configured, stage nothing and exit
+# successfully: a build with no bundled extensions is a valid BrowserHub build,
+# whereas urlretrieve(None) would raise and take the whole gclient hook — and
+# therefore the whole build — down with it.
+if not url or url == "None":
+    open(index_path, "w").write("{}")
+    print(f"{name}: no bundle URL configured, staging no bundled extensions")
+    sys.exit(0)
+
 urllib.request.urlretrieve(url, path)
 data = open(path, "rb").read()
 header = data[12:12 + struct.unpack("<I", data[8:12])[0]]

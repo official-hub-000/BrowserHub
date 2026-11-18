@@ -5,10 +5,20 @@ replace() {
     find $1 -type f -exec sed -i 's@'$org'@'$new'@g' {} \;
 }
 
+# Keys are optional. A local build without signing credentials still needs to
+# produce an unsigned APK for testing, and the original silently decoded two
+# empty environment variables into empty files, which failed much later inside
+# apksigner with a confusing error. Fail early, or continue unsigned — say which.
 set_keys() {
     mkdir -p $SCRIPT_DIR/keys
-    echo $LOCAL_TEST_JKS | base64 -d > $SCRIPT_DIR/keys/local.properties
-    echo $STORE_TEST_JKS | base64 -d > $SCRIPT_DIR/keys/test.jks
+    if [ -z "${LOCAL_TEST_JKS:-}" ] || [ -z "${STORE_TEST_JKS:-}" ]; then
+        export SKIP_SIGNING=1
+        echo "common.sh: LOCAL_TEST_JKS / STORE_TEST_JKS not set — building UNSIGNED."
+        echo "           Set both (base64-encoded) to produce signed APK/AAB."
+        return 0
+    fi
+    echo "$LOCAL_TEST_JKS" | base64 -d > $SCRIPT_DIR/keys/local.properties
+    echo "$STORE_TEST_JKS" | base64 -d > $SCRIPT_DIR/keys/test.jks
     unset LOCAL_TEST_JKS
     unset STORE_TEST_JKS
 }

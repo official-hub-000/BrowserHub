@@ -42,7 +42,12 @@ hooks = [
               '../extensions/bundle.py',
               '../extensions/dist',
               'titanium',
-              'https://github.com/jqssun/android-titanium-extension/releases/latest/download/titanium.crx']
+              # Must be a URL that actually serves a .crx. The upstream default
+              # pointed at a third-party release asset, which a BrowserHub build
+              # cannot rely on. To bundle the Titanium Extension, point this at
+              # your own release asset; leave it unset and bundle.py simply
+              # stages nothing, which is a valid build.
+              None]
   },
 ]
 target_os = ['android']
