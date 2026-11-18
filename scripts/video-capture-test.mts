@@ -490,6 +490,42 @@ console.log(`video capture: ${passed} checks pass — real media is found, impos
 }
 
 console.log('');
+/*
+ * YouTube's media has no file extension. Every classification rule in the app was
+ * extension-based, so a perfectly captured YouTube stream was dropped on the way
+ * to the sheet — the capture worked and nothing appeared. These pin the fix.
+ */
+{
+  const video = classifyMediaUrl(
+    'https://rr1.googlevideo.com/videoplayback?itag=137&mime=video%2Fmp4&sig=ABC',
+    ''
+  );
+  check('a YouTube video track is classified, not dropped', video !== null);
+  check('the YouTube video track is a direct file', video?.kind === 'file');
+  check('the audio track is not mistaken for video', video?.mime.startsWith('video/') === true);
+
+  const audio = classifyMediaUrl(
+    'https://rr1.googlevideo.com/videoplayback?itag=140&mime=audio%2Fmp4&sig=ABC',
+    ''
+  );
+  check('a YouTube audio track is classified', audio !== null);
+  check('the audio track is marked as audio', audio?.mime.startsWith('audio/') === true);
+
+  const audioByItag = classifyMediaUrl(
+    'https://rr1.googlevideo.com/videoplayback?itag=251&sig=ABC',
+    ''
+  );
+  check('an audio itag with no mime is still recognised as audio',
+    audioByItag?.mime.startsWith('audio/') === true);
+
+  const labelled = classifyMediaUrl(
+    'https://rr1.googlevideo.com/videoplayback?itag=137&sig=ABC',
+    ''
+  );
+  check('the row is labelled in words a person reads',
+    (labelled?.label ?? '').toLowerCase().includes('youtube'));
+}
+
 if (failures.length) {
   console.error(`video capture (after Java execution): ${failures.length} failure(s)`);
   for (const f of failures) console.error(`  - ${f}`);

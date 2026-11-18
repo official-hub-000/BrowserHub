@@ -146,6 +146,28 @@ export function classifyMediaUrl(
     };
   }
 
+  /*
+   * YouTube's media. googlevideo serves from /videoplayback with no extension at
+   * all, so the extension checks below never matched it and every YouTube capture
+   * was silently dropped even when the capture itself worked.
+   *
+   * `mime=audio` in the query means an audio-only track; separate tracks are
+   * normal on YouTube and are exactly what the merge step expects.
+   */
+  const lowerUrl = url.toLowerCase();
+  if (lowerUrl.includes('/videoplayback')) {
+    const audioOnly = /[?&]mime=audio/.test(lowerUrl) || /[?&]itag=(140|139|141|249|250|251|256|258)(&|$)/.test(lowerUrl);
+    return {
+      url,
+      kind: 'file',
+      mime: audioOnly ? 'audio/mp4' : lowerMime || 'video/mp4',
+      bytes: contentLength,
+      source: 'network',
+      label: audioOnly ? 'YouTube audio track' : 'YouTube video track',
+      signed: looksSigned(url),
+    };
+  }
+
   const hasExt = VIDEO_EXT.some((e) => path.endsWith(e)) || AUDIO_EXT.some((e) => path.endsWith(e));
   if (hasExt) {
     return {

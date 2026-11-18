@@ -155,25 +155,46 @@ export const VideoGrabberModal: React.FC<VideoGrabberModalProps> = ({
 
   const nativeDownloader = useMemo(() => AndroidHybridBridge.hasNativeDownloader(), []);
 
+  /*
+   * Scans repeatedly, not once.
+   *
+   * A single scan 60 ms after opening could only ever see media the page had
+   * already requested. Playing a video for ten minutes and still finding nothing
+   * was the visible result: every request happened after the only scan had
+   * already run. The sheet now keeps looking while it is open, so a video that
+   * starts playing after the sheet is shown still appears without the user having
+   * to close and reopen anything.
+   */
   const scan = useCallback(() => {
     const raw = AndroidHybridBridge.collectPageMedia();
     const parsed = parseCaptures(raw);
-    setItems(parsed.items);
+    if (parsed.items.length === 0) return;
+    setItems((previous) => {
+      // Keep the order stable so rows do not jump while the user is reaching for
+      // one; new finds are appended.
+      const seen = new Set(previous.map((m) => m.url));
+      const added = parsed.items.filter((m) => !seen.has(m.url));
+      return added.length ? [...previous, ...added] : previous;
+    });
     setPage(parsed.page);
     setScanning(false);
   }, []);
 
   useEffect(() => {
     setHasNative(AndroidHybridBridge.hasJniBridge());
-    // Paint whatever was captured during playback immediately, then re-scan.
+    // Paint whatever was captured during playback immediately, then keep looking.
     const cached = parseCaptures(AndroidHybridBridge.getPageMedia());
     if (cached.items.length) {
       setItems(cached.items);
       setPage(cached.page);
       setScanning(false);
     }
-    const timer = window.setTimeout(scan, 60);
-    return () => window.clearTimeout(timer);
+    const first = window.setTimeout(scan, 60);
+    const timer = window.setInterval(scan, 1500);
+    return () => {
+      window.clearTimeout(first);
+      window.clearInterval(timer);
+    };
   }, [scan]);
 
   const assessments: MediaAssessment[] = useMemo(

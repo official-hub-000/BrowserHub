@@ -391,9 +391,20 @@ public class MainActivity extends Activity {
             @Override
             public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);
+                /*
+                 * Only a genuinely different document invalidates the capture.
+                 * YouTube finishes its "page load" many times during one video as
+                 * the player swaps in panels, and wiping on every finish threw away
+                 * the media urls the player had just fetched — which is why playing
+                 * for ten minutes still found nothing. Comparing the url keeps a
+                 * real navigation clean without discarding a video's own captures.
+                 */
+                boolean differentDocument = lastLoadedUrl == null
+                        || !stripFragment(lastLoadedUrl).equals(stripFragment(url));
+                if (differentDocument) {
+                    lastPageMedia = "{\"items\":[],\"mse\":false,\"drm\":false}";
+                }
                 lastLoadedUrl = url;
-                // A new document means the old captures are meaningless.
-                lastPageMedia = "{\"items\":[],\"mse\":false,\"drm\":false}";
                 String title = view.getTitle() != null ? view.getTitle() : url;
                 notifyShellUrlChanged(url, title);
                 injectExtensionsAndExtractText(view);
@@ -606,28 +617,40 @@ public class MainActivity extends Activity {
     //  both and refuses the download rather than producing a broken file.
     // ========================================================================
 
-    /** Hooks XHR/fetch/media setters in the real page, then reads back captures. */
+    /**
+     * Hooks XHR/fetch/media setters in the real page, then reads back captures.
+     *
+     * This BLOCKS briefly for the answer rather than returning the previous one.
+     * It used to fire the readback with a callback and immediately return
+     * `lastPageMedia` — the value from before the readback, which after a page
+     * load was the empty one. The sheet polls this, so it read the stale empty
+     * string forever and reported "nothing found" however long the video played.
+     * A capture that is always one page behind is indistinguishable from a capture
+     * that does not work.
+     *
+     * Called from the JS bridge thread, never the UI thread, so waiting here does
+     * not deadlock the thread whose answer is being waited for.
+     */
     public String collectPageMedia() {
         final WebView view = browserWebView;
         if (view == null) return lastPageMedia;
+
+        // Install the hooks first, without waiting: they must exist on the page
+        // regardless of what this particular readback returns.
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
                 try {
                     view.evaluateJavascript(MediaCaptureScripts.HOOK, null);
-                    view.evaluateJavascript(MediaCaptureScripts.READBACK, new ValueCallback<String>() {
-                        @Override
-                        public void onReceiveValue(String value) {
-                            if (value != null && value.length() > 4 && !"null".equals(value)) {
-                                lastPageMedia = value;
-                            }
-                        }
-                    });
-                } catch (Throwable t) {
-                    // A capture failure must never break the page or the sheet.
+                } catch (Throwable ignored) {
                 }
             }
         });
+
+        String fresh = evaluateInPage(MediaCaptureScripts.READBACK, 2500);
+        if (fresh != null && fresh.length() > 4 && !"null".equals(fresh)) {
+            lastPageMedia = fresh;
+        }
         return lastPageMedia;
     }
 
@@ -1470,6 +1493,13 @@ public class MainActivity extends Activity {
                     }
                 }
         );
+    }
+
+    /** A url without its fragment, so #t=42 does not count as a new document. */
+    private static String stripFragment(String url) {
+        if (url == null) return "";
+        int hash = url.indexOf('#');
+        return hash < 0 ? url : url.substring(0, hash);
     }
 
     private static String escapeJs(String s) {
