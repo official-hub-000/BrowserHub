@@ -29,6 +29,7 @@ public final class YouTubeExtractTest {
         testThrottleHandling();
         testTrackJoining();
         testSignatureCipher();
+        testDirectApiShape();
         testCaptureCompletion();
 
         System.out.println();
@@ -167,6 +168,125 @@ public final class YouTubeExtractTest {
         check("a page with no player response is refused", !empty.ok);
         YouTubeExtractor.Result nul = YouTubeExtractor.parsePlayerResponse(null, new YouTubeExtractor.Result());
         check("null input is safe", !nul.ok);
+    }
+
+    // ----------------------------------------------------- direct player API
+    private static void testDirectApiShape() {
+        /*
+         * The request shape is the whole game here. A player API call that claims
+         * to be a client but does not look like one is answered with a bot check,
+         * not a stream list. These assertions pin the parts of the request that
+         * decide that, so a future tidy-up cannot quietly remove one.
+         */
+        check("the player endpoint is the documented one",
+                com.browserhub.app.media.YouTubePlayerApi.ENDPOINT
+                        .equals("https://www.youtube.com/youtubei/v1/player"));
+        check("more than one client identity is tried",
+                com.browserhub.app.media.YouTubePlayerApi.CLIENTS.length >= 2);
+
+        com.browserhub.app.media.YouTubePlayerApi.Client vr =
+                com.browserhub.app.media.YouTubePlayerApi.CLIENTS[0];
+        String body = com.browserhub.app.media.YouTubePlayerApi.requestBody(vr, "dQw4w9WgXcQ");
+        check("the body names the client", body.contains("\"clientName\":\"" + vr.name + "\""));
+        check("the body states the client version", body.contains("\"clientVersion\":\""));
+        check("the body carries the video id", body.contains("\"videoId\":\"dQw4w9WgXcQ\""));
+        check("the body reports a platform, which the native clients require",
+                body.contains("\"osName\":"));
+        check("age checks are bypassed for signed-out requests",
+                body.contains("\"contentCheckOk\":true") && body.contains("\"racyCheckOk\":true"));
+        check("the body is valid-looking JSON",
+                body.startsWith("{") && body.endsWith("}") && balancedBraces(body));
+
+        java.util.Map<String, String> headers =
+                com.browserhub.app.media.YouTubePlayerApi.headers(vr);
+        check("the client name header is sent",
+                headers.containsKey("X-YouTube-Client-Name"));
+        check("the client version header is sent",
+                headers.containsKey("X-YouTube-Client-Version"));
+        eq("the client name header matches the body", vr.id,
+                headers.get("X-YouTube-Client-Name"));
+        check("a real user agent is sent, matching the claimed client",
+                headers.get("User-Agent") != null
+                        && headers.get("User-Agent").contains(vr.version));
+        check("the origin is stated",
+                "https://www.youtube.com".equals(headers.get("Origin")));
+
+        // Every client must produce a complete, distinct request.
+        for (com.browserhub.app.media.YouTubePlayerApi.Client c
+                : com.browserhub.app.media.YouTubePlayerApi.CLIENTS) {
+            String b = com.browserhub.app.media.YouTubePlayerApi.requestBody(c, "dQw4w9WgXcQ");
+            check("client " + c.name + " produces a complete request",
+                    b.contains(c.name) && b.contains(c.version) && balancedBraces(b));
+            check("client " + c.name + " has its own user agent",
+                    com.browserhub.app.media.YouTubePlayerApi.headers(c)
+                            .get("User-Agent").contains(c.version));
+        }
+
+        // A specific refusal must win over a generic one; otherwise a private video
+        // reports "could not reach YouTube" and the user retries forever.
+        java.util.List<String> failures = new java.util.ArrayList<>();
+        failures.add("could not reach YouTube: timeout");
+        failures.add("This video is private");
+        eq("the specific refusal is the one reported", "This video is private",
+                com.browserhub.app.media.YouTubePlayerApi.pickReason(failures));
+        check("an empty failure list still explains itself",
+                com.browserhub.app.media.YouTubePlayerApi
+                        .pickReason(new java.util.ArrayList<>()).length() > 10);
+
+        // Transport errors must be actionable, not stack traces.
+        check("403 is explained as retryable",
+                com.browserhub.app.media.YouTubePlayerApi
+                        .friendly(new java.io.IOException("HTTP 403: x")).contains("403"));
+        check("429 is explained as rate limiting",
+                com.browserhub.app.media.YouTubePlayerApi
+                        .friendly(new java.io.IOException("HTTP 429: x")).toLowerCase()
+                        .contains("rate limit"));
+
+        // A refusal about the video itself must not be retried the slow way.
+        check("a private video is a final refusal",
+                com.browserhub.app.media.YouTubeExtractor.isFinalRefusal("This video is private"));
+        check("a members-only video is a final refusal",
+                com.browserhub.app.media.YouTubeExtractor.isFinalRefusal("members-only video"));
+        check("a country block is a final refusal",
+                com.browserhub.app.media.YouTubeExtractor
+                        .isFinalRefusal("not available in your country"));
+        check("a transport failure is NOT treated as final",
+                !com.browserhub.app.media.YouTubeExtractor.isFinalRefusal("could not reach YouTube"));
+
+        // The direct response is parsed by the same code as the page route, so a
+        // combined stream must be recognised as the preferred shape.
+        String apiReply = "{"
+                + "\"playabilityStatus\":{\"status\":\"OK\"},"
+                + "\"videoDetails\":{\"videoId\":\"dQw4w9WgXcQ\",\"title\":\"Direct\","
+                + " \"lengthSeconds\":\"212\"},"
+                + "\"streamingData\":{\"formats\":["
+                + "{\"itag\":18,\"mimeType\":\"video/mp4; codecs=\\\"avc1.42001E, mp4a.40.2\\\"\","
+                + " \"qualityLabel\":\"360p\",\"bitrate\":600000,\"contentLength\":\"9000000\","
+                + " \"url\":\"https://rr1.googlevideo.com/videoplayback?itag=18&sig=SIGNED\"}"
+                + "]}}";
+        com.browserhub.app.media.YouTubeExtractor.Result api =
+                com.browserhub.app.media.YouTubeExtractor.parsePlayerResponse(apiReply);
+        check("a direct reply with one combined stream is downloadable", api.ok);
+        check("the combined stream needs no signature work",
+                api.progressive != null && !api.progressive.needsSignature);
+        eq("the direct reply keeps the video id", "dQw4w9WgXcQ", api.videoId);
+        check("a combined stream means no merge step",
+                com.browserhub.app.media.YouTubePlayerApi.hasCombined(api));
+    }
+
+    private static boolean balancedBraces(String s) {
+        int depth = 0;
+        boolean inString = false;
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (c == '\\') { i++; continue; }
+            if (c == '"') { inString = !inString; continue; }
+            if (inString) continue;
+            if (c == '{') depth++;
+            else if (c == '}') depth--;
+            if (depth < 0) return false;
+        }
+        return depth == 0 && !inString;
     }
 
     // ------------------------------------------------------ signature cipher

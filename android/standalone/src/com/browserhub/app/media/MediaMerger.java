@@ -307,6 +307,65 @@ public final class MediaMerger {
         }
     }
 
+    /**
+     * POSTs a JSON body with a caller-supplied header set.
+     *
+     * The player API identifies the client entirely by headers (a client name, a
+     * version number, a key). A header set that matches a real client is what
+     * decides whether the response contains signed media URLs or a bot check, so
+     * the caller must be able to state the identity exactly rather than having it
+     * guessed here.
+     */
+    public static String postJson(String url, byte[] body, java.util.Map<String, String> headers)
+            throws IOException {
+        HttpURLConnection conn = null;
+        InputStream in = null;
+        try {
+            conn = (HttpURLConnection) new URL(url).openConnection();
+            conn.setConnectTimeout(CONNECT_TIMEOUT);
+            conn.setReadTimeout(READ_TIMEOUT);
+            conn.setRequestMethod("POST");
+            conn.setDoOutput(true);
+            conn.setRequestProperty("Content-Type", "application/json");
+            if (headers != null) {
+                for (java.util.Map.Entry<String, String> e : headers.entrySet()) {
+                    if (e.getKey() != null && e.getValue() != null) {
+                        conn.setRequestProperty(e.getKey(), e.getValue());
+                    }
+                }
+            }
+            java.io.OutputStream os = conn.getOutputStream();
+            os.write(body);
+            os.close();
+            int code = conn.getResponseCode();
+            InputStream error = null;
+            if (code >= 400) {
+                // The body of an error still carries YouTube's own explanation.
+                try { error = conn.getErrorStream(); } catch (Throwable ignored) {}
+                if (error == null) throw new IOException("HTTP " + code);
+                in = error;
+            } else {
+                in = conn.getInputStream();
+            }
+            java.io.ByteArrayOutputStream buf = new java.io.ByteArrayOutputStream();
+            byte[] chunk = new byte[8192];
+            int n;
+            while ((n = in.read(chunk)) > 0) buf.write(chunk, 0, n);
+            String text = buf.toString("UTF-8");
+            if (code >= 400) throw new IOException("HTTP " + code + ": " + preview(text));
+            return text;
+        } finally {
+            try { if (in != null) in.close(); } catch (Throwable ignored) {}
+            if (conn != null) conn.disconnect();
+        }
+    }
+
+    private static String preview(String text) {
+        if (text == null) return "";
+        String flat = text.replace('\n', ' ').replace('\r', ' ').trim();
+        return flat.length() > 300 ? flat.substring(0, 300) : flat;
+    }
+
     public static String fetchText(String url, String userAgent, String cookie) throws IOException {
         HttpURLConnection conn = null;
         InputStream in = null;

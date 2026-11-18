@@ -102,19 +102,64 @@ public final class YouTubeExtractor {
     }
 
     /**
-     * Fetches and parses the player response for a watch URL.
+     * Resolves a watch URL into downloadable streams.
      *
-     * @param userAgent a real mobile browser UA; YouTube serves a different (and
-     *                  sometimes incomplete) player to obvious non-browser agents.
+     * The player API is tried first, because it is the direct route: it returns
+     * URLs the server has already signed, so nothing has to be unscrambled and no
+     * page has to be involved. The watch page is a fallback for the cases the API
+     * will not answer — it carries the same information, it just costs more work to
+     * get at, and it is only used when the direct route returns nothing usable.
+     *
+     * @param userAgent a real mobile browser UA; the page fallback serves a
+     *                  different (and sometimes incomplete) player to non-browsers.
      */
     public static Result resolve(String watchUrl, String userAgent, String cookie) {
-        Result result = new Result();
         String id = videoId(watchUrl);
-        result.videoId = id;
         if (id.length() == 0) {
-            result.error = "that link is not a YouTube video";
-            return result;
+            Result bad = new Result();
+            bad.videoId = "";
+            bad.error = "that link is not a YouTube video";
+            return bad;
         }
+
+        // Direct route first. A refusal that is about the video itself (private,
+        // removed, members-only) will not improve on the page, so it is returned
+        // as-is rather than retried the slow way.
+        Result direct = YouTubePlayerApi.resolve(id, "YouTube");
+        if (direct.ok && (direct.progressive != null || direct.bestVideo != null)) {
+            return direct;
+        }
+        if (direct.error != null && isFinalRefusal(direct.error)) {
+            return direct;
+        }
+
+        Result fromPage = resolveFromPage(watchUrl, userAgent, cookie, id);
+        if (fromPage.ok) return fromPage;
+
+        // Both routes failed. The API's reason is usually the more specific one.
+        if (direct.error != null && direct.error.length() > 0) return direct;
+        return fromPage;
+    }
+
+    /**
+     * True when a refusal is about the video, not about how we asked.
+     *
+     * Retrying these through the page would waste the user's time and end with the
+     * same answer.
+     */
+    public static boolean isFinalRefusal(String error) {
+        String lower = error.toLowerCase(Locale.US);
+        return lower.contains("private") || lower.contains("removed")
+                || lower.contains("members only") || lower.contains("members-only")
+                || lower.contains("does not exist") || lower.contains("not available in your country")
+                || lower.contains("country") || lower.contains("rental")
+                || lower.contains("purchase");
+    }
+
+    /** The slower route: read the player response out of the watch page itself. */
+    public static Result resolveFromPage(String watchUrl, String userAgent, String cookie, String id) {
+        Result result = new Result();
+        result.videoId = id;
 
         try {
             String pageUrl = "https://www.youtube.com/watch?v=" + id + "&hl=en&has_verified=1&bpctr=9999999999";
