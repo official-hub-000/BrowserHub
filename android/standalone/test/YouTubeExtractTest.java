@@ -32,6 +32,7 @@ public final class YouTubeExtractTest {
         testDirectApiShape();
         testResolverParsing();
         testFormatSelection();
+        testPageMediaFinder();
         testSigningIdentity();
         testCaptureCompletion();
 
@@ -171,6 +172,86 @@ public final class YouTubeExtractTest {
         check("a page with no player response is refused", !empty.ok);
         YouTubeExtractor.Result nul = YouTubeExtractor.parsePlayerResponse(null, new YouTubeExtractor.Result());
         check("null input is safe", !nul.ok);
+    }
+
+    // ---------------------------------------------------- finding a page video
+    private static void testPageMediaFinder() {
+        /*
+         * Paste-a-link for ordinary sites. The rules are ordered by trust: the
+         * site's own Open Graph declaration first, then a player config, then any
+         * media reference. Getting that order wrong offers a sidebar advert
+         * instead of the video the page is about.
+         */
+        String ogPage = "<html><head>"
+                + "<meta property=\"og:title\" content=\"A Real Video\">"
+                + "<meta property=\"og:video:secure_url\" content=\"https://cdn.example.com/a.mp4\">"
+                + "</head><body><a href=\"https://ads.example.com/promo.mp4\">ad</a></body></html>";
+        com.browserhub.app.media.PageMediaFinder.Result og =
+                com.browserhub.app.media.PageMediaFinder.parse(ogPage, "https://example.com/watch/1");
+        check("an og:video declaration is found", og.ok);
+        eq("og:video beats a promo clip elsewhere in the page",
+                "https://cdn.example.com/a.mp4", og.url);
+        eq("the page title is taken", "A Real Video", og.title);
+
+        // Attribute order must not matter: both spellings occur in the wild.
+        String reversed = "<meta content=\"https://cdn.example.com/b.mp4\" property=\"og:video\">";
+        com.browserhub.app.media.PageMediaFinder.Result rev =
+                com.browserhub.app.media.PageMediaFinder.parse(reversed, "https://example.com/x");
+        check("a meta tag written content-first is still read", rev.ok);
+
+        // A player config, with the escaped slashes JSON uses.
+        String config = "<script>var player={\"file\":\"https:\\/\\/cdn.example.com\\/c.mp4\","
+                + "\"title\":\"From a script\"};</script>";
+        com.browserhub.app.media.PageMediaFinder.Result cfg =
+                com.browserhub.app.media.PageMediaFinder.parse(config, "https://example.com/x");
+        check("a player config is read", cfg.ok);
+        check("the escaped slashes are unescaped",
+                cfg.url != null && cfg.url.equals("https://cdn.example.com/c.mp4"));
+
+        // A relative address must be resolved against the page, not used as-is.
+        String relative = "<meta property=\"og:video\" content=\"/media/d.mp4\">";
+        com.browserhub.app.media.PageMediaFinder.Result rel =
+                com.browserhub.app.media.PageMediaFinder.parse(relative, "https://example.com/watch/9");
+        eq("a relative address is resolved against the page",
+                "https://example.com/media/d.mp4", rel.url);
+
+        // Protocol-relative, which several video hosts use.
+        String protoRel = "<meta property=\"og:video\" content=\"//cdn.example.com/e.mp4\">";
+        com.browserhub.app.media.PageMediaFinder.Result pr =
+                com.browserhub.app.media.PageMediaFinder.parse(protoRel, "https://example.com/x");
+        eq("a protocol-relative address gains the page's scheme",
+                "https://cdn.example.com/e.mp4", pr.url);
+
+        // A page with no video must say so, and must not invent a url.
+        String none = "<html><body><p>Just an article.</p></body></html>";
+        com.browserhub.app.media.PageMediaFinder.Result empty =
+                com.browserhub.app.media.PageMediaFinder.parse(none, "https://example.com/x");
+        check("a page with no video is reported as such", !empty.ok);
+        check("the reason is a sentence", empty.reason != null && empty.reason.length() > 20);
+        check("no url is invented", empty.url == null || empty.url.length() == 0);
+
+        // Hostile markup must not produce a non-http address.
+        String hostile = "<meta property=\"og:video\" content=\"javascript:alert(1)\">"
+                + "<meta property=\"og:title\" content=\"x\">";
+        com.browserhub.app.media.PageMediaFinder.Result bad =
+                com.browserhub.app.media.PageMediaFinder.parse(hostile, "https://example.com/x");
+        check("a javascript: address is refused", !bad.ok);
+
+        // A direct media link needs no page fetch at all.
+        check("a media file address is not treated as a page",
+                !com.browserhub.app.media.PageMediaFinder.isPageUrl("https://x.com/a.mp4"));
+        check("a page address is treated as a page",
+                com.browserhub.app.media.PageMediaFinder.isPageUrl("https://x.com/videos/1"));
+        check("text is not a page address",
+                !com.browserhub.app.media.PageMediaFinder.isPageUrl("hello"));
+
+        // Dimensions stated in the markup are worth surfacing.
+        eq("a resolution in the markup is found", "1080p",
+                com.browserhub.app.media.PageMediaFinder.qualityOf("<span>1080p HD</span>"));
+
+        // The front page from the screenshot must not be mistaken for a video page.
+        check("the youtube front page is not a media address",
+                !com.browserhub.app.media.PageMediaFinder.isUsableMedia("https://m.youtube.com"));
     }
 
     // ------------------------------------------------------- format selection

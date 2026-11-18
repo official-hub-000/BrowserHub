@@ -752,6 +752,32 @@ public class MainActivity extends Activity {
                         streamProbe = out.toString();
                         return;
                     }
+                    /*
+                     * A link to a page rather than to a stream. Fetch it once and
+                     * look for a media address in what comes back — an og:video
+                     * tag, a player config, or a plain video file reference. This
+                     * is what makes the paste-a-link box work for ordinary sites
+                     * and not just for YouTube.
+                     */
+                    if (!com.browserhub.app.media.Resolver.isPlaylist(url)
+                            && com.browserhub.app.media.PageMediaFinder.isPageUrl(url)) {
+                        com.browserhub.app.media.PageMediaFinder.Result found =
+                                com.browserhub.app.media.PageMediaFinder.find(url, ua, null);
+                        out.put("ok", found.ok);
+                        out.put("kind", "file");
+                        if (!found.ok) {
+                            out.put("reason", found.reason != null
+                                    ? found.reason : "no video was found on that page");
+                        } else {
+                            out.put("parts", 1);
+                            out.put("title", found.title != null ? found.title : "");
+                            out.put("bestResolution", found.quality != null ? found.quality : "");
+                            out.put("direct", found.url);
+                        }
+                        streamProbe = out.toString();
+                        return;
+                    }
+
                     if (com.browserhub.app.media.Resolver.isDashPlaylist(url)) {
                         String xml = com.browserhub.app.media.MediaMerger.fetchText(url, ua, null);
                         com.browserhub.app.media.DashManifest dash =

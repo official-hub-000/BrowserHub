@@ -12,6 +12,9 @@ import {
   formatBytes,
   formatDuration,
   hasLiveJobs,
+  isHomePage,
+  isYouTubeWatchUrl,
+  normaliseVideoUrl,
   parseDownloads,
   parseProbe,
   streamRefusal,
@@ -177,6 +180,62 @@ for (const bad of ['', 'not json', '{}', '{"jobs":null}', '{"jobs":[{}]}']) {
 }
 
 console.log('');
+/*
+ * Paste-a-link. This is the flow the screenshot was missing: the sheet was opened
+ * on https://m.youtube.com — a front page — so it correctly found no video and
+ * was unable to accept one. Every shape below is something a phone share sheet or
+ * an address bar actually produces.
+ */
+check('a bare 11-character id becomes a watch link',
+  normaliseVideoUrl('dQw4w9WgXcQ') === 'https://www.youtube.com/watch?v=dQw4w9WgXcQ');
+check('a short link is accepted as-is',
+  normaliseVideoUrl('https://youtu.be/dQw4w9WgXcQ') === 'https://youtu.be/dQw4w9WgXcQ');
+check('a scheme-less mobile link gains https',
+  normaliseVideoUrl('m.youtube.com/watch?v=dQw4w9WgXcQ')
+    === 'https://m.youtube.com/watch?v=dQw4w9WgXcQ');
+check('a timestamp is stripped',
+  normaliseVideoUrl('https://youtu.be/dQw4w9WgXcQ?t=42')
+    === 'https://youtu.be/dQw4w9WgXcQ');
+check('share tracking is stripped',
+  normaliseVideoUrl('https://www.youtube.com/watch?v=dQw4w9WgXcQ&si=abcdef')
+    === 'https://www.youtube.com/watch?v=dQw4w9WgXcQ');
+check('a fragment is stripped',
+  normaliseVideoUrl('https://youtu.be/dQw4w9WgXcQ#t=10')
+    === 'https://youtu.be/dQw4w9WgXcQ');
+check('an ordinary site link is accepted',
+  normaliseVideoUrl('https://example.com/videos/1') === 'https://example.com/videos/1');
+check('nonsense is refused rather than fetched',
+  normaliseVideoUrl('hello there') === '');
+check('an empty link is refused', normaliseVideoUrl('') === '');
+check('a javascript url is refused',
+  normaliseVideoUrl('javascript:alert(1)') === '');
+
+check('a watch link is recognised', isYouTubeWatchUrl('https://m.youtube.com/watch?v=dQw4w9WgXcQ'));
+check('a short link is recognised', isYouTubeWatchUrl('https://youtu.be/dQw4w9WgXcQ'));
+check('an embed is not treated as a watch page',
+  !isYouTubeWatchUrl('https://www.youtube.com/embed/dQw4w9WgXcQ'));
+
+/*
+ * The exact page from the screenshot. It must be recognised as a front page so
+ * the sheet can say "open a video first" instead of implying the site failed.
+ */
+check('the youtube front page is a front page', isHomePage('https://m.youtube.com'));
+check('the youtube front page with a trailing slash is a front page',
+  isHomePage('https://m.youtube.com/'));
+check('a watch page is not a front page',
+  !isHomePage('https://m.youtube.com/watch?v=dQw4w9WgXcQ'));
+check('an ordinary article is not a front page', !isHomePage('https://example.com/a/b'));
+check('an empty url counts as a front page', isHomePage(''));
+
+/* A probe that found a direct file must hand that address to the download. */
+const directProbe = parseProbe(JSON.stringify({
+  ok: true, kind: 'file', parts: 1, direct: 'https://cdn.example.com/v.mp4', title: 'T',
+}));
+check('a direct media address survives the probe',
+  directProbe?.direct === 'https://cdn.example.com/v.mp4');
+const noDirect = parseProbe(JSON.stringify({ ok: true, kind: 'hls', parts: 4 }));
+check('a probe without a direct address has none', noDirect?.direct === undefined);
+
 if (failures.length) {
   console.error(`download queue: ${failures.length} failure(s)`);
   for (const f of failures) console.error(`  - ${f}`);

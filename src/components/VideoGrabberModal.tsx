@@ -15,7 +15,9 @@ import {
   describeProbe,
   formatBytes,
   formatDuration,
+  isHomePage,
   isYouTubeWatchUrl,
+  normaliseVideoUrl,
   parseDownloads,
   parseProbe,
   streamRefusal,
@@ -57,6 +59,19 @@ export const VideoGrabberModal: React.FC<VideoGrabberModalProps> = ({
   const [downloaded, setDownloaded] = useState<Record<string, boolean>>({});
   const [probes, setProbes] = useState<Record<string, StreamProbe | null>>({});
   const [jobs, setJobs] = useState<DownloadJob[]>([]);
+  /*
+   * A link pasted by hand.
+   *
+   * This is how the app being compared to works, and it is why it downloads from
+   * every page: it does not care what the browser is showing, only what link you
+   * give it. Without this, opening the sheet on a homepage — or on any site that
+   * is not currently playing the video you want — finds nothing, correctly, and
+   * the feature looks broken.
+   */
+  const [link, setLink] = useState('');
+  const [linkProbe, setLinkProbe] = useState<StreamProbe | null>(null);
+  const [linkBusy, setLinkBusy] = useState(false);
+  const [linkSaved, setLinkSaved] = useState(false);
   const [youtubeProbe, setYoutubeProbe] = useState<StreamProbe | null>(null);
   const [youtubeStarted, setYoutubeStarted] = useState(false);
 
@@ -255,6 +270,101 @@ export const VideoGrabberModal: React.FC<VideoGrabberModalProps> = ({
             </div>
           )}
 
+          {/*
+            Paste a link. Always visible, on every page, because the video you want
+            is often not the page you are on.
+          */}
+          {hasNative && (
+            <div className="rounded-xl border border-slate-800 bg-[#060608] p-3 space-y-2">
+              <div className="text-[11px] font-semibold text-slate-300">Download from a link</div>
+              <div className="flex gap-2">
+                <input
+                  value={link}
+                  onChange={(e) => {
+                    setLink(e.target.value);
+                    setLinkProbe(null);
+                    setLinkSaved(false);
+                  }}
+                  placeholder="Paste a video link"
+                  inputMode="url"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  className="flex-1 min-w-0 bg-[#0b0b0f] border border-slate-800 rounded-lg px-2.5 py-2 text-[11px] text-white placeholder:text-slate-600 outline-none focus:border-cyan-500/50"
+                />
+                <button
+                  onClick={() => {
+                    const trimmed = link.trim();
+                    if (!trimmed) return;
+                    const url = normaliseVideoUrl(trimmed);
+                    if (!url) {
+                      setLinkProbe({
+                        ok: false,
+                        reason: 'That does not look like a link. Paste the address of a video page.',
+                      });
+                      return;
+                    }
+                    setLinkBusy(true);
+                    setLinkProbe(null);
+                    setLinkSaved(false);
+                    AndroidHybridBridge.probeStream(url);
+                    let tries = 0;
+                    const timer = window.setInterval(() => {
+                      tries += 1;
+                      const parsed = parseProbe(AndroidHybridBridge.getStreamProbe());
+                      if (parsed) {
+                        window.clearInterval(timer);
+                        setLinkBusy(false);
+                        setLinkProbe(parsed);
+                      } else if (tries > 60) {
+                        window.clearInterval(timer);
+                        setLinkBusy(false);
+                        setLinkProbe({ ok: false, reason: 'The link did not answer. Check it and try again.' });
+                      }
+                    }, 500);
+                  }}
+                  className="px-3 py-2 rounded-lg bg-cyan-500/20 border border-cyan-500/40 text-cyan-200 text-[11px] font-semibold cursor-pointer disabled:opacity-40 shrink-0"
+                  disabled={linkBusy || !link.trim()}
+                >
+                  {linkBusy ? 'Checking…' : 'Check'}
+                </button>
+              </div>
+
+              {linkProbe && (
+                <p
+                  className={`text-[11px] leading-relaxed ${
+                    linkProbe.ok ? 'text-cyan-200/80' : 'text-amber-200/80'
+                  }`}
+                >
+                  {linkProbe.ok ? describeProbe(linkProbe) : linkProbe.reason}
+                </p>
+              )}
+
+              {linkProbe?.ok && (
+                <button
+                  onClick={() => {
+                    const url =
+                      linkProbe.direct?.trim() || normaliseVideoUrl(link.trim());
+                    if (!url) return;
+                    const title = linkProbe.title?.trim() || 'video';
+                    const safe = title.replace(/[\\/:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim();
+                    const kind = linkProbe.kind === 'youtube' ? 'youtube' : linkProbe.kind || 'file';
+                    const id = AndroidHybridBridge.startDownload(url, `${safe || 'video'}.mp4`, kind, title);
+                    if (id) setLinkSaved(true);
+                  }}
+                  className={`w-full flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-semibold cursor-pointer ${
+                    linkSaved
+                      ? 'bg-emerald-500/20 border border-emerald-500/40 text-emerald-300'
+                      : 'bg-cyan-500/20 border border-cyan-500/40 text-cyan-200 hover:bg-cyan-500/30'
+                  }`}
+                >
+                  <Download size={14} />
+                  {linkSaved ? 'Saved to your downloads' : 'Download this video'}
+                </button>
+              )}
+            </div>
+          )}
+
           {hasNative && page.drm && (
             <div className="rounded-xl border border-rose-500/40 bg-rose-500/10 px-3.5 py-3 flex gap-2.5">
               <ShieldAlert size={16} className="text-rose-400 shrink-0 mt-0.5" />
@@ -335,10 +445,13 @@ export const VideoGrabberModal: React.FC<VideoGrabberModalProps> = ({
           {!scanning && items.length === 0 && !onYouTube && (
             <div className="rounded-xl border border-slate-800 bg-[#060608] px-3.5 py-4 text-center">
               <ScanLine size={22} className="mx-auto text-slate-600 mb-2" />
-              <div className="text-xs font-semibold text-slate-300">No video on this page yet</div>
+              <div className="text-xs font-semibold text-slate-300">
+                {isHomePage(pageUrl) ? 'Open a video first' : 'No video on this page yet'}
+              </div>
               <p className="text-[11px] text-slate-500 leading-relaxed mt-1.5">
-                Play the video for a second, then tap scan again. BrowserHub only finds media the page
-                has actually requested — it cannot reach into a site it has not loaded.
+                {isHomePage(pageUrl)
+                  ? 'This is a site front page, so there is no video to grab yet. Open the video you want, or paste its link above.'
+                  : 'Play the video for a second, then tap scan again. BrowserHub finds media the page has actually requested — or paste the video link above to skip that entirely.'}
               </p>
             </div>
           )}

@@ -39,6 +39,11 @@ export interface StreamProbe {
   title?: string;
   /** "one file" or "picture + sound" — what has to be joined. */
   track?: string;
+  /**
+   * A media address found inside a page, when the link was a page rather than a
+   * file. This is what gets downloaded, not the page address itself.
+   */
+  direct?: string;
 }
 
 export const EMPTY_PROBE: StreamProbe = { ok: false };
@@ -100,6 +105,7 @@ export function parseProbe(raw: string): StreamProbe | null {
       kind: typeof p.kind === 'string' ? p.kind : undefined,
       title: typeof p.title === 'string' ? p.title : undefined,
       track: typeof p.track === 'string' ? p.track : undefined,
+      direct: typeof p.direct === 'string' && p.direct.length > 0 ? p.direct : undefined,
     };
   } catch {
     return null;
@@ -159,6 +165,67 @@ export function describeProbe(probe: StreamProbe | null): string {
  * it arrives inside the player's JSON, so a "grab what the page requested"
  * approach finds nothing on a perfectly working page.
  */
+/**
+ * Turns whatever was pasted into a real video page address.
+ *
+ * People paste all of these, and all of them mean the same video:
+ *
+ *   dQw4w9WgXcQ                        a bare id, copied from a share sheet
+ *   youtu.be/dQw4w9WgXcQ               the short link
+ *   m.youtube.com/watch?v=dQw4w9WgXcQ  what a phone actually copies
+ *   https://youtube.com/shorts/...     a short
+ *   a link with &t=42s, &si=…, #t=42   tracking and timestamps bolted on
+ *
+ * Returning "" means "this is not a video link", which the sheet reports rather
+ * than fetching something arbitrary.
+ */
+export function normaliseVideoUrl(raw: string): string {
+  const input = (raw ?? '').trim();
+  if (!input) return '';
+
+  // A bare 11-character id is the most common paste from a phone share sheet.
+  if (/^[A-Za-z0-9_-]{11}$/.test(input)) {
+    return `https://www.youtube.com/watch?v=${input}`;
+  }
+
+  let url = input;
+  if (!/^https?:\/\//i.test(url)) {
+    // "youtu.be/x" and "m.youtube.com/watch?v=x" arrive without a scheme.
+    if (/^(www\.|m\.)?(youtube\.com|youtu\.be|youtube-nocookie\.com)\//i.test(url)) {
+      url = `https://${url}`;
+    } else {
+      return '';
+    }
+  }
+
+  // Strip tracking parameters and timestamps, which are noise to the resolver.
+  url = url.replace(/([?&])(si|pp|feature|t|start|end|ab_channel)=[^&]*/gi, '$1');
+  url = url.replace(/[?&]+$/, '');
+  url = url.replace(/#.*$/, '');
+
+  return url;
+}
+
+/**
+ * True for a site's front page rather than a page about something.
+ *
+ * Worth distinguishing, because "no video on this page" is a confusing thing to
+ * read on youtube.com: the app is being honest, but the useful sentence is "you
+ * are on the homepage". A path with no segments is the reliable signal; a query
+ * string only counts when it selects content, which `watch?v=` does.
+ */
+export function isHomePage(raw: string): boolean {
+  const url = (raw ?? '').trim();
+  if (!url) return true;
+  const match = /^https?:\/\/[^/]+(\/[^?#]*)?(\?[^#]*)?/i.exec(url);
+  if (!match) return true;
+  const path = (match[1] ?? '').replace(/\/+$/, '');
+  if (path.length > 1) return false;
+  const query = match[2] ?? '';
+  // A query that names a video means this is a watch page, not a front page.
+  return !/[?&](v|video_id|watch)=/i.test(query);
+}
+
 export function isYouTubeWatchUrl(url: string): boolean {
   if (!url) return false;
   const lower = url.toLowerCase();
