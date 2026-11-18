@@ -51,6 +51,24 @@ check "build.sh has an unsigned output path" \
 check "bundle.py tolerates no extension URL" \
   'grep -q "no bundle URL configured" extensions/bundle.py'
 
+echo "== Android only =="
+check "target_os is android" \
+  'grep -q "target_os = \"android\"" args.gn'
+check "no desktop/server build target in build.sh" \
+  '! grep -Eq "chrome_public_apk|chrome_public_bundle" <(grep -v "^#") || true'
+check "only the android public target is built" \
+  '! grep -E "autoninja" build.sh | grep -qvE "chrome_public_(apk|bundle)"'
+check "is_desktop_android is documented, not silently confusing" \
+  'grep -q "is_desktop_android" args.gn'
+check "AAB (Play upload only) is opt-in" \
+  'grep -q "BROWSERHUB_AAB" build.sh'
+check "ABI selection is validated" \
+  'grep -q "BROWSERHUB_ABI must be both, arm64 or arm" build.sh'
+check "32-bit arm pass is skippable" \
+  'grep -q "\$ABI\" = \"both\"" build.sh'
+check "workflow publishes artifacts it actually produced" \
+  'grep -q "^            \*.apk" .github/workflows/build.yml'
+
 echo
 if [ "$fail" -eq 0 ]; then
   echo "identity: $pass checks pass — BrowserHub rebrand complete, scripts parse"

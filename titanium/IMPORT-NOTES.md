@@ -49,6 +49,40 @@ are now explicit:
 3. **Attribution/metadata drift** between `args.gn`, `patch.sh` and `fastlane`,
    now consistent.
 
+## Android only
+
+The build is Android-only and always was: `target_os = "android"`, and the only
+targets ever built are `chrome_public_apk` / `chrome_public_bundle`. There is no
+desktop, Linux or ChromeOS target anywhere in this repository. What *was* being
+produced beyond what a phone needs:
+
+| Artifact | Needed by | Now |
+|---|---|---|
+| `*-armeabi-v7a.apk` (32-bit) | phones from before ~2015 | opt-in via `BROWSERHUB_ABI` |
+| `*-arm64-v8a.apk` (64-bit) | every phone since ~2015 | **default** |
+| `*-arm64-v8a.aab` | Play Store upload only — **Android cannot install a .aab** | off unless `BROWSERHUB_AAB=1` |
+
+Pick your target with one variable:
+
+```bash
+BROWSERHUB_ABI=arm64 ./build.sh    # one APK, 64-bit; skips a whole 32-bit compile
+BROWSERHUB_ABI=both  ./build.sh    # default: two APKs, also covers old phones
+BROWSERHUB_ABI=arm   ./build.sh    # 32-bit only, for a specific old device
+BROWSERHUB_AAB=1     ./build.sh    # additionally produce the Play upload bundle
+```
+
+The 32-bit pass is a **separate full Chromium compile**, not a flag on the same
+build, so `BROWSERHUB_ABI=arm64` roughly halves total build time.
+
+### `is_desktop_android = true` is not desktop-only
+
+This reads like a desktop flag and it is the one setting in `args.gn` most likely
+to cause a wrong conclusion. It does **not** produce a desktop build. It selects
+Chromium's desktop-style Android UI — desktop-mode windowing, mouse/trackpad
+support, tablet and Chromebook form factors — which is what lets a phone browser
+handle a physical keyboard or DeX-style display. Removing it does not make the
+build "more Android"; it removes input and form-factor support. Left as upstream.
+
 ## Building it — measured blockers
 
 **It cannot be built in this environment.** Verified, not assumed:

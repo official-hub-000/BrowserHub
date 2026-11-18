@@ -38,12 +38,37 @@ cp $SCRIPT_DIR/args.gn out/Default/args.gn
 gn gen out/Default # gn args out/Default; echo 'treat_warnings_as_errors = false' >> out/Default/args.gn
 mkdir -p out/tmp out/release
 
-autoninja -C out/Default chrome_public_apk
-mv $(find out/Default/apks -name 'Chrome*.apk') out/tmp/$VERSION-armeabi-v7a.apk
-sed -i 's/target_cpu = "arm"/target_cpu = "arm64"/' out/Default/args.gn
-autoninja -C out/Default chrome_public_apk chrome_public_bundle
-mv $(find out/Default/apks -name 'Chrome*.apk') out/tmp/$VERSION-arm64-v8a.apk
-mv $(find out/Default/apks -name 'Chrome*.aab') out/tmp/$VERSION-arm64-v8a.aab
+# Android only, and only the ABIs you ask for.
+#
+#   BROWSERHUB_ABI=both    two APKs, 32-bit + 64-bit (default; covers old phones)
+#   BROWSERHUB_ABI=arm64   one APK, 64-bit only  -- every phone since ~2015
+#   BROWSERHUB_ABI=arm     one APK, 32-bit only
+#
+# arm64 alone halves the build: the 32-bit pass is a separate full compile that
+# no modern device ever loads.
+ABI="${BROWSERHUB_ABI:-both}"
+case "$ABI" in
+    both|arm64|arm) ;;
+    *) echo "build.sh: BROWSERHUB_ABI must be both, arm64 or arm (got '$ABI')" >&2; exit 1 ;;
+esac
+
+if [ "$ABI" = "both" ] || [ "$ABI" = "arm" ]; then
+    autoninja -C out/Default chrome_public_apk
+    mv $(find out/Default/apks -name 'Chrome*.apk') out/tmp/$VERSION-armeabi-v7a.apk
+fi
+
+if [ "$ABI" = "both" ] || [ "$ABI" = "arm64" ]; then
+    sed -i 's/target_cpu = "arm"/target_cpu = "arm64"/' out/Default/args.gn
+    autoninja -C out/Default chrome_public_apk
+    mv $(find out/Default/apks -name 'Chrome*.apk') out/tmp/$VERSION-arm64-v8a.apk
+fi
+
+# The AAB is a Play Store *upload* format. Android cannot install one, so it is
+# off by default; enable it only when publishing to Play.
+if [ -n "${BROWSERHUB_AAB:-}" ]; then
+    autoninja -C out/Default chrome_public_bundle
+    mv $(find out/Default/apks -name 'Chrome*.aab') out/tmp/$VERSION-arm64-v8a.aab
+fi
 
 export PATH=$PWD/third_party/jdk/current/bin/:$PATH
 export ANDROID_HOME=$PWD/third_party/android_sdk/public
@@ -56,8 +81,14 @@ if [ -n "${SKIP_SIGNING:-}" ]; then
     done
     echo "build.sh: unsigned artifacts in out/release/"
 else
-    sign_apk out/tmp/$VERSION-armeabi-v7a.apk out/release/$VERSION-armeabi-v7a.apk
-    sign_apk out/tmp/$VERSION-arm64-v8a.apk out/release/$VERSION-arm64-v8a.apk
-    sign_aab out/tmp/$VERSION-arm64-v8a.aab out/release/$VERSION-arm64-v8a.aab
+    # Sign only what this ABI selection actually produced.
+    for a in out/tmp/*.apk; do
+        [ -e "$a" ] || continue
+        sign_apk "$a" "out/release/$(basename "$a")"
+    done
+    for a in out/tmp/*.aab; do
+        [ -e "$a" ] || continue
+        sign_aab "$a" "out/release/$(basename "$a")"
+    done
 fi
 rm -rf $SCRIPT_DIR/keys
