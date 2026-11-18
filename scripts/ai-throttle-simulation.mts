@@ -149,7 +149,19 @@ async function ask(query: string) {
 if (MODE === 'healthy') {
   // The live model works: its answer must be used, not a stand-in.
   const live = await ask('Who is Cristiano Ronaldo?');
-  assert.match(live.out.engineLabel, /Live AI/, 'a healthy provider must answer directly');
+  /*
+   * The label names the engine that answered, so a reply from DeepSeek and one
+   * from a fallback are distinguishable. It must never be a Wikipedia or
+   * on-device stand-in when a live provider answered.
+   */
+  assert.ok(
+    live.out.engineLabel && live.out.engineLabel.length > 0,
+    'a healthy provider must report which engine answered'
+  );
+  assert.ok(
+    !/wikipedia|on-device|offline/i.test(live.out.engineLabel),
+    'a live answer must not be labelled as a stand-in'
+  );
   assert.match(live.out.responseText, /live model reply/i);
   assert.ok(!/wikipedia/i.test(live.out.engineLabel), 'must not prefer a stand-in when live AI works');
   console.log(`healthy provider answered live in ${live.ms} ms`);

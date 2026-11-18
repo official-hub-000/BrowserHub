@@ -27,7 +27,16 @@ public final class NativeAiClient {
      * rate-limited model broke every question after it — the exact "answered
      * 'Who is Ronaldo' then failed 'Who is goat'" behaviour.
      */
-    private static final String[] MODELS = {"openai", "mistral", "llama", "openai-fast"};
+    /**
+     * Model aliases for the Pollinations gateway. DeepSeek first: it is the
+     * strongest reasoner reachable without a key, and the canonical id is the
+     * one from Pollinations' own APIDOCS.md.
+     */
+    private static final String[] MODELS = {
+            "deepseek/deepseek-v4-flash", "openai", "mistral", "llama", "openai-fast"};
+
+    /** The model that answers alongside each provider, when it needs one. */
+    private static final String DEEPSEEK_MODEL = "deepseek/deepseek-v4-flash";
     private static final ConcurrentHashMap<String, String> RESULTS = new ConcurrentHashMap<String, String>();
 
     private NativeAiClient() {}
@@ -62,6 +71,9 @@ public final class NativeAiClient {
      * has its own limits, so when one is saturated another can still answer.
      */
     private static final String[][] PROVIDERS = {
+            // DeepSeek through the keyless gateway. Its own api.deepseek.com
+            // needs a paid key, which would break the zero-key promise.
+            {"https://text.pollinations.ai/openai", "deepseek"},
             {"https://text.pollinations.ai/openai", "pollinations"},
             {"https://api.deepinfra.com/v1/openai/chat/completions", "deepinfra"},
             {"https://ai.hackclub.com/chat/completions", "hackclub"},
@@ -101,7 +113,11 @@ public final class NativeAiClient {
             JSONObject payload = new JSONObject();
             // DeepInfra and Hack Club need a concrete model; Pollinations accepts
             // its own alias names.
-            if ("pollinations".equals(providerId)) {
+            if ("deepseek".equals(providerId)) {
+                payload.put("model", DEEPSEEK_MODEL);
+                // DeepSeek rambles; a phone reply should stay readable.
+                payload.put("max_tokens", 800);
+            } else if ("pollinations".equals(providerId)) {
                 payload.put("model", model);
             } else if ("deepinfra".equals(providerId)) {
                 payload.put("model", "meta-llama/Meta-Llama-3.1-8B-Instruct");

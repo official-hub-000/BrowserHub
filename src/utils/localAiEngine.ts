@@ -20,6 +20,13 @@ export interface LocalAiInput {
   history?: Array<{ role: 'user' | 'assistant'; content: string }>;
   /** Human-readable name of the engine selected in the address bar. */
   searchEngineName?: string;
+  /**
+   * Which AI engine the user picked in the AI settings. 'auto' rotates, a
+   * specific id is tried first. Never a hard lock: if the chosen engine is
+   * down the others still answer, because a reply from the wrong engine beats
+   * no reply.
+   */
+  preferredAiEngine?: string;
 }
 
 export interface LocalAiOutput {
@@ -407,6 +414,8 @@ export function runLocalAiClient(input: LocalAiInput): LocalAiOutput {
 interface ChatProvider {
   id: string;
   label: string;
+  /** Shown in the answer footer when this provider answered. */
+  engineLabel?: string;
   build: (messages: { role: string; content: string }[]) => {
     url: string;
     init: RequestInit;
@@ -415,10 +424,92 @@ interface ChatProvider {
   };
 }
 
-const CHAT_PROVIDERS: ChatProvider[] = [
+/**
+ * DeepSeek, through the same keyless gateway the app already uses.
+ *
+ * DeepSeek's own api.deepseek.com requires a paid key, which would end the
+ * zero-key promise. This is DeepSeek V4 Flash served by Pollinations, which is
+ * keyless and speaks the OpenAI chat-completions shape, so it slots into the
+ * same code path with no separate transport.
+ *
+ * `deepseek/deepseek-v4-flash` is the canonical id from Pollinations' own
+ * APIDOCS.md, not an invented one. If the gateway ever retires it the request
+ * simply fails and the next provider answers — the user still gets a reply.
+ */
+const DEEPSEEK_MODEL = 'deepseek/deepseek-v4-flash';
+const DEEPSEEK_LABEL = 'DeepSeek V4 Flash';
+
+/** One entry per engine the user can choose, in the order the UI shows them. */
+export interface AiEngineChoice {
+  id: string;
+  label: string;
+  /** One line describing what this engine is for. */
+  blurb: string;
+  /** True when it needs no key of any kind. */
+  zeroKey: boolean;
+}
+
+export const AI_ENGINES: AiEngineChoice[] = [
+  {
+    id: 'auto',
+    label: 'Auto',
+    blurb: 'Tries DeepSeek first, then the other keyless engines',
+    zeroKey: true,
+  },
+  {
+    id: 'deepseek',
+    label: 'DeepSeek V4 Flash',
+    blurb: 'Strongest reasoning here — good for code and long questions',
+    zeroKey: true,
+  },
   {
     id: 'pollinations',
     label: 'Pollinations',
+    blurb: 'Fast general answers',
+    zeroKey: true,
+  },
+  {
+    id: 'deepinfra',
+    label: 'DeepInfra (open chat)',
+    blurb: 'Open-model fallback with its own quota',
+    zeroKey: true,
+  },
+  {
+    id: 'hackclub',
+    label: 'Hack Club AI',
+    blurb: 'Independent fallback',
+    zeroKey: true,
+  },
+];
+
+/** The engine id actually used when the user picks 'auto'. */
+export const DEFAULT_AI_ENGINE = 'deepseek';
+
+const CHAT_PROVIDERS: ChatProvider[] = [
+  {
+    id: 'deepseek',
+    label: DEEPSEEK_LABEL,
+    engineLabel: 'DeepSeek V4 Flash (keyless gateway)',
+    build: (messages) => ({
+      url: 'https://text.pollinations.ai/openai',
+      init: {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: DEEPSEEK_MODEL,
+          messages,
+          // DeepSeek reasons well but rambles; cap it so a phone reply stays
+          // readable rather than a wall of text.
+          max_tokens: 800,
+        }),
+      },
+      parse: (data) => data?.choices?.[0]?.message?.content ?? null,
+    }),
+  },
+  {
+    id: 'pollinations',
+    label: 'Pollinations',
+    engineLabel: 'Pollinations (keyless)',
     build: (messages) => ({
       url: 'https://text.pollinations.ai/openai',
       init: {
@@ -482,15 +573,22 @@ const CHAT_PROVIDERS: ChatProvider[] = [
  */
 async function askAnyProvider(
   messages: { role: string; content: string }[],
-  perProviderMs: number
+  perProviderMs: number,
+  preferred?: string
 ): Promise<{ text: string; label: string } | null> {
-  // Prefer providers that are not currently blocked. A blocked one is still
-  // tried last rather than skipped, because our block is a local estimate.
-  const ordered = [...CHAT_PROVIDERS].sort((a, b) => {
-    const aBlocked = providerAvailable(a.id) ? 0 : 1;
-    const bBlocked = providerAvailable(b.id) ? 0 : 1;
-    return aBlocked - bBlocked;
-  });
+  /*
+   * Ordering is three tiers, in this order:
+   *   1. the engine the user picked, so a choice is honoured immediately
+   *   2. providers not recently rate limited, so a healthy one is not skipped
+   *   3. everything else, because a local rate-limit estimate can be wrong
+   */
+  const chosen =
+    preferred && preferred !== 'auto' ? preferred : DEFAULT_AI_ENGINE;
+  const rank = (p: ChatProvider) => {
+    if (p.id === chosen) return 0;
+    return providerAvailable(p.id) ? 1 : 2;
+  };
+  const ordered = [...CHAT_PROVIDERS].sort((a, b) => rank(a) - rank(b));
 
   for (const provider of ordered) {
     if (!providerAvailable(provider.id)) {
@@ -541,7 +639,7 @@ async function askAnyProvider(
       }
       const text = parse(data);
       if (typeof text === 'string' && text.trim().length > 2) {
-        return { text: text.trim(), label: provider.label };
+        return { text: text.trim(), label: provider.engineLabel ?? provider.label };
       }
       noteAiAttempt('provider', `${provider.label}: empty response`);
     } catch (err) {
@@ -900,16 +998,26 @@ export async function runSmartHybridAi(input: LocalAiInput): Promise<LocalAiOutp
    * assistant was simply offline. Now each provider is a different service with
    * its own quota, tried in order, and a success no longer blocks the next ask.
    */
-  const multiReply = await fetchLive(
-    async () => (await askAnyProvider(chatMessages, 6000))?.text ?? null,
+  let lastEngineLabel = '';
+  const answered = await fetchLive(
+    async () => {
+      const reply = await askAnyProvider(chatMessages, 6000, input.preferredAiEngine);
+      // fetchLive works in strings; the engine label is carried alongside so a
+      // silent downgrade to a fallback engine stays visible to the user.
+      if (reply) lastEngineLabel = reply.label;
+      return reply?.text ?? null;
+    },
     20000
   );
-  if (multiReply) {
+  if (answered) {
     markModelAnswered();
     noteNetworkSuccess();
     return persist({
-      ...liveReply(multiReply),
-      engineLabel: 'Live AI (no key needed)',
+      ...liveReply(answered),
+      // Name the engine that actually answered. The old code replaced this
+      // with a generic "Live AI" string, so a DeepSeek answer and a fallback
+      // answer looked identical and a silent downgrade was invisible.
+      engineLabel: lastEngineLabel || 'Live AI (no key needed)',
     });
   }
 

@@ -325,7 +325,10 @@ export function createApiRouter() {
         headers: { 'Content-Type': 'application/json' },
         signal: controller.signal,
         body: JSON.stringify({
-          model: 'openai',
+          // DeepSeek V4 Flash through the keyless gateway: the strongest
+          // reasoner reachable without a key. Canonical id from APIDOCS.md.
+          model: 'deepseek/deepseek-v4-flash',
+          max_tokens: 800,
           messages: [
             { role: 'system', content: systemPrompt },
             ...(Array.isArray(messages) ? messages.slice(-6) : []),
@@ -341,7 +344,7 @@ export function createApiRouter() {
         if (reply && reply.length > 2) {
           res.json({
             ok: true,
-            engineLabel: 'Live AI (no key needed)',
+            engineLabel: 'DeepSeek V4 Flash (keyless gateway)',
             responseText: reply,
             bullets: [],
           });

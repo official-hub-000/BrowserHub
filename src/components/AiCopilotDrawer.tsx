@@ -20,7 +20,7 @@ import { copyText } from '../utils/aiCache';
 import { getSearchEngineOption } from '../data/presets';
 import type { SearchEngineId } from '../types/browser';
 import { AiThinkingState } from './AiThinkingState';
-import { runSmartHybridAi } from '../utils/localAiEngine';
+import { AI_ENGINES, runSmartHybridAi } from '../utils/localAiEngine';
 import { useExitTransition } from '../utils/useExitTransition';
 
 interface AiCopilotDrawerProps {
@@ -28,6 +28,9 @@ interface AiCopilotDrawerProps {
   livePageText?: string;
   /** Engine chosen in the address bar, used in offline guidance. */
   searchEngineId?: SearchEngineId;
+  /** Which AI engine the user picked. 'auto' rotates. */
+  aiEngine?: string;
+  onSelectAiEngine?: (id: string) => void;
   initialMode?: string;
   initialQuery?: string;
   onClose: () => void;
@@ -152,6 +155,8 @@ export const AiCopilotDrawer: React.FC<AiCopilotDrawerProps> = ({
   tab,
   livePageText,
   searchEngineId = 'google',
+  aiEngine = 'auto',
+  onSelectAiEngine,
   initialMode,
   initialQuery,
   onClose,
@@ -212,6 +217,7 @@ export const AiCopilotDrawer: React.FC<AiCopilotDrawerProps> = ({
         query: customQuery || '',
         history: messages.map((m) => ({ role: m.role, content: m.content })),
         searchEngineName: getSearchEngineOption(searchEngineId).name,
+        preferredAiEngine: aiEngine,
       });
     } catch (err) {
       const detail = err instanceof Error ? err.message : String(err);
@@ -301,6 +307,42 @@ export const AiCopilotDrawer: React.FC<AiCopilotDrawerProps> = ({
         style={{ backgroundColor: '#000000' }}
         onClick={(e) => e.stopPropagation()}
       >
+        {/*
+          Engine picker. One row of chips, because choosing the model must be a
+          single tap, not a settings journey. The active engine is visible at
+          all times so a silent fallback is never mistaken for the chosen one.
+        */}
+        {onSelectAiEngine && (
+          <div
+            className="px-3 py-2 border-b border-slate-800 shrink-0 overflow-x-auto"
+            style={{ backgroundColor: '#050507' }}
+          >
+            <div className="flex items-center gap-1.5 min-w-max">
+              <span className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold pr-1">
+                Engine
+              </span>
+              {AI_ENGINES.map((engine) => {
+                const selected = (aiEngine || 'auto') === engine.id;
+                return (
+                  <button
+                    key={engine.id}
+                    onClick={() => onSelectAiEngine(engine.id)}
+                    title={engine.blurb}
+                    aria-pressed={selected}
+                    className={`px-2.5 py-1 rounded-full text-[11px] font-semibold cursor-pointer border shrink-0 ${
+                      selected
+                        ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-200'
+                        : 'bg-[#0c0c10] border-slate-800 text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    {engine.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* Header */}
         <div
           className="px-4 py-3 border-b border-slate-800 flex items-center justify-between shrink-0"

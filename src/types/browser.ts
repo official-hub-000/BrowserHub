@@ -164,6 +164,8 @@ export interface BrowserCustomization {
   customAccentHex: string;
   addressBarPosition: AddressBarPosition;
   searchEngine: SearchEngineId;
+  /** Which AI engine answers. 'auto' rotates, an id pins that engine first. */
+  aiEngine: string;
   uiDensity: 'compact' | 'comfortable';
   biometricLockIncognito: boolean;
   readerFont: 'sans' | 'serif' | 'mono';

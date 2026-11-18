@@ -221,6 +221,7 @@ export function App() {
     customAccentHex: '#22d3ee',
     addressBarPosition: 'top',
     searchEngine: 'google',
+    aiEngine: 'auto',
     uiDensity: 'comfortable',
     biometricLockIncognito: false,
     readerFont: 'sans',
@@ -1806,6 +1807,10 @@ export function App() {
           tab={activeTab}
           livePageText={livePageTexts[activeTab.id]}
           searchEngineId={customization.searchEngine}
+          aiEngine={customization.aiEngine}
+          onSelectAiEngine={(id) =>
+            setCustomization((prev) => ({ ...prev, aiEngine: id }))
+          }
           initialMode={aiDrawerState.mode}
           initialQuery={aiDrawerState.query}
           onClose={() => setAiDrawerState({ open: false })}

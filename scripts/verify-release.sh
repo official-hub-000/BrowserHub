@@ -90,6 +90,9 @@ npx tsx scripts/extension-runtime-test.mts | tail -1
 echo "== Viewport sync coalesced (no JNI call per frame or per render) =="
 npx tsx scripts/viewport-sync-test.mts | tail -1
 
+echo "== DeepSeek: wired on every answer path, still zero-key =="
+npx tsx scripts/deepseek-engine-test.mts | tail -1
+
 echo "== Motion: everything that animates in also animates out =="
 npx tsx scripts/motion-test.mts | tail -1
 
