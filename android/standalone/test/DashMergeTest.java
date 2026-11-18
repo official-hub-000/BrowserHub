@@ -43,7 +43,71 @@ public final class DashMergeTest {
             for (String f : failures) System.err.println("  - " + f);
             System.exit(1);
         }
+        // ------------------------------------------------ parallel range download
+        /*
+         * These decide whether a fast download is correct. A range set that does not
+         * cover the file exactly leaves a zero-filled hole at the end, which plays as
+         * a video that stops early — the kind of bug nobody reports as "corruption".
+         */
+        java.util.List<long[]> r4 = com.browserhub.app.media.RangeDownloader
+                .rangesFor(1000, 4);
+        checkEq("four ranges are produced", "4", String.valueOf(r4.size()));
+        checkEq("the first starts at zero", "0", String.valueOf(r4.get(0)[0]));
+        checkEq("the last ends at the final byte", "999", String.valueOf(r4.get(3)[1]));
+        boolean contiguous = true;
+        for (int i = 1; i < r4.size(); i++) {
+            if (r4.get(i)[0] != r4.get(i - 1)[1] + 1) contiguous = false;
+        }
+        check("the ranges are contiguous with no gap and no overlap", contiguous);
+
+        // An odd length must not lose its tail.
+        java.util.List<long[]> odd = com.browserhub.app.media.RangeDownloader
+                .rangesFor(1001, 4);
+        long covered = 0;
+        for (long[] range : odd) covered += range[1] - range[0] + 1;
+        checkEq("an odd length is covered exactly, with no tail lost", "1001",
+                String.valueOf(covered));
+
+        // Sizes that do not divide evenly are the normal case, not the edge case.
+        for (long size : new long[] { 1, 2, 7, 1023, 1024, 1025, 999999 }) {
+            java.util.List<long[]> ranges = com.browserhub.app.media.RangeDownloader
+                    .rangesFor(size, 4);
+            long sum = 0;
+            for (long[] range : ranges) sum += range[1] - range[0] + 1;
+            check("size " + size + " is covered exactly", sum == size);
+        }
+
+        // A small file must not be split into connections that each do nothing.
+        checkEq("a tiny file uses one connection", "1",
+                String.valueOf(com.browserhub.app.media.RangeDownloader.threadsFor(1000)));
+        checkEq("a large file uses four", "4",
+                String.valueOf(com.browserhub.app.media.RangeDownloader.threadsFor(50L * 1024 * 1024)));
+        checkEq("an unknown size uses one", "1",
+                String.valueOf(com.browserhub.app.media.RangeDownloader.threadsFor(0)));
+
+        // Content-Range is the only trustworthy source of the total size.
+        checkEq("the total is read from Content-Range", "12345",
+                String.valueOf(com.browserhub.app.media.RangeDownloader
+                        .totalFromContentRange("bytes 0-0/12345")));
+        checkEq("an unknown total is not guessed", "0",
+                String.valueOf(com.browserhub.app.media.RangeDownloader
+                        .totalFromContentRange("bytes 0-0/*")));
+        checkEq("a missing header is not guessed", "0",
+                String.valueOf(com.browserhub.app.media.RangeDownloader
+                        .totalFromContentRange(null)));
+
         System.out.println("dash merge: " + passed + " checks pass — separate tracks are joined into one file");
+    }
+
+    /** Equality with the actual value in the failure text, so a failure says why. */
+    private static void checkEq(String name, String expected, String actual) {
+        if (expected == null ? actual == null : expected.equals(actual)) {
+            passed += 1;
+            System.out.println("  ok  " + name);
+        } else {
+            failures.add(name);
+            System.out.println("  FAIL " + name + " (expected " + expected + ", got " + actual + ")");
+        }
     }
 
     private static void check(String name, boolean ok) {

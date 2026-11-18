@@ -285,8 +285,25 @@ public class MainActivity extends Activity {
         browserWebView.setOverScrollMode(View.OVER_SCROLL_NEVER);
         browserWebView.setVerticalScrollBarEnabled(false);
         browserWebView.setHorizontalScrollBarEnabled(false);
-        // Hardware layers keep the WebView on the GPU instead of a software bitmap.
-        browserWebView.setLayerType(View.LAYER_TYPE_HARDWARE, null);
+        /*
+         * No LAYER_TYPE_HARDWARE here, deliberately.
+         *
+         * Forcing a hardware layer tells the system to keep the whole WebView in
+         * one GPU texture and re-upload it whenever anything inside changes. On a
+         * text page that is a small win. On a page playing video — YouTube being
+         * the case in hand — the video surface plus a page that repaints around it
+         * means the entire 1080p layer is recomposited every frame. The reported
+         * symptom was exactly that: "lagging as if a high-end PC game is playing
+         * on mobile".
+         *
+         * A WebView already uses the GPU for its normal rendering. All this flag
+         * added on top was the forced full-layer recomposite, so its removal is
+         * the fix rather than a trade.
+         */
+        if (Build.VERSION.SDK_INT == Build.VERSION_CODES.LOLLIPOP) {
+            // Only here, where the renderer had no GPU path of its own.
+            browserWebView.setLayerType(View.LAYER_TYPE_HARDWARE, null);
+        }
 
         CookieManager cm = CookieManager.getInstance();
         cm.setAcceptCookie(true);

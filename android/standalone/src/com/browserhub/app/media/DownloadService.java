@@ -144,12 +144,27 @@ public class DownloadService extends Service {
                 job.title = info.title;
             }
 
+            /*
+             * The throttle token. A googlevideo url carrying an &n= parameter is
+             * served at a trickle — literally a couple of hundred bytes a second —
+             * unless that parameter has been transformed by the player's own
+             * JavaScript. Downloading as-is "works", produces a file, and takes
+             * hours, which is the worst kind of failure because nothing looks
+             * broken. This MUST run before any media byte is requested.
+             */
+            if (transformThrottleTokens(info) > 0) {
+                job.message = "Preparing the download";
+                publishProgress(job, false);
+            }
+
             if (info.progressive != null) {
                 // One file with picture and sound: nothing to join.
                 job.message = "Downloading " + info.progressive.qualityLabel;
                 publishProgress(job, false);
-                boolean ok = MediaGrabberDirect.fetch(
-                        info.progressive.url, info.progressive, out, userAgent, cookie, job);
+                boolean ok = RangeDownloader.fetch(
+                        info.progressive.url, out,
+                        info.progressive.userAgent != null ? info.progressive.userAgent : userAgent,
+                        cookie, job);
                 if (job.cancel.get()) {
                     job.status = "cancelled";
                     job.message = "Cancelled";
@@ -335,8 +350,17 @@ public class DownloadService extends Service {
             return;
         }
 
-        // A direct file: stream it and report progress as it lands.
-        boolean ok = MediaGrabberDirect.fetch(url, out, userAgent, cookie, job);
+        /*
+         * A direct file: fetch it over several connections at once.
+         *
+         * A single connection over mobile data is limited by round-trip time and
+         * per-connection throttling far more often than by available bandwidth,
+         * which is how a healthy link can measure a couple of hundred bytes a
+         * second. RangeDownloader probes for range support and falls back to one
+         * connection when the server will not do it, so this is faster when it can
+         * be and never incorrect when it cannot.
+         */
+        boolean ok = RangeDownloader.fetch(url, out, userAgent, cookie, job);
         if (job.cancel.get()) {
             job.status = "cancelled";
             job.message = "Cancelled";
@@ -356,6 +380,36 @@ public class DownloadService extends Service {
         if (total > 0) return (int) Math.min(100, (done * 100) / total);
         if (segTotal > 0) return (int) Math.min(100, (segDone * 100) / segTotal);
         return 0;
+    }
+
+    /**
+     * Transforms every throttled stream url, in place.
+     *
+     * Only streams that are actually going to be downloaded are touched, so a
+     * video with twenty offered formats does not pay for twenty JavaScript calls.
+     *
+     * @return how many were transformed
+     */
+    private int transformThrottleTokens(YouTubeExtractor.Result info) {
+        YouTubeExtractor.Stream[] wanted = new YouTubeExtractor.Stream[] {
+                info.progressive, info.bestVideo, info.bestAudio
+        };
+        int changed = 0;
+        for (YouTubeExtractor.Stream stream : wanted) {
+            if (stream == null || stream.url == null) continue;
+            if (!YouTubeThrottle.needsTransform(stream.url)) continue;
+            String token = YouTubeThrottle.tokenOf(stream.url);
+            if (token.length() == 0) continue;
+            // The transform lives in the player, so it is asked for there. With no
+            // page available the url is left alone: an untransformed url is slow,
+            // but a wrongly invented one is a 403.
+            String solved = SignatureSolver.Holder.solve(token);
+            if (solved != null && solved.length() > 0 && !solved.equals(token)) {
+                stream.url = YouTubeThrottle.withToken(stream.url, solved);
+                changed++;
+            }
+        }
+        return changed;
     }
 
     /** True when any stream that would actually be downloaded still lacks a signature. */

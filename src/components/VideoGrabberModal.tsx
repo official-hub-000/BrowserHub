@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { X, Download, Film, RefreshCw, AlertTriangle, ShieldAlert, ScanLine } from 'lucide-react';
 import { AndroidHybridBridge } from '../bridge/androidHybridBridge';
 import {
@@ -165,10 +165,13 @@ export const VideoGrabberModal: React.FC<VideoGrabberModalProps> = ({
    * starts playing after the sheet is shown still appears without the user having
    * to close and reopen anything.
    */
+  const foundSomethingRef = useRef(false);
+
   const scan = useCallback(() => {
     const raw = AndroidHybridBridge.collectPageMedia();
     const parsed = parseCaptures(raw);
     if (parsed.items.length === 0) return;
+    foundSomethingRef.current = true;
     setItems((previous) => {
       // Keep the order stable so rows do not jump while the user is reaching for
       // one; new finds are appended.
@@ -189,11 +192,30 @@ export const VideoGrabberModal: React.FC<VideoGrabberModalProps> = ({
       setPage(cached.page);
       setScanning(false);
     }
-    const first = window.setTimeout(scan, 60);
-    const timer = window.setInterval(scan, 1500);
+    /*
+     * 2 s, not 1.5 s, and a scan that stops once it has found something.
+     *
+     * Each scan crosses the JS/native boundary and waits for a page readback. At
+     * 1.5 s that request was in flight roughly two thirds of the time the sheet
+     * was open, which is felt as lag in a sheet that should be free to scroll.
+     * Once media has been found there is nothing more to discover on a page that
+     * is not changing, so polling stops rather than continuing forever.
+     */
+    let timer: number | null = null;
+    const first = window.setTimeout(() => {
+      scan();
+      timer = window.setInterval(() => {
+        if (foundSomethingRef.current) {
+          if (timer !== null) window.clearInterval(timer);
+          timer = null;
+          return;
+        }
+        scan();
+      }, 2000);
+    }, 60);
     return () => {
       window.clearTimeout(first);
-      window.clearInterval(timer);
+      if (timer !== null) window.clearInterval(timer);
     };
   }, [scan]);
 
