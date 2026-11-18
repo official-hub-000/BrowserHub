@@ -808,11 +808,26 @@ public class MainActivity extends Activity {
                         if (!found.ok) {
                             out.put("reason", found.reason != null
                                     ? found.reason : "no video was found on that page");
+                        } else if (found.isManifest) {
+                            /*
+                             * The page pointed at a playlist, not a file: an HLS or
+                             * DASH address in a player config. Handing that back as
+                             * "direct" would save the playlist text as the video, so
+                             * resolve it properly instead — same path a pasted
+                             * playlist link takes.
+                             */
+                            out.put("direct", found.url);
+                            out.put("manifest", true);
+                            out.put("title", found.title != null ? found.title : "");
+                            out.put("bestResolution", found.quality != null ? found.quality : "");
+                            out.put("kind", com.browserhub.app.media.Resolver.isDashPlaylist(found.url)
+                                    ? "dash" : "hls");
                         } else {
                             out.put("parts", 1);
                             out.put("title", found.title != null ? found.title : "");
                             out.put("bestResolution", found.quality != null ? found.quality : "");
                             out.put("direct", found.url);
+                            out.put("foundBy", found.foundBy != null ? found.foundBy : "");
                         }
                         streamProbe = out.toString();
                         return;

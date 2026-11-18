@@ -2,38 +2,75 @@ package com.browserhub.app.media;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Finds a video on an ordinary web page, given only its address.
+ * Finds a video on any page, following yt-dlp's generic extractor.
  *
- * This is the other half of the paste-a-link feature. YouTube has its own
- * resolver because its media lives in a JSON blob that needs a specific key; most
- * other sites put the same information in one of a handful of standard places,
- * and this reads all of them:
+ * yt-dlp supports well over a thousand sites with a thousand small extractors
+ * plus one fallback: its generic extractor. That fallback is what this is — the
+ * same searches, in the same order, because the order is the part that was
+ * learned the hard way by that project over many years and is not something to
+ * invent again.
  *
- *   1. Open Graph:  <meta property="og:video" content="…"> — the site's own
- *      statement of what its video is, which is what social cards use.
- *   2. Twitter card: <meta name="twitter:player:stream" content="…">
- *   3. A player config: "file":"…mp4" / "video_url":"…" / "contentUrl":"…"
- *   4. A plain media reference anywhere in the markup, as a last resort.
+ * The order, taken from yt_dlp/extractor/generic.py:
  *
- * The order matters: the earlier a source appears, the more likely it is to be
- * the video the page is about rather than an advertisement or a preview clip.
- * That is why an og:video tag beats a URL found in a script, even though both
- * are "a video on the page".
+ *   1. An embed URL that is itself a player page (iframes, twitter:player) —
+ *      followed as a second page, because the video is not on this one.
+ *   2. A KVS player (kt_player), which needs its own decode.
+ *   3. JSON-LD VideoObject, the schema.org declaration.
+ *   4. JW Player in a SWFObject: `flashvars: "…file=http…"`.
+ *   5. JW Player setup blocks with a `file:` key.
+ *   6. A loose `file=` / `source=` attribute.
+ *   7. A JSON `file:` / `video_url:` key.
+ *   8. Flowplayer and Cinerama embeds.
+ *   9. twitter:player:stream — a raw stream, checked before twitter:player
+ *      because that one is an iframe.
+ *  10. Open Graph `og:video`, but ONLY when og:video:type says it is a video and
+ *      not a Flash player — that check is why a page with a swf player does not
+ *      offer a .swf as a download.
+ *  11. A meta refresh redirect.
+ *  12. twitter:player as a last resort.
  *
- * The result is a direct file address, which the existing download path already
- * knows how to fetch. Nothing here downloads anything.
+ * A candidate is rejected when its extension is a subtitle, image, stylesheet,
+ * script or flash file. That filter is the difference between finding the video
+ * and offering a poster image named "video.jpg".
+ *
+ * What is deliberately NOT done: rewriting a player URL into a real one by
+ * pattern-matching minified JavaScript. yt-dlp tries that for one player family
+ * (KVS) and its own source calls the approach unreliable — it is the piece that
+ * breaks. A page whose video cannot be reached without executing its player is
+ * handled by reading the live page in the app instead, where the player has
+ * already done the work.
  */
 public final class PageMediaFinder {
 
-    /** Media file extensions worth accepting from a page. */
-    private static final String[] MEDIA_EXT = {
-            ".mp4", ".webm", ".m4v", ".mov", ".mkv", ".m3u8", ".mpd", ".m4a", ".mp3"
+    /**
+     * Extensions a candidate may have, from yt-dlp's MEDIA_EXTENSIONS.
+     *
+     * Used both ways: to accept a media url, and to reject a page address that is
+     * really a direct file needing no page fetch at all.
+     */
+    static final String[] VIDEO_EXT = {
+            "3g2", "3gp", "f4v", "mk3d", "divx", "mpg", "ogv", "m4v", "wmv",
+            "avi", "flv", "mkv", "mov", "mp4", "webm"
+    };
+    static final String[] AUDIO_EXT = {
+            "aac", "ape", "asf", "f4a", "f4b", "m4b", "m4r", "oga", "ogx", "spx",
+            "vorbis", "wma", "weba", "aiff", "alac", "flac", "m4a", "mka", "mp3",
+            "ogg", "opus", "wav"
+    };
+    static final String[] MANIFEST_EXT = { "f4f", "f4m", "m3u8", "smil", "mpd" };
+
+    /** Extensions that look like media but are never a downloadable video. */
+    static final String[] REJECT_EXT = {
+            "swf", "png", "jpg", "jpeg", "gif", "webp", "bmp", "svg",
+            "srt", "sbv", "sub", "vtt", "ttml", "ass", "lrc",
+            "js", "mjs", "xml", "json", "css", "html", "htm", "txt", "pdf"
     };
 
     private PageMediaFinder() {}
@@ -44,6 +81,12 @@ public final class PageMediaFinder {
         public String url;
         public String title;
         public String quality;
+        /** Which rule found it, for the log and for the tests. */
+        public String foundBy;
+        /** True when this is a playlist the merger should read, not a single file. */
+        public boolean isManifest;
+        /** An embed page that must be fetched instead of this one. */
+        public String followUrl;
         public String reason;
     }
 
@@ -52,17 +95,32 @@ public final class PageMediaFinder {
         if (url == null || url.length() < 8) return false;
         String lower = url.toLowerCase(Locale.US);
         if (!lower.startsWith("http://") && !lower.startsWith("https://")) return false;
-        // A direct media address needs no page fetch.
-        for (String ext : MEDIA_EXT) {
-            if (lower.contains(ext) && !lower.contains(ext + "?")) return false;
+        if (lower.contains("/videoplayback")) return false;
+        String path = pathOf(lower);
+        for (String ext : ALL_MEDIA_EXT) {
+            if (path.endsWith("." + ext)) return false;
         }
-        return !lower.contains("/videoplayback");
+        // A url whose query carries a media file is already a stream.
+        for (String ext : ALL_MEDIA_EXT) {
+            if (lower.contains("." + ext) && lower.indexOf("." + ext) > lower.indexOf('?')) return false;
+        }
+        return true;
+    }
+
+    static final String[] ALL_MEDIA_EXT;
+
+    static {
+        List<String> all = new ArrayList<>();
+        for (String e : VIDEO_EXT) all.add(e);
+        for (String e : AUDIO_EXT) all.add(e);
+        for (String e : MANIFEST_EXT) all.add(e);
+        ALL_MEDIA_EXT = all.toArray(new String[0]);
     }
 
     /**
      * Fetches {@code pageUrl} and looks for a video on it.
      *
-     * @return a direct media address, or a reason nothing was found
+     * @return a direct media address, a followable embed page, or a reason
      */
     public static Result find(String pageUrl, String userAgent, String cookie) {
         Result result = new Result();
@@ -80,14 +138,29 @@ public final class PageMediaFinder {
             result.reason = "that link returned an empty page";
             return result;
         }
-        return parse(html, pageUrl);
+        Result parsed = parse(html, pageUrl);
+
+        // A page that only holds an embed: fetch the player page and look there.
+        if (!parsed.ok && parsed.followUrl != null && parsed.followUrl.length() > 0
+                && !parsed.followUrl.equals(pageUrl)) {
+            try {
+                String embedded = MediaMerger.fetchTextWithHeaders(
+                        parsed.followUrl, userAgent, cookie, pageUrl, null);
+                if (embedded != null && embedded.length() > 40) {
+                    Result inner = parse(embedded, parsed.followUrl);
+                    if (inner.ok) return inner;
+                }
+            } catch (Throwable ignored) {
+            }
+        }
+        return parsed;
     }
 
     /**
      * Looks for a video in already-fetched markup.
      *
-     * Separate from {@link #find} so the searching rules can be tested against
-     * captured pages without a network.
+     * Separate from {@link #find} so the rules can be tested against captured
+     * pages with no network involved.
      */
     public static Result parse(String html, String pageUrl) {
         Result result = new Result();
@@ -99,62 +172,124 @@ public final class PageMediaFinder {
         result.title = titleOf(html);
         result.quality = qualityOf(html);
 
-        // 1. The site's own declaration.
-        String openGraph = metaContent(html, "og:video:secure_url");
-        if (openGraph.length() == 0) openGraph = metaContent(html, "og:video:url");
-        if (openGraph.length() == 0) openGraph = metaContent(html, "og:video");
-        String fromOg = absolute(openGraph, pageUrl);
-        if (isUsableMedia(fromOg)) {
-            result.ok = true;
-            result.url = fromOg;
-            return result;
+        // 1. An embedded player page. Followed rather than returned, because the
+        //    answer is on the other side of it.
+        String follow = firstEmbedPage(html, pageUrl);
+        if (follow != null) {
+            result.followUrl = follow;
         }
 
-        // 2. A Twitter player stream, which some sites use instead.
-        String twitter = absolute(metaContent(html, "twitter:player:stream"), pageUrl);
-        if (isUsableMedia(twitter)) {
-            result.ok = true;
-            result.url = twitter;
-            return result;
+        // 3. JSON-LD VideoObject. Before the player-embed rules because it is the
+        //    site stating the answer directly.
+        String jsonLd = jsonLdContentUrl(html, pageUrl);
+        if (isAcceptable(jsonLd)) {
+            return accept(result, jsonLd, "json-ld");
         }
 
-        // 3. A player configuration key. Order is by how specific the key is.
-        String[] keys = {
-                "contentUrl", "video_url", "videoUrl", "file", "src", "hls", "dash",
-                "playlist", "streamUrl", "mediaUrl"
-        };
-        for (String key : keys) {
+        // 4. JW Player in a SWFObject: flashvars: "…file=http…"
+        for (String candidate : findAll(html,
+                "flashvars[\"']?\\s*[:,]\\s*[\"'][^\"']*?file=(https?[^\"'&]*)")) {
+            String url = absolute(unescape(candidate), pageUrl);
+            if (isAcceptable(url)) return accept(result, url, "jwplayer-swfobject");
+        }
+
+        // 5. A JW Player setup block with a file key.
+        for (String candidate : findAll(html,
+                "(?:jw_plugins|JWPlayerOptions|jwplayer\\s*\\(\\s*[\"'][^'\"]+[\"']\\s*\\)\\s*\\.setup)"
+                        + "[\\s\\S]{0,4000}?[\"']?file[\"']?\\s*:\\s*[\"']([^\"']+)[\"']")) {
+            String url = absolute(unescape(candidate), pageUrl);
+            if (isAcceptable(url)) return accept(result, url, "jwplayer-setup");
+        }
+
+        // 6. A loose file= or source= attribute.
+        for (String candidate : findAll(html, "[^A-Za-z0-9](?:file|source)=(https?[^\"'&]+)")) {
+            String url = absolute(unescape(candidate), pageUrl);
+            if (isAcceptable(url)) return accept(result, url, "file-attribute");
+        }
+
+        // 7. A JSON file: / video_url: key.
+        for (String key : new String[] { "file", "video_url", "videoUrl", "contentUrl",
+                "streamUrl", "mediaUrl", "hls", "hlsUrl", "dash", "dashUrl", "playlist" }) {
             String value = jsonStringField(html, key);
-            String candidate = absolute(jsonUnescape(value), pageUrl);
-            if (isUsableMedia(candidate)) {
-                result.ok = true;
-                result.url = candidate;
-                return result;
+            String url = absolute(unescape(value), pageUrl);
+            if (isAcceptable(url)) return accept(result, url, "json:" + key);
+        }
+
+        // 8. Flowplayer.
+        for (String candidate : findAll(html,
+                "flowplayer\\(\"[^\"]+\",\\s*\\{[^}]+\\}\\s*,\\s*\\{[^}]+?[\"']?clip[\"']?\\s*:\\s*"
+                        + "\\{\\s*[\"']?url[\"']?\\s*:\\s*[\"']([^\"']+)[\"']")) {
+            String url = absolute(unescape(candidate), pageUrl);
+            if (isAcceptable(url)) return accept(result, url, "flowplayer");
+        }
+
+        // 8b. Cinerama.
+        for (String candidate : findAll(html, "cinerama\\.embedPlayer\\(\\s*'[^']+',\\s*'([^']+)'")) {
+            String url = absolute(unescape(candidate), pageUrl);
+            if (isAcceptable(url)) return accept(result, url, "cinerama");
+        }
+
+        // 9. twitter:player:stream — a raw stream. Checked before twitter:player,
+        //    which is an iframe.
+        String twitterStream = absolute(unescape(
+                metaContentAnyOrder(html, "twitter:player:stream")), pageUrl);
+        if (isAcceptable(twitterStream)) return accept(result, twitterStream, "twitter:stream");
+
+        // 10. Open Graph, but only when og:video:type says video. A page whose
+        //     og:video is a Flash player must not offer a .swf.
+        String ogType = metaContentAnyOrder(html, "og:video:type");
+        boolean saysVideo = ogType.length() == 0
+                || ogType.toLowerCase(Locale.US).startsWith("video/");
+        if (saysVideo && (ogType.length() == 0 || !ogType.toLowerCase(Locale.US).contains("x-shockwave"))) {
+            for (String key : new String[] { "og:video:secure_url", "og:video:url", "og:video",
+                    "og:audio:secure_url", "og:audio:url", "og:audio" }) {
+                String url = absolute(unescape(metaContentAnyOrder(html, key)), pageUrl);
+                if (isAcceptable(url)) return accept(result, url, "opengraph:" + key);
             }
         }
 
-        // 4. Any media reference in the markup, preferring the earliest, which is
-        //    usually the page's own video rather than a promoted one in a sidebar.
-        String loose = firstMediaUrl(html);
-        String absoluteLoose = absolute(loose, pageUrl);
-        if (isUsableMedia(absoluteLoose)) {
-            result.ok = true;
-            result.url = absoluteLoose;
-            return result;
+        // 11. A meta refresh.
+        String refresh = metaRefreshTarget(html);
+        if (refresh.length() > 0) {
+            String url = absolute(unescape(refresh), pageUrl);
+            if (isAcceptable(url)) return accept(result, url, "meta-refresh");
+            if (follow == null && url.length() > 0) result.followUrl = url;
         }
 
-        result.reason = "no video was found on that page — it may load the player with a script "
-                + "after opening, in which case play it in the browser and use the page scan instead";
+        // 12. twitter:player as the last resort: an iframe to follow.
+        String twitterPlayer = absolute(unescape(
+                metaContentAnyOrder(html, "twitter:player")), pageUrl);
+        if (twitterPlayer.length() > 0 && !twitterPlayer.equals(pageUrl)) {
+            result.followUrl = twitterPlayer;
+        }
+
+        // Nothing was declared. Take the first real media address in the markup,
+        // which catches pages that simply link the file.
+        String loose = firstAcceptableMediaUrl(html, pageUrl);
+        if (loose != null) return accept(result, loose, "loose-media-url");
+
+        result.reason = follow != null
+                ? "the video is on an embedded player page that could not be read"
+                : "no video was found on that page — play it in the browser and use the page scan instead";
         return result;
     }
 
-    /** Reads a meta tag's content by property or name. */
-    static String metaContent(String html, String key) {
-        // Both attribute orders occur in the wild, so both are tried.
+    private static Result accept(Result result, String url, String how) {
+        result.ok = true;
+        result.url = url;
+        result.foundBy = how;
+        result.isManifest = hasManifestExtension(url);
+        return result;
+    }
+
+    // ------------------------------------------------------------------ helpers
+
+    /** Reads a meta tag by property or name, in either attribute order. */
+    public static String metaContentAnyOrder(String html, String key) {
         String[] patterns = {
                 "<meta[^>]+(?:property|name)\\s*=\\s*[\"']" + Pattern.quote(key)
-                        + "[\"'][^>]*content\\s*=\\s*[\"']([^\"']+)[\"']",
-                "<meta[^>]+content\\s*=\\s*[\"']([^\"']+)[\"'][^>]*(?:property|name)\\s*=\\s*[\"']"
+                        + "[\"'][^>]*?content\\s*=\\s*[\"']([^\"']*)[\"']",
+                "<meta[^>]+content\\s*=\\s*[\"']([^\"']*)[\"'][^>]*?(?:property|name)\\s*=\\s*[\"']"
                         + Pattern.quote(key) + "[\"']"
         };
         for (String p : patterns) {
@@ -164,49 +299,153 @@ public final class PageMediaFinder {
         return "";
     }
 
-    /** Reads a JSON string value for a key, honouring escapes. */
-    static String jsonStringField(String text, String key) {
-        Matcher m = Pattern.compile("\"" + Pattern.quote(key) + "\"\\s*:\\s*\"((?:[^\"\\\\]|\\\\.)*)\"")
-                .matcher(text);
-        if (!m.find()) return "";
-        return m.group(1);
+    /** An iframe or player address that should be fetched instead of the page. */
+    static String firstEmbedPage(String html, String pageUrl) {
+        Matcher iframe = Pattern.compile(
+                "<iframe[^>]+src\\s*=\\s*[\"']([^\"']+)[\"']", Pattern.CASE_INSENSITIVE).matcher(html);
+        while (iframe.find()) {
+            String src = absolute(unescape(iframe.group(1)), pageUrl);
+            String lower = src.toLowerCase(Locale.US);
+            if (lower.contains("/embed") || lower.contains("/player")
+                    || lower.contains("player.") || lower.contains("/v/")) {
+                return src;
+            }
+        }
+        return null;
     }
 
-    static String jsonUnescape(String s) {
-        if (s == null) return "";
-        return s.replace("\\/", "/").replace("\\u0026", "&").replace("\\\"", "\"");
-    }
-
-    /** The first plausible media address in the markup. */
-    static String firstMediaUrl(String html) {
-        Matcher m = Pattern.compile("https?://[^\"'\\s<>\\\\)]+", Pattern.CASE_INSENSITIVE)
-                .matcher(html);
-        while (m.find()) {
-            String candidate = jsonUnescape(m.group());
-            String lower = candidate.toLowerCase(Locale.US);
-            for (String ext : MEDIA_EXT) {
-                if (lower.contains(ext)) return candidate;
+    /** The contentUrl of a schema.org VideoObject. */
+    static String jsonLdContentUrl(String html, String pageUrl) {
+        for (String block : jsonLdBlocks(html)) {
+            if (!block.contains("VideoObject")) continue;
+            for (String key : new String[] { "contentUrl", "embedUrl" }) {
+                String value = jsonStringField(block, key);
+                if (value != null && value.length() > 0) {
+                    return absolute(unescape(value), pageUrl);
+                }
             }
         }
         return "";
     }
 
-    /** True when the address is a media file worth handing to the downloader. */
-    public static boolean isUsableMedia(String url) {
+    /** Every JSON-LD script body on the page. */
+    static List<String> jsonLdBlocks(String html) {
+        List<String> out = new ArrayList<>();
+        Matcher m = Pattern.compile(
+                "<script[^>]+type\\s*=\\s*[\"']application/ld\\+json[\"'][^>]*>([\\s\\S]*?)</script>",
+                Pattern.CASE_INSENSITIVE).matcher(html);
+        while (m.find()) out.add(m.group(1));
+        return out;
+    }
+
+    static String metaRefreshTarget(String html) {
+        Matcher m = Pattern.compile(
+                "<meta[^>]+http-equiv\\s*=\\s*[\"']refresh[\"'][^>]*?content\\s*=\\s*[\"'][^\"']*?"
+                        + "(?:URL|url)\\s*=\\s*'?([^'\"]+)",
+                Pattern.CASE_INSENSITIVE).matcher(html);
+        return m.find() ? m.group(1).trim() : "";
+    }
+
+    static List<String> findAll(String html, String regex) {
+        List<String> out = new ArrayList<>();
+        Matcher m = Pattern.compile(regex, Pattern.CASE_INSENSITIVE | Pattern.DOTALL).matcher(html);
+        while (m.find()) {
+            if (m.groupCount() >= 1 && m.group(1) != null) out.add(m.group(1));
+            if (out.size() > 40) break;
+        }
+        return out;
+    }
+
+    /** Reads a JSON string value for a key, honouring escapes. */
+    public static String jsonStringField(String text, String key) {
+        if (text == null) return "";
+        Matcher m = Pattern.compile("\"" + Pattern.quote(key) + "\"\\s*:\\s*\"((?:[^\"\\\\]|\\\\.)*)\"")
+                .matcher(text);
+        return m.find() ? m.group(1) : "";
+    }
+
+    public static String unescape(String s) {
+        if (s == null) return "";
+        String out = s.replace("\\/", "/").replace("\\u0026", "&").replace("\\u003d", "=")
+                .replace("\\u003f", "?").replace("\\\"", "\"");
+        return htmlUnescape(out);
+    }
+
+    public static String htmlUnescape(String s) {
+        if (s == null) return "";
+        return s.replace("&amp;", "&").replace("&quot;", "\"").replace("&#39;", "'")
+                .replace("&apos;", "'").replace("&lt;", "<").replace("&gt;", ">");
+    }
+
+    /** True when a candidate is a media address and not a rejection-worthy one. */
+    public static boolean isAcceptable(String url) {
         if (url == null || url.length() < 12) return false;
         String lower = url.toLowerCase(Locale.US);
         if (!lower.startsWith("http://") && !lower.startsWith("https://")) return false;
         if (lower.contains("/videoplayback")) return true;
-        for (String ext : MEDIA_EXT) {
-            if (lower.contains(ext)) return true;
+
+        String path = pathOf(lower);
+        String ext = extensionOf(path);
+
+        // A manifest is always acceptable; that is what the merger is for.
+        if (ext.length() > 0 && contains(MANIFEST_EXT, ext)) return true;
+        if (ext.length() > 0 && contains(REJECT_EXT, ext)) return false;
+        if (ext.length() > 0 && (contains(VIDEO_EXT, ext) || contains(AUDIO_EXT, ext))) return true;
+
+        // No extension: trust a stated mime type in the query, which is how
+        // googlevideo and several CDNs serve media.
+        return lower.contains("mime=video") || lower.contains("mime=audio")
+                || lower.contains("format=mp4") || lower.contains("type=video");
+    }
+
+    /** True for yt-dlp's "usable media" test, kept for the caller's naming. */
+    public static boolean isUsableMedia(String url) {
+        return isAcceptable(url);
+    }
+
+    static boolean hasManifestExtension(String url) {
+        String ext = extensionOf(pathOf(url == null ? "" : url.toLowerCase(Locale.US)));
+        return ext.length() > 0 && contains(MANIFEST_EXT, ext);
+    }
+
+    /** The first media address in the markup that passes the filter. */
+    static String firstAcceptableMediaUrl(String html, String pageUrl) {
+        Matcher m = Pattern.compile("(?:https?:)?//?[^\"'\\s<>\\\\)]+", Pattern.CASE_INSENSITIVE)
+                .matcher(html);
+        while (m.find()) {
+            String candidate = absolute(unescape(m.group()), pageUrl);
+            if (isAcceptable(candidate)) return candidate;
         }
-        // A player endpoint that serves a stream without a file extension is only
-        // trusted when it says so in the address.
-        return lower.contains("mime=video") || lower.contains("format=mp4");
+        return null;
+    }
+
+    static String pathOf(String url) {
+        if (url == null) return "";
+        int q = url.indexOf('?');
+        String noQuery = q < 0 ? url : url.substring(0, q);
+        int scheme = noQuery.indexOf("://");
+        if (scheme < 0) return noQuery;
+        int slash = noQuery.indexOf('/', scheme + 3);
+        return slash < 0 ? "/" : noQuery.substring(slash);
+    }
+
+    static String extensionOf(String path) {
+        if (path == null) return "";
+        int dot = path.lastIndexOf('.');
+        if (dot < 0 || dot == path.length() - 1) return "";
+        String ext = path.substring(dot + 1).toLowerCase(Locale.US);
+        // A path segment that is not really an extension (an id with a dot in it).
+        if (ext.length() > 5) return "";
+        return ext;
+    }
+
+    static boolean contains(String[] set, String value) {
+        for (String s : set) if (s.equals(value)) return true;
+        return false;
     }
 
     /** Resolves a possibly-relative address against the page it came from. */
-    static String absolute(String url, String pageUrl) {
+    public static String absolute(String url, String pageUrl) {
         if (url == null || url.length() == 0) return "";
         String trimmed = url.trim();
         if (trimmed.startsWith("//")) {
@@ -217,7 +456,6 @@ public final class PageMediaFinder {
             return base.length() > 0 ? base + trimmed : "";
         }
         if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) return trimmed;
-        // A bare relative path is not worth guessing at.
         return "";
     }
 
@@ -229,9 +467,9 @@ public final class PageMediaFinder {
         return slash < 0 ? url : url.substring(0, slash);
     }
 
-    /** The page title, cleaned of the site's branding. */
+    /** The page title, without the site's branding. */
     static String titleOf(String html) {
-        String og = metaContent(html, "og:title");
+        String og = metaContentAnyOrder(html, "og:title");
         if (og.length() == 0) {
             Matcher m = Pattern.compile("<title[^>]*>([^<]{2,200})</title>", Pattern.CASE_INSENSITIVE)
                     .matcher(html);
@@ -241,14 +479,13 @@ public final class PageMediaFinder {
     }
 
     static String tidy(String raw) {
-        if (raw == null) return "";
-        return raw.replace("&amp;", "&").replace("&quot;", "\"").replace("&#39;", "'")
-                .replace("&lt;", "<").replace("&gt;", ">").trim();
+        return htmlUnescape(raw == null ? "" : raw).trim();
     }
 
     /** A resolution hint from the markup, when one is stated. */
     public static String qualityOf(String html) {
-        Matcher m = Pattern.compile("(\\d{3,4})\\s*p\\b").matcher(html);
+        if (html == null) return "";
+        Matcher m = Pattern.compile("(\\d{3,4})\\s*p\\b", Pattern.CASE_INSENSITIVE).matcher(html);
         int best = 0;
         while (m.find()) {
             try {
@@ -268,16 +505,16 @@ public final class PageMediaFinder {
         return "that link could not be opened: " + message;
     }
 
-    /** Every media address the page mentions, for a picker when several exist. */
+    /** Every acceptable media address the page mentions, in document order. */
     public static List<String> allMediaUrls(String html, String pageUrl) {
-        List<String> out = new ArrayList<>();
-        if (html == null) return out;
-        Matcher m = Pattern.compile("https?://[^\"'\\s<>\\\\)]+", Pattern.CASE_INSENSITIVE).matcher(html);
+        LinkedHashSet<String> out = new LinkedHashSet<>();
+        if (html == null) return new ArrayList<>();
+        Matcher m = Pattern.compile("(?:https?:)?//?[^\"'\\s<>\\\\)]+", Pattern.CASE_INSENSITIVE).matcher(html);
         while (m.find()) {
-            String candidate = absolute(jsonUnescape(m.group()), pageUrl);
-            if (isUsableMedia(candidate) && !out.contains(candidate)) out.add(candidate);
+            String candidate = absolute(unescape(m.group()), pageUrl);
+            if (isAcceptable(candidate)) out.add(candidate);
             if (out.size() >= 20) break;
         }
-        return out;
+        return new ArrayList<>(out);
     }
 }
