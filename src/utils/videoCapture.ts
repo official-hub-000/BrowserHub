@@ -60,7 +60,9 @@ export type DownloadVerdict =
   | 'cross-origin-blocked'
   | 'needs-merge'
   | 'drm-protected'
-  | 'live-stream';
+  | 'live-stream'
+  /** A stream that can be joined into one file by the native engine. */
+  | 'mergeable';
 
 export interface MediaAssessment {
   media: CapturedMedia;
@@ -192,17 +194,40 @@ export function assessMedia(
   media: CapturedMedia,
   page: PageConstraints,
   pageUrl: string,
-  nativeDownloader: boolean
+  nativeDownloader: boolean,
+  options: { canMergeStreams?: boolean } = {}
 ): MediaAssessment {
-  if (media.kind === 'hls' || media.kind === 'dash') {
+  const canMerge = Boolean(options.canMergeStreams) && nativeDownloader;
+
+  if (media.kind === 'hls') {
+    if (canMerge) {
+      return {
+        media,
+        verdict: 'mergeable',
+        actionable: true,
+        reason:
+          'A stream, not a file. BrowserHub will fetch every part and join them into one video. ' +
+          'Encrypted streams it cannot decrypt are refused before they start.',
+      };
+    }
     return {
       media,
       verdict: 'needs-merge',
       actionable: false,
       reason:
-        'This is a stream playlist, not a video file. Saving it gives you a small text file, ' +
-        'not the video. Downloading it properly means fetching every segment and joining them, ' +
-        'which this build does not do.',
+        'This is a stream playlist, not a video file. Saving it gives you a small text file. ' +
+        'Joining the parts needs the Android build, which does it natively.',
+    };
+  }
+
+  if (media.kind === 'dash') {
+    return {
+      media,
+      verdict: 'needs-merge',
+      actionable: false,
+      reason:
+        'This is a DASH manifest. Joining DASH needs a remuxer this build does not include, so ' +
+        'it is not offered rather than producing a broken file.',
     };
   }
 

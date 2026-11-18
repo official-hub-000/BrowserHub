@@ -9,6 +9,9 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <!-- Required on Android 14+ to run a download as a foreground service. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!--
       Only needed on Android 9 and below, where a finished download is copied
       into the public Movies folder. Android 10+ publishes through MediaStore,
@@ -51,6 +54,17 @@
                 <data android:scheme="https" />
             </intent-filter>
         </activity>
+
+        <!--
+          Stream merging runs here so a long download survives the app going to
+          the background. dataSync is the correct type for a user-initiated file
+          download on Android 14+.
+        -->
+        <service
+            android:name="com.browserhub.app.media.DownloadService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync"
+            android:label="BrowserHub downloads" />
 
         <service
             android:name="com.browserhub.app.vpn.HubVpnService"

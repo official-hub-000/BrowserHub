@@ -192,4 +192,50 @@ public class BrowserHubBridge {
     public boolean hasNativeDownloader() {
         return true;
     }
+
+    // ------------------------------------------------------------------
+    //  Stream engine: turn what the page is playing into one file.
+    // ------------------------------------------------------------------
+
+    /**
+     * Starts a download that survives the sheet closing.
+     *
+     * @param kind "hls" for a stream playlist (merged), "file" for a direct URL.
+     * @return the job id, so the UI can poll it.
+     */
+    @JavascriptInterface
+    public String startDownload(String url, String filename, String kind, String title) {
+        return activity.startMediaDownload(url, filename, kind, title);
+    }
+
+    /** Every job with live progress, as JSON. */
+    @JavascriptInterface
+    public String getDownloads() {
+        return com.browserhub.app.media.DownloadQueue.toJson();
+    }
+
+    @JavascriptInterface
+    public boolean cancelDownload(String jobId) {
+        return com.browserhub.app.media.DownloadQueue.cancel(jobId);
+    }
+
+    @JavascriptInterface
+    public void clearFinishedDownloads() {
+        com.browserhub.app.media.DownloadQueue.clearFinished();
+    }
+
+    /**
+     * Reads a playlist without downloading it, so the UI can show real facts
+     * (resolution, part count, encryption) before the user commits.
+     */
+    @JavascriptInterface
+    public void probeStream(String url) {
+        activity.probeStream(url);
+    }
+
+    /** The probe result as JSON, or "" while it is still running. */
+    @JavascriptInterface
+    public String getStreamProbe() {
+        return activity.getStreamProbe();
+    }
 }

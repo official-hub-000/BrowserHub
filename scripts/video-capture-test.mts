@@ -97,11 +97,33 @@ check('does not flag a plain url', !looksSigned('https://c.example.com/v.mp4'));
 
 // --------------------------------------------------- honest verdicts, part 1
 {
+  // Without a merger, a playlist must not be offered as a video file.
   const hls = classifyMediaUrl('https://cdn.example.com/master.m3u8', '')!;
   const a = assessMedia(hls, page(), 'https://cdn.example.com/watch', true);
-  check('a playlist is not offered as a download', a.actionable === false);
+  check('a playlist is not offered when there is no merger', a.actionable === false);
   check('playlist verdict is needs-merge', a.verdict === 'needs-merge');
-  check('playlist reason says it is not a video file', /not a video file/i.test(a.reason));
+  check('playlist reason says saving it is not a video', /not a video file/i.test(a.reason));
+
+  // With the native merger present, the same item becomes a real download.
+  const merged = assessMedia(hls, page(), 'https://cdn.example.com/watch', true, {
+    canMergeStreams: true,
+  });
+  check('a playlist IS offered when the merger exists', merged.actionable === true);
+  check('mergeable verdict is named', merged.verdict === 'mergeable');
+  check('the merge reason explains joining parts', /join/i.test(merged.reason));
+  check(
+    'the merger is not offered in the web build (it is native only)',
+    assessMedia(hls, page(), 'https://cdn.example.com/watch', false, { canMergeStreams: true })
+      .actionable === false
+  );
+
+  // DASH is still refused: joining it needs a remuxer this build does not have.
+  const dash = classifyMediaUrl('https://cdn.example.com/stream.mpd', '')!;
+  const dashAssessed = assessMedia(dash, page(), 'https://cdn.example.com/watch', true, {
+    canMergeStreams: true,
+  });
+  check('DASH is refused even with the merger', dashAssessed.actionable === false);
+  check('DASH reason names the missing remuxer', /remux/i.test(dashAssessed.reason));
 }
 {
   const mp4 = classifyMediaUrl('https://cdn.example.com/clip.mp4', '')!;

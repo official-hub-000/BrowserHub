@@ -61,6 +61,14 @@ export interface AndroidJniBridge {
   downloadPageMedia?: (url: string, filename: string) => void;
   /** Present only in the Android build, where the platform downloader exists. */
   hasNativeDownloader?: () => boolean;
+
+  // Stream engine: merging what a page is playing into one file.
+  startDownload?: (url: string, filename: string, kind: string, title: string) => string;
+  getDownloads?: () => string;
+  cancelDownload?: (jobId: string) => boolean;
+  clearFinishedDownloads?: () => void;
+  probeStream?: (url: string) => void;
+  getStreamProbe?: () => string;
 }
 
 declare global {
@@ -169,6 +177,62 @@ export const AndroidHybridBridge = {
       return true;
     } catch {
       return false;
+    }
+  },
+
+  // ------------------------------------------------------------------
+  //  Stream engine. Every method degrades to "unavailable" on the web.
+  // ------------------------------------------------------------------
+
+  startDownload(url: string, filename: string, kind: string, title: string): string {
+    try {
+      if (!this.hasJniBridge() || !window.BrowserHubNative?.startDownload) return '';
+      return window.BrowserHubNative.startDownload(url, filename, kind, title) ?? '';
+    } catch {
+      return '';
+    }
+  },
+
+  getDownloads(): string {
+    try {
+      if (!this.hasJniBridge() || !window.BrowserHubNative?.getDownloads) return '';
+      return window.BrowserHubNative.getDownloads() ?? '';
+    } catch {
+      return '';
+    }
+  },
+
+  cancelDownload(jobId: string): boolean {
+    try {
+      if (!this.hasJniBridge() || !window.BrowserHubNative?.cancelDownload) return false;
+      return Boolean(window.BrowserHubNative.cancelDownload(jobId));
+    } catch {
+      return false;
+    }
+  },
+
+  clearFinishedDownloads(): void {
+    try {
+      window.BrowserHubNative?.clearFinishedDownloads?.();
+    } catch {
+      /* nothing to do */
+    }
+  },
+
+  probeStream(url: string): void {
+    try {
+      window.BrowserHubNative?.probeStream?.(url);
+    } catch {
+      /* nothing to do */
+    }
+  },
+
+  getStreamProbe(): string {
+    try {
+      if (!this.hasJniBridge() || !window.BrowserHubNative?.getStreamProbe) return '';
+      return window.BrowserHubNative.getStreamProbe() ?? '';
+    } catch {
+      return '';
     }
   },
 

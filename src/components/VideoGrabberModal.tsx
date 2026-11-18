@@ -10,6 +10,16 @@ import {
   type MediaAssessment,
   type PageConstraints,
 } from '../utils/videoCapture';
+import {
+  EMPTY_PROBE,
+  describeProbe,
+  formatBytes,
+  parseDownloads,
+  parseProbe,
+  streamRefusal,
+  type DownloadJob,
+  type StreamProbe,
+} from '../utils/downloadQueue';
 
 interface VideoGrabberModalProps {
   pageUrl: string;
@@ -43,6 +53,60 @@ export const VideoGrabberModal: React.FC<VideoGrabberModalProps> = ({
   const [scanning, setScanning] = useState(true);
   const [hasNative, setHasNative] = useState(false);
   const [downloaded, setDownloaded] = useState<Record<string, boolean>>({});
+  const [probes, setProbes] = useState<Record<string, StreamProbe | null>>({});
+  const [jobs, setJobs] = useState<DownloadJob[]>([]);
+
+  /**
+   * What the stream actually is, asked before the user commits.
+   *
+   * A playlist can be 4 parts or 4000, can be AES-128 (fine) or SAMPLE-AES (DRM,
+   * impossible). Showing the real numbers and refusing the impossible ones up
+   * front is the difference between a download and a trick.
+   */
+  useEffect(() => {
+    const streams = items.filter((i) => i.kind === 'hls');
+    if (!streams.length || !AndroidHybridBridge.hasJniBridge()) return;
+    for (const stream of streams) {
+      AndroidHybridBridge.probeStream(stream.url);
+    }
+    const timer = window.setInterval(() => {
+      const raw = AndroidHybridBridge.getStreamProbe();
+      const parsed = parseProbe(raw);
+      if (parsed) {
+        setProbes((prev) => {
+          const next = { ...prev };
+          for (const stream of streams) {
+            if (!next[stream.url]) next[stream.url] = parsed;
+          }
+          return next;
+        });
+        AndroidHybridBridge.clearFinishedDownloads();
+        window.clearInterval(timer);
+      }
+    }, 400);
+    const stop = window.setTimeout(() => window.clearInterval(timer), 20000);
+    return () => {
+      window.clearInterval(timer);
+      window.clearTimeout(stop);
+    };
+  }, [items]);
+
+  /** Poll the engine while anything is moving, and stop when nothing is. */
+  useEffect(() => {
+    if (!AndroidHybridBridge.hasJniBridge()) return;
+    let active = true;
+    const tick = () => {
+      if (!active) return;
+      const parsed = parseDownloads(AndroidHybridBridge.getDownloads());
+      setJobs(parsed);
+    };
+    tick();
+    const timer = window.setInterval(tick, 700);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+    };
+  }, []);
 
   const nativeDownloader = useMemo(() => AndroidHybridBridge.hasNativeDownloader(), []);
 
@@ -68,7 +132,10 @@ export const VideoGrabberModal: React.FC<VideoGrabberModalProps> = ({
   }, [scan]);
 
   const assessments: MediaAssessment[] = useMemo(
-    () => items.map((m) => assessMedia(m, page, pageUrl, nativeDownloader)),
+    () =>
+      items.map((m) =>
+        assessMedia(m, page, pageUrl, nativeDownloader, { canMergeStreams: true })
+      ),
     [items, page, pageUrl, nativeDownloader]
   );
 
@@ -77,6 +144,12 @@ export const VideoGrabberModal: React.FC<VideoGrabberModalProps> = ({
 
   const handleDownload = (media: CapturedMedia) => {
     const filename = suggestedFilename(media, pageTitle);
+    // A stream goes through the merger; a direct file streams straight to disk.
+    if (media.kind === 'hls') {
+      const id = AndroidHybridBridge.startDownload(media.url, filename, 'hls', pageTitle);
+      if (id) setDownloaded((prev) => ({ ...prev, [media.url]: true }));
+      return;
+    }
     const started = AndroidHybridBridge.downloadPageMedia(media.url, filename);
     if (started) {
       setDownloaded((prev) => ({ ...prev, [media.url]: true }));
@@ -195,15 +268,27 @@ export const VideoGrabberModal: React.FC<VideoGrabberModalProps> = ({
                 </div>
               </div>
 
-              <p
-                className={`text-[11px] leading-relaxed ${
-                  a.actionable ? 'text-emerald-200/80' : 'text-amber-200/80'
-                }`}
-              >
-                {a.reason}
-              </p>
+              {a.verdict === 'mergeable' ? (
+                <p className="text-[11px] leading-relaxed text-cyan-200/80">
+                  {streamRefusal(probes[a.media.url] ?? null) ?? describeProbe(probes[a.media.url] ?? null)}
+                </p>
+              ) : (
+                <p
+                  className={`text-[11px] leading-relaxed ${
+                    a.actionable ? 'text-emerald-200/80' : 'text-amber-200/80'
+                  }`}
+                >
+                  {a.reason}
+                </p>
+              )}
 
-              {a.actionable && (
+              {a.verdict === 'mergeable' && streamRefusal(probes[a.media.url] ?? null) && (
+                <p className="text-[10px] leading-relaxed text-rose-200/80">
+                  No download is offered for this one. A file that will not play is not a download.
+                </p>
+              )}
+
+              {a.actionable && !(a.verdict === 'mergeable' && streamRefusal(probes[a.media.url] ?? null)) && (
                 <button
                   onClick={() => handleDownload(a.media)}
                   className={`w-full flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-semibold cursor-pointer ${
@@ -213,7 +298,11 @@ export const VideoGrabberModal: React.FC<VideoGrabberModalProps> = ({
                   }`}
                 >
                   <Download size={14} />
-                  {downloaded[a.media.url] ? 'Downloading to Movies/BrowserHub' : 'Download video'}
+                  {downloaded[a.media.url]
+                    ? 'Saved to your downloads'
+                    : a.verdict === 'mergeable'
+                      ? 'Download full video'
+                      : 'Download video'}
                 </button>
               )}
             </div>
@@ -226,13 +315,78 @@ export const VideoGrabberModal: React.FC<VideoGrabberModalProps> = ({
             </p>
           )}
 
+          {jobs.length > 0 && (
+            <div className="rounded-xl border border-slate-800 bg-[#060608] p-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="text-[10px] font-bold text-slate-300">Downloads</div>
+                <button
+                  onClick={() => {
+                    AndroidHybridBridge.clearFinishedDownloads();
+                    setJobs((prev) =>
+                      prev.filter((j) => j.status === 'running' || j.status === 'queued')
+                    );
+                  }}
+                  className="text-[10px] text-slate-500 hover:text-slate-300 cursor-pointer"
+                >
+                  Clear finished
+                </button>
+              </div>
+              {jobs.map((job) => (
+                <div key={job.id} className="space-y-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="text-[11px] text-white truncate">{job.filename}</div>
+                    <div className="text-[10px] shrink-0 font-mono">
+                      {job.status === 'done' && (
+                        <span className="text-emerald-400">
+                          done{formatBytes(job.bytes) ? ` · ${formatBytes(job.bytes)}` : ''}
+                        </span>
+                      )}
+                      {job.status === 'failed' && <span className="text-rose-400">failed</span>}
+                      {job.status === 'cancelled' && <span className="text-slate-500">cancelled</span>}
+                      {job.status === 'running' && (
+                        <span className="text-cyan-300">
+                          {job.percent}%{formatBytes(job.bytes) ? ` · ${formatBytes(job.bytes)}` : ''}
+                        </span>
+                      )}
+                      {job.status === 'queued' && <span className="text-slate-400">queued</span>}
+                    </div>
+                  </div>
+                  {(job.status === 'running' || job.status === 'queued') && (
+                    <>
+                      <div className="h-1 rounded-full bg-[#121216] overflow-hidden">
+                        <div
+                          className="h-full bg-cyan-400"
+                          style={{ width: `${Math.max(2, job.percent)}%` }}
+                        />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] text-slate-500">{job.message}</span>
+                        <button
+                          onClick={() => {
+                            AndroidHybridBridge.cancelDownload(job.id);
+                          }}
+                          className="text-[10px] text-rose-300 hover:text-rose-200 cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </>
+                  )}
+                  {job.status === 'failed' && job.message && (
+                    <div className="text-[10px] text-rose-200/80 leading-relaxed">{job.message}</div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
           <div className="rounded-xl border border-slate-800 bg-[#060608] px-3.5 py-3">
             <div className="text-[10px] font-bold text-slate-300 mb-1.5">What this can and cannot do</div>
             <ul className="text-[10px] text-slate-500 leading-relaxed space-y-1">
               <li>Finds video files the page actually requests while you watch.</li>
-              <li>Downloads them straight to Movies/BrowserHub, with session cookies.</li>
-              <li>Refuses stream playlists, which need segment merging this build lacks.</li>
-              <li>Refuses DRM video, which cannot be decrypted by any browser app.</li>
+              <li>Joins HLS streams into one file, including AES-128 encrypted ones.</li>
+              <li>Keeps downloading in the background, with progress and cancel.</li>
+              <li>Refuses DASH and DRM video, which this build cannot turn into a playable file.</li>
               <li>No ads, no interstitials, no unlock timers, no account.</li>
             </ul>
           </div>

@@ -87,6 +87,9 @@ public class MainActivity extends Activity {
     /** Latest media capture set as JSON, so the sheet paints instantly. */
     private volatile String lastPageMedia = "{\"items\":[],\"mse\":false,\"drm\":false}";
 
+    /** Stream probe result for the download sheet, as JSON. */
+    private volatile String streamProbe = "";
+
     private String lastLoadedUrl = "";
     private boolean lastDesktopState = false;
     private int lastTopPx = -1;
@@ -550,6 +553,81 @@ public class MainActivity extends Activity {
         if (url == null || url.length() == 0) return;
         String ua = browserWebView != null ? browserWebView.getSettings().getUserAgentString() : null;
         MediaGrabber.download(this, url, filename, ua, null);
+    }
+
+    // ========================================================================
+    //  STREAM ENGINE
+    //
+    //  A stream playlist is not a video file: it is a list of a few hundred
+    //  small files. This starts the job that fetches and joins them, inside a
+    //  foreground service so it survives the app leaving the screen.
+    // ========================================================================
+
+    /** Starts a queued download and returns its id. */
+    public String startMediaDownload(String url, String filename, String kind, String title) {
+        if (url == null || url.length() == 0) return "";
+        String safeKind = "hls".equalsIgnoreCase(kind)
+                ? com.browserhub.app.media.DownloadQueue.KIND_HLS
+                : com.browserhub.app.media.DownloadQueue.KIND_FILE;
+        String safeName = com.browserhub.app.media.DownloadQueue.filenameFor(filename, safeKind);
+        com.browserhub.app.media.DownloadQueue.Job job =
+                com.browserhub.app.media.DownloadQueue.enqueue(url, safeName, safeKind, title);
+        String ua = browserWebView != null ? browserWebView.getSettings().getUserAgentString() : null;
+        com.browserhub.app.media.DownloadService.start(this, job, safeKind, ua);
+        return job.id;
+    }
+
+    public String getDownloadsJson() {
+        return com.browserhub.app.media.DownloadQueue.toJson();
+    }
+
+    /**
+     * Reads a playlist so the sheet can state the facts up front: how many parts,
+     * what resolution, whether it is encrypted. Doing this before the download
+     * means the user is never surprised by a job that turns out to be impossible.
+     */
+    public void probeStream(final String url) {
+        streamProbe = "";
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                org.json.JSONObject out = new org.json.JSONObject();
+                try {
+                    String ua = browserWebView != null
+                            ? browserWebView.getSettings().getUserAgentString() : null;
+                    com.browserhub.app.media.HlsPlaylist playlist =
+                            com.browserhub.app.media.MediaMerger.loadPlaylist(url, ua, null);
+                    if (playlist.error != null) {
+                        out.put("ok", false);
+                        out.put("reason", playlist.error);
+                    } else {
+                        out.put("ok", true);
+                        out.put("parts", playlist.segments.size());
+                        out.put("encrypted", playlist.encrypted);
+                        out.put("sampleAes", playlist.sampleAes);
+                        out.put("seconds", Math.round(playlist.totalDuration));
+                        out.put("bestResolution", bestResolutionOf(playlist));
+                    }
+                } catch (Throwable t) {
+                    try {
+                        out.put("ok", false);
+                        out.put("reason", t.getMessage() != null ? t.getMessage() : "probe failed");
+                    } catch (Throwable ignored) {
+                    }
+                }
+                streamProbe = out.toString();
+            }
+        }, "BrowserHubProbe").start();
+    }
+
+    public String getStreamProbe() {
+        return streamProbe;
+    }
+
+    private static String bestResolutionOf(com.browserhub.app.media.HlsPlaylist playlist) {
+        com.browserhub.app.media.HlsPlaylist.Variant best = playlist.bestVariant();
+        if (best == null || best.resolution == null) return "";
+        return best.resolution;
     }
 
     /** Copies text via the Android clipboard service. */
