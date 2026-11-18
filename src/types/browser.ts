@@ -32,6 +32,8 @@ export interface NetworkLogEntry {
   latencyMs: number;
   sizeKb: number;
   timestamp: string;
+  /** How many requests to this domain this row represents. */
+  count?: number;
 }
 
 export interface BrowserTab {

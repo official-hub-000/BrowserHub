@@ -13,6 +13,8 @@ import android.net.VpnService;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
@@ -150,6 +152,14 @@ public class MainActivity extends Activity {
     private String lastLoadedUrl = "";
     private boolean lastDesktopState = false;
     private int lastTopPx = -1;
+    /**
+     * Last applied text zoom. setTextZoom() invalidates the whole document
+     * layout, so calling it with the same value every sync — which the shell
+     * does on each layout pass — re-laid-out every open page continuously.
+     */
+    private int lastTextZoom = -1;
+    /** Last applied browser visibility, so a no-op sync does not touch the view. */
+    private int lastBrowserVisibility = View.GONE;
     private int lastBottomPx = -1;
     private String lastFindQuery = "";
     private String lastInjectedCss = "";
@@ -1072,17 +1082,64 @@ public class MainActivity extends Activity {
         });
     }
 
+    /**
+     * Ad-block counter bridge — throttled and batched.
+     *
+     * This used to cross into JavaScript for EVERY blocked request. An ad-heavy
+     * page blocks three figures of them while loading, so that was one
+     * runOnUiThread message plus one evaluateJavascript round-trip per blocked
+     * URL, all on the main thread, competing with the page's own layout work.
+     * On a mid-range phone that is visible as the page "catching" while it
+     * loads.
+     *
+     * Now blocks are counted natively and the shell is told at most twice a
+     * second, with the total. The UI shows the same number; nothing that matters
+     * to a person is lost, and the main thread is not spammed.
+     */
+    private int pendingBlockedCount = 0;
+    private final java.util.LinkedHashSet<String> pendingBlockedHosts =
+            new java.util.LinkedHashSet<String>();
+    private long lastBlockFlushAt = 0L;
+    private boolean blockFlushScheduled = false;
+
     private void notifyShellAdBlocked(final String host, final String list) {
-        runOnUiThread(new Runnable() {
+        pendingBlockedCount++;
+        if (host != null && pendingBlockedHosts.size() < 6) {
+            pendingBlockedHosts.add(host);
+        }
+        if (blockFlushScheduled) return;
+
+        long since = System.currentTimeMillis() - lastBlockFlushAt;
+        long delay = since >= 500L ? 0L : 500L - since;
+        blockFlushScheduled = true;
+        Runnable flush = new Runnable() {
             @Override
             public void run() {
-                shellWebView.evaluateJavascript(
-                        "if(window.__onNativeAdBlocked){window.__onNativeAdBlocked('" + escapeJs(host)
-                                + "','" + list + "');}",
-                        null
-                );
+                blockFlushScheduled = false;
+                lastBlockFlushAt = System.currentTimeMillis();
+                final int count = pendingBlockedCount;
+                final String firstHost = pendingBlockedHosts.isEmpty()
+                        ? "" : pendingBlockedHosts.iterator().next();
+                pendingBlockedCount = 0;
+                pendingBlockedHosts.clear();
+                if (count == 0) return;
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        shellWebView.evaluateJavascript(
+                                "if(window.__onNativeAdBlocked){window.__onNativeAdBlocked('"
+                                        + escapeJs(firstHost) + "','" + count + "');}",
+                                null
+                        );
+                    }
+                });
             }
-        });
+        };
+        if (delay <= 0L) {
+            new Handler(Looper.getMainLooper()).post(flush);
+        } else {
+            new Handler(Looper.getMainLooper()).postDelayed(flush, delay);
+        }
     }
 
     public void syncNativeBrowserViewport(
@@ -1124,10 +1181,13 @@ public class MainActivity extends Activity {
                     // stop input, and detach it from the shell's hit testing.
                     browserWebView.clearFocus();
                     browserWebView.stopLoading();
-                    browserWebView.setFocusable(false);
-                    browserWebView.setFocusableInTouchMode(false);
-                    browserWebView.setVisibility(View.GONE);
-                    browserWebView.setTranslationY(browserWebView.getHeight() + 2 * (int) getResources().getDisplayMetrics().density);
+                    if (lastBrowserVisibility != View.GONE) {
+                        lastBrowserVisibility = View.GONE;
+                        browserWebView.setFocusable(false);
+                        browserWebView.setFocusableInTouchMode(false);
+                        browserWebView.setVisibility(View.GONE);
+                        browserWebView.setTranslationY(browserWebView.getHeight() + 2 * (int) getResources().getDisplayMetrics().density);
+                    }
                     return;
                 }
 
@@ -1149,7 +1209,11 @@ public class MainActivity extends Activity {
                     browserWebView.setLayoutParams(lp);
                 }
 
-                browserWebView.getSettings().setTextZoom(Math.max(50, Math.min(200, zoomPct)));
+                int wantZoom = Math.max(50, Math.min(200, zoomPct));
+                if (wantZoom != lastTextZoom) {
+                    lastTextZoom = wantZoom;
+                    browserWebView.getSettings().setTextZoom(wantZoom);
+                }
 
                 boolean uaChanged = (isDesktop != lastDesktopState);
                 if (uaChanged) {
@@ -1176,12 +1240,23 @@ public class MainActivity extends Activity {
                     }
                 }
 
-                browserWebView.setFocusable(true);
-                browserWebView.setFocusableInTouchMode(true);
-                browserWebView.setTranslationY(0f);
-                browserWebView.setVisibility(View.VISIBLE);
-                if (browserWebView.getParent() != null) {
-                    browserWebView.bringToFront();
+                /*
+                 * Only touch the view when its state is actually changing.
+                 * This block used to run on EVERY shell sync, and a sync fires
+                 * on each layout pass: setFocusable + setVisibility +
+                 * bringToFront invalidate the parent and force a re-layout even
+                 * when nothing moved. That is per-frame main-thread work during
+                 * scrolling, which is exactly what "lags" feels like.
+                 */
+                if (lastBrowserVisibility != View.VISIBLE) {
+                    lastBrowserVisibility = View.VISIBLE;
+                    browserWebView.setTranslationY(0f);
+                    browserWebView.setVisibility(View.VISIBLE);
+                    browserWebView.setFocusable(true);
+                    browserWebView.setFocusableInTouchMode(true);
+                    if (browserWebView.getParent() != null) {
+                        browserWebView.bringToFront();
+                    }
                 }
 
                 if (!url.equals(lastLoadedUrl)) {

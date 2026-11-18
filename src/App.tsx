@@ -614,13 +614,22 @@ export function App() {
       );
     };
 
-    window.__onNativeAdBlocked = (domain: string, list?: string) => {
-      const isTracker = list === 'trackers';
+    /*
+     * The native side batches blocked requests and sends a COUNT, not a list
+     * name: one blocked request per JS round-trip was saturating the main
+     * thread on ad-heavy pages. Accept either shape so a count and a list name
+     * both work, and add the real number rather than always adding one.
+     */
+    window.__onNativeAdBlocked = (domain: string, listOrCount?: string) => {
+      const isTracker = listOrCount === 'trackers';
+      const amount = /^\d+$/.test(listOrCount ?? '')
+        ? Math.max(1, parseInt(listOrCount as string, 10))
+        : 1;
       setShields((prev) => ({
         ...prev,
-        totalAdsBlocked: isTracker ? prev.totalAdsBlocked : prev.totalAdsBlocked + 1,
+        totalAdsBlocked: isTracker ? prev.totalAdsBlocked : prev.totalAdsBlocked + amount,
         totalTrackersBlocked: isTracker
-          ? prev.totalTrackersBlocked + 1
+          ? prev.totalTrackersBlocked + amount
           : prev.totalTrackersBlocked,
       }));
       setTabs((prev) =>
@@ -628,26 +637,55 @@ export function App() {
           t.id === activeTabId
             ? {
                 ...t,
-                adsBlocked: isTracker ? t.adsBlocked : t.adsBlocked + 1,
-                trackersBlocked: isTracker ? t.trackersBlocked + 1 : t.trackersBlocked,
+                adsBlocked: isTracker ? t.adsBlocked : t.adsBlocked + amount,
+                trackersBlocked: isTracker ? t.trackersBlocked + amount : t.trackersBlocked,
               }
             : t
         )
       );
-      setNetworkLogs((prev) => [
-        {
-          id: `blk-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-          domain: domain || 'ad-tracker',
-          url: `https://${domain || 'tracker'}`,
-          type: isTracker ? 'tracker' : 'ad-banner',
-          status: 'blocked',
-          ruleMatched: 'Native HubShield Filter',
-          latencyMs: 0,
-          sizeKb: 0,
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-        },
-        ...prev.slice(0, 49),
-      ]);
+      /*
+       * One row per domain, not one row per blocked request. A page can block
+       * dozens of requests to the same host; pushing a row for each one both
+       * churned React state and pushed the genuinely interesting entries out of
+       * the 50-row window. The row carries the count instead.
+       */
+      const key = domain || 'ad-tracker';
+      setNetworkLogs((prev) => {
+        const existing = prev.findIndex((e) => e.domain === key && e.status === 'blocked');
+        if (existing >= 0) {
+          const merged = [...prev];
+          const hit = merged[existing];
+          merged[existing] = {
+            ...hit,
+            count: (hit.count ?? 1) + amount,
+            timestamp: new Date().toLocaleTimeString([], {
+              hour: '2-digit',
+              minute: '2-digit',
+              second: '2-digit',
+            }),
+          };
+          return merged;
+        }
+        return [
+          {
+            id: `blk-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+            domain: key,
+            url: `https://${domain || 'tracker'}`,
+            type: isTracker ? 'tracker' : 'ad-banner',
+            status: 'blocked',
+            ruleMatched: 'Native HubShield Filter',
+            latencyMs: 0,
+            sizeKb: 0,
+            count: amount,
+            timestamp: new Date().toLocaleTimeString([], {
+              hour: '2-digit',
+              minute: '2-digit',
+              second: '2-digit',
+            }),
+          },
+          ...prev.slice(0, 49),
+        ];
+      });
     };
 
     window.__onNativeFindResult = (activeOrdinal: number, totalMatches: number) => {

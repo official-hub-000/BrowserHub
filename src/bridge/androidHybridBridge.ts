@@ -76,7 +76,7 @@ declare global {
     BrowserHubNative?: AndroidJniBridge;
     __onNativeUrlChanged?: (url: string, title: string) => void;
     /** `list` is "ads" or "trackers" so the two shield counters stay separate. */
-    __onNativeAdBlocked?: (domain: string, list?: string) => void;
+    __onNativeAdBlocked?: (domain: string, listOrCount?: string) => void;
     __onAndroidBackPressed?: () => boolean;
     /** Real match counts coming back from the native Find-in-page engine. */
     __onNativeFindResult?: (activeOrdinal: number, totalMatches: number) => void;

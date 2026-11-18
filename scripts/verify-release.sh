@@ -90,6 +90,9 @@ npx tsx scripts/extension-runtime-test.mts | tail -1
 echo "== Viewport sync coalesced (no JNI call per frame or per render) =="
 npx tsx scripts/viewport-sync-test.mts | tail -1
 
+echo "== Frame path: a sync with no changes must touch nothing =="
+node scripts/frame-path-test.mjs | tail -1
+
 echo "== Live AI timing: can a reply arrive before the wait ends? =="
 npx tsx scripts/live-ai-timing-test.mts | tail -1
 
