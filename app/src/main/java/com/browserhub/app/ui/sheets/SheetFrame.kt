@@ -38,6 +38,8 @@ import androidx.compose.ui.unit.dp
 import com.browserhub.app.theme.RomKit
 import com.browserhub.app.ui.kit.Grabber
 
+/** Sheet overlay frame - scrim + rounded-top card, scrollable content, fits any screen. */
+@Composable
 fun SheetFrame(onDismiss: () -> Unit, content: @Composable ColumnScope.() -> Unit) {
     Box(
         Modifier
