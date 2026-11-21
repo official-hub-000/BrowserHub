@@ -50,31 +50,34 @@ val PlusJakartaSansFontFamily = FontFamily(
 val JetBrainsMonoFontFamily = FontFamily.Monospace
 
 val BrowserHubTypography = Typography(
+    // GC.Display Black, 30 sp / -0.5 tracking
     displaySmall = TextStyle(
         fontFamily = SpaceGroteskFontFamily,
-        fontWeight = FontWeight.Bold,
-        fontSize = 32.sp,
-        lineHeight = 38.sp,
+        fontWeight = FontWeight.Black,
+        fontSize = 30.sp,
+        lineHeight = 36.sp,
         letterSpacing = (-0.5).sp
     ),
+    // GC.Display Bold, 20 sp / -0.2 tracking
     headlineMedium = TextStyle(
         fontFamily = SpaceGroteskFontFamily,
-        fontWeight = FontWeight.SemiBold,
-        fontSize = 24.sp,
-        lineHeight = 30.sp,
-        letterSpacing = (-0.25).sp
+        fontWeight = FontWeight.Bold,
+        fontSize = 20.sp,
+        lineHeight = 26.sp,
+        letterSpacing = (-0.2).sp
     ),
+    // GC.Display SemiBold, 15 sp
     headlineSmall = TextStyle(
         fontFamily = SpaceGroteskFontFamily,
         fontWeight = FontWeight.SemiBold,
-        fontSize = 20.sp,
-        lineHeight = 26.sp
+        fontSize = 15.sp,
+        lineHeight = 20.sp
     ),
     titleMedium = TextStyle(
         fontFamily = PlusJakartaSansFontFamily,
         fontWeight = FontWeight.SemiBold,
-        fontSize = 16.sp,
-        lineHeight = 22.sp
+        fontSize = 15.sp,
+        lineHeight = 20.sp
     ),
     titleSmall = TextStyle(
         fontFamily = PlusJakartaSansFontFamily,
@@ -85,8 +88,8 @@ val BrowserHubTypography = Typography(
     bodyLarge = TextStyle(
         fontFamily = PlusJakartaSansFontFamily,
         fontWeight = FontWeight.Normal,
-        fontSize = 15.sp,
-        lineHeight = 22.sp
+        fontSize = 14.sp,
+        lineHeight = 20.sp
     ),
     bodyMedium = TextStyle(
         fontFamily = PlusJakartaSansFontFamily,
@@ -98,24 +101,32 @@ val BrowserHubTypography = Typography(
         fontFamily = PlusJakartaSansFontFamily,
         fontWeight = FontWeight.Normal,
         fontSize = 12.sp,
-        lineHeight = 16.sp
+        lineHeight = 17.sp
     ),
+    // GC.MonoValue (12 sp, Medium, no tracking) - numbers, units, button text
     labelLarge = TextStyle(
-        fontFamily = PlusJakartaSansFontFamily,
-        fontWeight = FontWeight.SemiBold,
-        fontSize = 14.sp,
-        lineHeight = 20.sp
-    ),
-    labelMedium = TextStyle(
         fontFamily = JetBrainsMonoFontFamily,
         fontWeight = FontWeight.Medium,
         fontSize = 12.sp,
         lineHeight = 16.sp
     ),
-    labelSmall = TextStyle(
-        fontFamily = PlusJakartaSansFontFamily,
+    // GC.LabelSm (9.5 sp, +0.4 tracking) - dense secondary mono labels
+    labelMedium = TextStyle(
+        fontFamily = JetBrainsMonoFontFamily,
         fontWeight = FontWeight.Medium,
-        fontSize = 11.sp,
-        lineHeight = 14.sp
+        fontSize = 9.5.sp,
+        lineHeight = 14.sp,
+        letterSpacing = 0.4.sp
+    ),
+    // GC.Label: mono 10 sp, +1.0 tracking. Every section header, chip label
+    // and eyebrow in the app reads through this slot. Uppercase is applied at
+    // the call site (text.uppercase()), exactly as GamersHub's SectionLabel
+    // does it - Compose TextStyle has no text-transform property.
+    labelSmall = TextStyle(
+        fontFamily = JetBrainsMonoFontFamily,
+        fontWeight = FontWeight.Medium,
+        fontSize = 10.sp,
+        lineHeight = 14.sp,
+        letterSpacing = 1.0.sp
     )
 )
