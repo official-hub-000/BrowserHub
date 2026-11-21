@@ -123,16 +123,18 @@ jobs:
           set -o pipefail
           gradle assembleDebug --stacktrace --no-daemon --console=plain 2>&1 | tee /tmp/gradle.log
 
+      # Logs and artifact zips both resolve to blob storage the session cannot
+      # reach, but a *failing step's message* comes back through api.github.com
+      # as a check annotation. So the useful lines are echoed (truncated to fit
+      # the 64 kB annotation budget) and the step exits non-zero to publish them.
       - name: Publish build error (only on failure)
         if: failure()
         run: |
-          {
-            echo "## Gradle failure"
-            echo '```'
-            grep -nE "e: file|error:|What went wrong|FAILURE:|Caused by|Execution failed|> Task .* FAILED" /tmp/gradle.log | head -80 || tail -80 /tmp/gradle.log
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
-          cp /tmp/gradle.log /tmp/gradle-error.log || true
+          echo "=== GRADLE FAILURE (tail) ==="
+          grep -nE "e: file|error:|What went wrong|FAILURE:|Caused by:|Execution failed|> Task .* FAILED|Could not resolve|Unresolved" /tmp/gradle.log | head -40 | cut -c1-300
+          echo "=== last 40 lines ==="
+          tail -40 /tmp/gradle.log | cut -c1-300
+          exit 1
 
       - name: Upload build log (only on failure)
         if: failure()
