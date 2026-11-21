@@ -130,7 +130,14 @@ jobs:
       - name: Report failure
         if: failure()
         run: |
-          LINE=$(grep -m1 -E "^e: file|error:|What went wrong|Could not resolve|Execution failed" /tmp/gradle.log | cut -c1-260)
+          # Take the diagnostic, not the generic header. Order matters: a
+          # Kotlin compiler line ("e: file:...") explains the failure best,
+          # then "Caused by", then whatever Gradle names after the header.
+          LINE=$(grep -m1 -E "^e: file|^e: " /tmp/gradle.log)
+          [ -z "$LINE" ] && LINE=$(grep -m1 -E "Caused by:" /tmp/gradle.log)
+          [ -z "$LINE" ] && LINE=$(awk '/What went wrong/{f=1;next} f&&NF{print;exit}' /tmp/gradle.log)
+          [ -z "$LINE" ] && LINE=$(grep -m1 -E "error:|Could not resolve" /tmp/gradle.log)
+          LINE=$(printf '%s' "$LINE" | tr -s ' ' | cut -c1-240)
           LINE=${LINE:-$(tail -3 /tmp/gradle.log | tr '\n' ' ' | cut -c1-260)}
           echo "GRADLE_ERROR: $LINE"
           echo "GRADLE_ERROR=$LINE" >> "$GITHUB_ENV"
