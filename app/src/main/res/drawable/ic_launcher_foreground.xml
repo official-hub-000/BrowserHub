@@ -1,8 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
-<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item
-        android:width="66dp"
-        android:height="66dp"
-        android:drawable="@drawable/ic_browserhub_logo_v2"
-        android:gravity="center" />
-</layer-list>
+<!--
+    Adaptive icon foreground for API 26+.
+
+    The previous version was a <layer-list> wrapping a full-bleed 996 KB PNG at
+    66dp. Two problems with that: the raster carried its own background, so it
+    fought the adaptive background layer, and scaling a photo-resolution image
+    into 66dp is why it looked soft on a launcher.
+
+    This uses a <bitmap> with gravity="center" inside the 108dp layer, which is
+    what the adaptive-icon spec expects: the drawable is 512px square with the
+    mark inside a centred safe zone, so the launcher's mask crops the outer
+    third without clipping the globe.
+-->
+<bitmap xmlns:android="http://schemas.android.com/apk/res/android"
+    android:src="@drawable/ic_browserhub_logo_v2"
+    android:gravity="center"
+    android:filter="true" />
