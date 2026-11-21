@@ -107,10 +107,15 @@ fun BrowserHubApp(viewModel: BrowserViewModel) {
         }
     }
 
-    BrowserHubTheme(
-        studioTheme = uiState.settings.studioTheme,
-        isIncognito = activeTab.isIncognito
+    // GamersHub's GameCornerTheme now owns the app-wide palette and type.
+    // Incognito keeps its own variant by swapping the accent while the rest of
+    // the token set stays GC's: the surface/background values are identical in
+    // both, so incognito still reads as a distinct mode without leaving the
+    // design system.
+    BrowserHubGameCornerTheme(
+        theme = uiState.settings.studioTheme
     ) {
+        BrowserHubSemanticLayer(isIncognito = activeTab.isIncognito) {
         val browserColors = LocalBrowserColors.current
         val clearedHistoryMsg = context.getString(R.string.toast_history_cleared)
         val isOmniboxTop = uiState.settings.addressBarPosition == AddressBarPosition.TOP
@@ -797,4 +802,5 @@ fun BrowserHubApp(viewModel: BrowserViewModel) {
             }
         }
     }
+}
 }

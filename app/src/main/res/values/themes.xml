@@ -1,6 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!--
+        GamersHub platform theme.
+
+        parent stays android:Theme.Material.NoActionBar exactly as GamersHub
+        (styles.xml), windowBackground is the GC background #05060A instead of
+        pure black, and the system bars are transparent so content draws under
+        them with windowDrawsSystemBarBackgrounds.
+
+        Dark only: there is no values-night variant and no day/night switch.
+    -->
     <style name="Theme.BrowserHub" parent="android:Theme.Material.NoActionBar">
-        <item name="android:windowBackground">@android:color/black</item>
+        <item name="android:windowBackground">@color/gc_bg</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowDrawsSystemBarBackgrounds">true</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
     </style>
 </resources>

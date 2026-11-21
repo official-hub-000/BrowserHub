@@ -239,3 +239,54 @@ fun BrowserHubTheme(
         )
     }
 }
+
+/**
+ * Semantic + incognito layer, kept after the GamersHub re-skin.
+ *
+ * BrowserHub's screens read `LocalBrowserColors` for semantic signals (secure /
+ * warning / cyan / emerald / violet / crimson / amber) and for the incognito
+ * badge colours. Those are consumed by ~11 files, so the values are preserved
+ * here and injected inside GameCornerTheme rather than removed.
+ *
+ * Only the decorative tokens now come from GC; the semantic signals keep their
+ * established meanings, which the brief freezes ("semantic signals: status
+ * only, never decoration").
+ */
+@Composable
+fun BrowserHubSemanticLayer(isIncognito: Boolean, content: @Composable () -> Unit) {
+    val scheme = MaterialTheme.colorScheme
+    val semanticColors = BrowserSemanticColors(
+        secure = FlagshipEmerald,
+        warning = FlagshipAmber,
+        cyan = FlagshipCyan,
+        emerald = FlagshipEmerald,
+        violet = FlagshipViolet,
+        crimson = FlagshipCrimson,
+        amber = FlagshipAmber,
+        cardBg = scheme.surface,
+        cardBorder = scheme.outline,
+        hubGlowPrimary = if (isIncognito) IncognitoPrimaryDark else scheme.primary,
+        hubGlowSecondary = scheme.secondary,
+        incognitoBadgeBg = IncognitoContainerDark,
+        incognitoBadgeContent = IncognitoPrimaryDark,
+        isDark = true
+    )
+    CompositionLocalProvider(LocalBrowserColors provides semanticColors) {
+        if (isIncognito) {
+            // Incognito keeps a distinct surface tint while staying inside the
+            // dark-only, no-dynamic-colour rule of the new system.
+            MaterialTheme(
+                colorScheme = scheme.copy(
+                    primary = IncognitoPrimaryDark,
+                    primaryContainer = IncognitoContainerDark,
+                    background = IncognitoBgDark,
+                    surface = IncognitoSurfaceDark,
+                    surfaceVariant = IncognitoSurfaceVariantDark
+                ),
+                content = content
+            )
+        } else {
+            content()
+        }
+    }
+}

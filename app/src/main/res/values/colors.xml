@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Platform-side colour values that must match the Compose tokens in
+    theme/GameCorner.kt. XML cannot read Kotlin constants, so they are
+    duplicated here deliberately and kept in one place.
+
+    GC.Bg      = #05060A
+    RomKit.Panel = #0D1017
+-->
+<resources>
+    <color name="gc_bg">#05060A</color>
+    <color name="gc_panel">#0D1017</color>
+    <color name="gc_stroke">#232B3D</color>
+</resources>

@@ -1,0 +1,21 @@
+Oxanium — SIL Open Font License 1.1
+
+Copyright 2019 The Oxanium Project Authors
+(https://github.com/sevmeyer/oxanium)
+
+Licensed under the SIL Open Font License, Version 1.1.
+The full licence text is available at:
+    https://scripts.sil.org/OFL
+and at:
+    https://openfontlicense.org/
+
+The copyright line and licence reference above are read directly from the
+font's own `name` table (name IDs 0, 13 and 14) in oxanium.ttf, so they match
+the file on disk exactly rather than being retyped from memory.
+
+Why the full licence body is not reproduced here: it was not reachable from the
+build environment (raw.githubusercontent.com and scripts.sil.org are both
+routed out), and reproducing the OFL from memory risks a subtly wrong text,
+which would be worse than an accurate reference. The canonical text at the URLs
+above governs. If you need it vendored, drop the official OFL.txt beside this
+file unchanged.
