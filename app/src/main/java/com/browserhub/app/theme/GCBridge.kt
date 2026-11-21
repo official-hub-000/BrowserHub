@@ -13,6 +13,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import android.app.Activity
+import com.browserhub.app.data.model.StudioTheme
 import androidx.core.view.WindowCompat
 
 /**
