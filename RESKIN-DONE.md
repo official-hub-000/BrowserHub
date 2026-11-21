@@ -138,3 +138,37 @@ parsed at render time, so the colours cannot drift from the app):
 
 They are illustrations of the design layer, not device captures — the sandbox
 has no emulator. The token values in them are read from source, not retyped.
+
+## 9. The APK
+
+The build now actually runs, on GitHub's runners (this sandbox has no JDK, no
+Android SDK, and cannot reach `dl.google.com` or `maven.google.com`).
+
+- **Release:** https://github.com/official-hub-000/BrowserHub/releases/tag/build-65
+- **APK:** https://github.com/official-hub-000/BrowserHub/releases/download/build-65/BrowserHub.apk
+- **Size:** 23,812,734 bytes · **Commit:** `72f0189` · **Run:** 44867710807
+- Signed with a generated debug key — installs directly, not Play-ready.
+
+To build it, CI supplies the three things the tree is missing: a
+`google-services.json` (a real one from `secrets.FIREBASE_GOOGLE_SERVICES_JSON`
+if present, otherwise a placeholder), a `debug.keystore` generated on the
+runner, and Gradle itself (9.3.1, because AGP 9.1.1 requires it).
+
+### What the real compiler caught that static checks could not
+
+The earlier claim in §6 that brace/symbol checks were sufficient was too
+confident. Six real defects only surfaced once Kotlin ran:
+
+1. `GCBridge.kt` — `StudioTheme` used as a receiver without being imported.
+2. `BrowserHubApp.kt` — `BrowserHubGameCornerTheme` and `BrowserHubSemanticLayer`
+   called without imports.
+3. `BrowserHubApp.kt` — `targetState == None` had `fadeOut` on the *enter* side
+   of `togetherWith`, which is an `ExitTransition`; no overload applied.
+4. `BottomControlBar.kt` — the 23 restored imports were appended *after* the
+   code; Kotlin requires them at the top.
+5. `ShieldsAndTabsSheets.kt` — replacing `ModalSheetScrim` sliced to the first
+   `@Composable`, which was the parameter line, leaving 63 orphaned lines.
+6. `SheetFrame.kt` — the port dropped the source's `@Composable` annotation.
+
+All six are fixed. The lesson is recorded here rather than quietly deleted:
+compile before claiming a build is green.
