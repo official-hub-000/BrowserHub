@@ -79,6 +79,8 @@ import com.browserhub.app.ui.viewmodel.BrowserOverlay
 import com.browserhub.app.ui.viewmodel.BrowserViewModel
 import com.browserhub.app.theme.RomKit
 import com.browserhub.app.theme.RomKitEase
+import com.browserhub.app.theme.BrowserHubGameCornerTheme
+import com.browserhub.app.ui.theme.BrowserHubSemanticLayer
 
 @Composable
 fun BrowserHubApp(viewModel: BrowserViewModel) {
