@@ -130,17 +130,21 @@ jobs:
       - name: Report failure
         if: failure()
         run: |
-          # Take the diagnostic, not the generic header. Order matters: a
-          # Kotlin compiler line ("e: file:...") explains the failure best,
-          # then "Caused by", then whatever Gradle names after the header.
-          LINE=$(grep -m1 -E "^e: file|^e: " /tmp/gradle.log)
-          [ -z "$LINE" ] && LINE=$(grep -m1 -E "Caused by:" /tmp/gradle.log)
-          [ -z "$LINE" ] && LINE=$(awk '/What went wrong/{f=1;next} f&&NF{print;exit}' /tmp/gradle.log)
-          [ -z "$LINE" ] && LINE=$(grep -m1 -E "error:|Could not resolve" /tmp/gradle.log)
-          LINE=$(printf '%s' "$LINE" | tr -s ' ' | cut -c1-240)
-          LINE=${LINE:-$(tail -3 /tmp/gradle.log | tr '\n' ' ' | cut -c1-260)}
-          echo "GRADLE_ERROR: $LINE"
+          # ls exists even when gradle never ran, which distinguishes "config
+          # failed before any output" from "compiled and broke".
+          LINE=""
+          if [ -f /tmp/gradle.log ]; then
+            LINE=$(grep -m1 -E "^e: file|^e: " /tmp/gradle.log)
+            [ -z "$LINE" ] && LINE=$(grep -m1 -E "Caused by:" /tmp/gradle.log)
+            [ -z "$LINE" ] && LINE=$(grep -m1 -iE "error|exception|failed" /tmp/gradle.log)
+            [ -z "$LINE" ] && LINE=$(awk '/What went wrong/{f=1;next} f&&NF{print;exit}' /tmp/gradle.log)
+          else
+            LINE="NO_LOG_WRITTEN"
+          fi
+          [ -z "$LINE" ] && LINE="EMPTY_DIAGNOSIS"
+          LINE=$(printf '%s' "$LINE" | tr -s ' \t' ' ' | cut -c1-230)
           echo "GRADLE_ERROR=$LINE" >> "$GITHUB_ENV"
+          echo "carried: $LINE"
           exit 0
 
       # The artifact *listing* (names, sizes) is reachable through
