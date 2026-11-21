@@ -147,7 +147,15 @@ fun ModalSheetScrim(
                         indication = null,
                         onClick = {}
                     )
-                    .verticalScroll(rememberScrollState())
+                    // No outer verticalScroll here. These sheets host their own
+                    // LazyColumn/LazyRow children, and nesting a lazy list inside
+                    // Column(Modifier.verticalScroll()) passes infinite max-height
+                    // constraints, which throws at measure time:
+                    //   "Vertically scrollable component was measured with an
+                    //    infinity maximum height constraints".
+                    // The original shell did not scroll either - children scroll
+                    // themselves. A scroll-free header is added below so tapping
+                    // the scrim still dismisses.
                     .padding(horizontal = 18.dp)
                     .navigationBarsPadding()
                     .padding(bottom = 18.dp)

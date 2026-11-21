@@ -172,3 +172,36 @@ confident. Six real defects only surfaced once Kotlin ran:
 
 All six are fixed. The lesson is recorded here rather than quietly deleted:
 compile before claiming a build is green.
+
+## 10. Crash fix — tab switching and opening options
+
+**Symptom.** Switching tabs, or opening an options sheet, crashed the app.
+
+**Cause (mine).** The re-skinned `ModalSheetScrim` wrapped every sheet in
+`Column(Modifier.verticalScroll(...))`. Thirty-one `LazyColumn`/`LazyRow`
+containers live inside those sheets, and Compose refuses to measure a lazy
+list under an infinite max-height constraint:
+
+```
+IllegalStateException: Vertically scrollable component was measured with an
+infinity maximum height constraints
+```
+
+That is exactly the "switch tabs / open options" path: Tabs opens
+`TabVaultSheet`, Tools opens `ControlAndStudioSheets`, and both host lazy
+lists.
+
+**Why it was wrong, not just unlucky.** The original shell never scrolled —
+verified against `0f5c17d`: `grep -c verticalScroll` on the old
+`ModalSheetScrim` returns 0. GamersHub's own `SheetFrame` does scroll
+(`Sheets.kt:79`), but its callers do not nest lazy lists inside it. I copied
+the scroll without checking what this app puts inside. The rule that matters
+here is "port the shell, keep the children working".
+
+**Fix.** `verticalScroll` removed from the scrim. Sheets scroll themselves,
+exactly as before the re-skin. The grabber, R18 clip, hairline, 760 dp cap,
+18 dp gutter and `#99000000` scrim all stay.
+
+**Not reproducible locally.** No emulator here, so this was diagnosed from the
+constraint contract rather than a stack trace. If anything still crashes, the
+next step is a logcat line — see §11.
