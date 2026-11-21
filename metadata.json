@@ -1,0 +1,8 @@
+{
+  "name": "BrowserHub",
+  "description": "A fast, privacy-minded Android mobile web browser and quick-access hub with multi-tab browsing, incognito mode, bookmarks, and browsing history.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
