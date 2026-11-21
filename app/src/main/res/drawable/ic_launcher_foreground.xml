@@ -2,17 +2,58 @@
 <!--
     Adaptive icon foreground for API 26+.
 
-    The previous version was a <layer-list> wrapping a full-bleed 996 KB PNG at
-    66dp. Two problems with that: the raster carried its own background, so it
-    fought the adaptive background layer, and scaling a photo-resolution image
-    into 66dp is why it looked soft on a launcher.
+    Design rules borrowed from the app's own icon set (ui/icons/GhIcons.kt):
+    straight segments only, no curves, miter joins, butt caps, 45-degree
+    chamfers, and one consistent stroke weight. The old foreground was a
+    512px raster carrying its own background, which fought the adaptive
+    background layer and went soft on a launcher.
 
-    This uses a <bitmap> with gravity="center" inside the 108dp layer, which is
-    what the adaptive-icon spec expects: the drawable is 512px square with the
-    mark inside a centred safe zone, so the launcher's mask crops the outer
-    third without clipping the globe.
+    The mark: a flat-top hexagonal "prism" with a triangular aperture cut into
+    its lower right - a browser window reduced to pure geometry. Every edge is
+    a line; the aperture's corner is a 45-degree chamfer, not a curve.
+
+    Geometry is drawn on the 108x108 adaptive grid. The visible mark spans
+    r=28 from centre, inside the 66dp (r=33) safe zone, so no mask clips it.
 -->
-<bitmap xmlns:android="http://schemas.android.com/apk/res/android"
-    android:src="@drawable/ic_browserhub_logo_v2"
-    android:gravity="center"
-    android:filter="true" />
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Hex body: soft fill so the mark has mass on the near-black background -->
+    <path
+        android:fillColor="#0E3A46"
+        android:pathData="M82.0,54.0 L68.0,78.2 L40.0,78.2 L26.0,54.0 L40.0,29.8 L68.0,29.8 Z" />
+
+    <!-- Hex outline: 1.75u stroke scaled to this grid, miter joins -->
+    <path
+        android:strokeColor="#35E1F2"
+        android:strokeWidth="4.5"
+        android:strokeLineJoin="miter"
+        android:strokeLineCap="butt"
+        android:fillColor="#00000000"
+        android:pathData="M82.0,54.0 L68.0,78.2 L40.0,78.2 L26.0,54.0 L40.0,29.8 L68.0,29.8 Z" />
+
+    <!-- Aperture: a chamfered wedge, the only bright cyan fill on the mark -->
+    <path
+        android:fillColor="#35E1F2"
+        android:pathData="M48.0,42.0 L48.0,66.0 L56.0,60.0 L56.0,48.0 Z" />
+
+    <!-- Second aperture bar: the "window" pane, same stroke as the hex -->
+    <path
+        android:strokeColor="#7BF0FA"
+        android:strokeWidth="4.5"
+        android:strokeLineJoin="miter"
+        android:strokeLineCap="butt"
+        android:fillColor="#00000000"
+        android:pathData="M56.0,44.0 L70.0,44.0" />
+
+    <path
+        android:strokeColor="#7BF0FA"
+        android:strokeWidth="4.5"
+        android:strokeLineJoin="miter"
+        android:strokeLineCap="butt"
+        android:fillColor="#00000000"
+        android:pathData="M56.0,54.0 L72.0,54.0" />
+</vector>

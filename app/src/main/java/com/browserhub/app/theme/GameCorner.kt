@@ -72,9 +72,11 @@ object GC {
     val Beige = Color(0xFFC7D2E0)
 
     /** Light red — the default look of the whole app. */
-    val LightRed = Color(0xFFFF6900)
+    /** The app's default accent. Still named for its original role so every
+     *  existing reference keeps compiling; the value is now BrowserHub cyan. */
+    val LightRed = Color(0xFF35E1F2)
     /** Deeper stop that pairs with [LightRed] in gradients and rims. */
-    val LightRedDeep = Color(0xFFFF8A3D)
+    val LightRedDeep = Color(0xFF7BF0FA)
 
     /** Sampled from the launcher emblem: ember red core, orange edge, violet circuitry. */
     val IconRed = Color(0xFFF6231C)
@@ -93,6 +95,10 @@ object GC {
     data class Tone(val name: String, val color: Color, val pair: Color, val bed: Color)
 
     val TONES: List<Tone> = listOf(
+        // 0 is the default: BrowserHub cyan, the same hue as the launcher mark.
+        Tone("Cyan", Color(0xFF35E1F2), Color(0xFF7BF0FA), Color(0xFF0B2A31)),
+        // The original GamersHub ember family, shifted down one slot. Nothing
+        // removed - every red is still selectable, just no longer the default.
         Tone("Light red", Color(0xFFFF6900), Color(0xFFFF8A3D), Color(0xFF2A1608)),
         Tone("Rose red", Color(0xFFFF6B6B), Color(0xFFFF3B3B), Color(0xFF3D1416)),
         Tone("True red", Color(0xFFFF4D4D), Color(0xFFD32F2F), Color(0xFF3C1010)),

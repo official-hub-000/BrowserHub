@@ -42,14 +42,14 @@ val FlagshipCyanDarkBg = GC.SurfaceHi
 val FlagshipEmerald = RomKit.Good         // #38E08B - "secure" signal
 val FlagshipEmeraldBright = RomKit.Good
 val FlagshipEmeraldDarkBg = GC.SurfaceHi
-val FlagshipViolet = GC.LightRedDeep      // decorative violet -> accent pair
+val FlagshipViolet = GC.LightRedDeep      // decorative violet -> accent pair (cyan hi)
 val FlagshipVioletDarkBg = GC.TONES[0].bed
 val FlagshipCrimson = RomKit.Bad          // #FF5C6C - "danger" signal
 val FlagshipCrimsonDarkBg = GC.TONES[1].bed
 val FlagshipAmber = RomKit.Warn           // #FFC857 - "warning" signal
 val FlagshipAmberDarkBg = GC.TONES[5].bed
 val FlagshipFrost = GC.TextSoft
-val FlagshipFireOrange = RomKit.Ember     // #FF6900 - the accent itself
+val FlagshipFireOrange = GC.LightRed      // #35E1F2 - the accent itself (cyan)
 val FlagshipFireRed = RomKit.EmberDeep    // #D95300
 
 // ---- Incognito ---------------------------------------------------------------
@@ -58,7 +58,7 @@ val FlagshipFireRed = RomKit.EmberDeep    // #D95300
 val IncognitoBgDark = GC.Bg
 val IncognitoSurfaceDark = GC.Surface
 val IncognitoSurfaceVariantDark = GC.SurfaceHi
-val IncognitoPrimaryDark = RomKit.Ember
+val IncognitoPrimaryDark = GC.LightRed   // cyan, matching the default accent
 val IncognitoContainerDark = GC.TONES[0].bed
 
 // ---- Compatibility aliases (used across screens) -----------------------------
@@ -68,9 +68,9 @@ val DangerRoseDark = RomKit.Bad
 
 /** Accent list for the studio theme picker - kept as a list, now GC tones. */
 val HubAccentList = listOf(
+    GC.LightRed,          // cyan - the default, listed first
     RomKit.Ember,
     RomKit.Good,
-    RomKit.EmberHi,
     GC.LightRedDeep,
     RomKit.Bad,
     RomKit.Warn

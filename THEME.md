@@ -219,3 +219,65 @@ layer already accepts any index or custom colour.
 ViewModels, repositories, services, receivers, permissions, entitlement logic,
 ad/cast SDKs, navigation targets, data flow, and the feature set are untouched.
 This layer only replaces how things look and move.
+
+---
+
+## 10. Default accent is cyan
+
+The default accent is **`#35E1F2`** (cyan), not the original light red.
+
+**Why cyan and not a new colour:** it was already in the palette as
+`RomKit.Cyan`, used as the secondary in both `darkColorScheme` calls. Promoting
+an existing token keeps the design system internally consistent — nothing was
+invented.
+
+### How it is wired
+
+Cyan is now **tone 0** in `GC.TONES`, which is what index `0` resolves to. That
+matters because the default path is `StudioTheme.AMOLED_BLACK → index 0`, and
+`LocalAccent` falls back to `GC.LightRed`, which is now `#35E1F2`. One change,
+so every consumer — `primary`, `LocalAccent`, `accentNow()`, tag beds, icon
+chips, gradient rims — follows automatically.
+
+| # | Tone | Value |
+|---|---|---|
+| **0** | **Cyan (default)** | **`#35E1F2`** |
+| 1 | Light red | `#FF6900` |
+| 2 | Rose red | `#FF6B6B` |
+| 3 | True red | `#FF4D4D` |
+| 4 | Signal red | `#FF2D2D` |
+| 5 | Deep red | `#E53935` |
+| 6 | Ember | `#FF7A18` |
+| 7 | custom | user pick |
+
+**Nothing was removed.** The six ember tones all still exist and are still
+selectable — they moved down one slot. `StudioTheme` values were remapped to
+keep pointing at the same hues: `VIVALDI_CRIMSON` 2→3, `WARM_DUSK` 5→6.
+`CYBER_CYAN` already meant cyan and still does.
+
+Cyan's bed (`#0B2A31`) and pair (`#7BF0FA`) were derived to sit inside the same
+warm near-black family, so `readable()` and `inkOn()` behave as they do for
+every other tone.
+
+Incognito still reads as a distinct mode: it keeps its own surface, background
+and container values, and now shares the cyan accent rather than fighting it.
+
+## 11. App icon
+
+The old mark was a **512 px raster** (a cyan globe plus a purple cursor) sitting
+inside an adaptive layer — it carried its own background, fought the background
+layer, and went soft on launchers.
+
+The new mark is drawn in the design system's own icon dialect: straight
+segments only, **no curves**, miter joins, butt caps, 45° chamfers, flat-top
+hexagonal geometry. It is pure vector at every density.
+
+| Layer | File | Notes |
+|---|---|---|
+| background | `ic_launcher_background.xml` | `#0B2D36 → #071620 → #05060A`, same surface family as `GC.Bg` |
+| foreground | `ic_launcher_foreground.xml` | cyan `#35E1F2` and `#7BF0FA`, mark within the r=33 safe zone |
+| monochrome | `ic_launcher_monochrome.xml` | alpha-only white, identical geometry, for Android 13 themed icons |
+| rasters | `mipmap-*/ic_launcher[_round].png` | 48/72/96/144/192, regenerated from the same geometry |
+
+The launcher name and package are unchanged — this is a new mark for the same
+app, not a rebrand.

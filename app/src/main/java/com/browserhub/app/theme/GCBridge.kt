@@ -27,28 +27,35 @@ import androidx.core.view.WindowCompat
  *
  * So StudioTheme is *mapped* onto the GamersHub accent engine instead:
  *
- *   CYBER_CYAN        -> TONES index 0 (Light red is GC's default; kept for
- *                        the "cyber" read via the secondary cyan signal)
+ *   CYBER_CYAN        -> TONES index 0 (cyan) - its exact match
  *   MULLVAD_EMERALD   -> Great for Jade-ish reads; GC has no green tone, so it
  *                        uses the semantic Good colour as its accent
  *   ARC_VIOLET        -> custom accent #A855F7
  *   NORDIC_FROST      -> custom accent #93C5FD
- *   VIVALDI_CRIMSON   -> TONES index 2 (True red)
- *   WARM_DUSK         -> TONES index 5 (Ember)
- *   AMOLED_BLACK      -> TONES index 0, the app's own default
+ *   VIVALDI_CRIMSON   -> TONES index 3 (True red)
+ *   WARM_DUSK         -> TONES index 6 (Ember)
+ *   AMOLED_BLACK      -> TONES index 0, the app's own default: now cyan
+ *
+ * Index 0 became cyan when the default accent changed, and the six ember
+ * tones shifted down one slot. The two red choices were re-pointed so they
+ * still select the same hues they did before that change.
  *
  * Nothing is dropped: all seven still produce a visibly different accent.
  * Values come from GC/RomKit; only the mapping is new.
  */
 @Composable
 fun StudioTheme.toGameCorner(): Pair<Int, Color?> = when (this) {
+    // Index 0 is cyan, the app default, so a fresh install and the stored
+    // AMOLED_BLACK default both land on cyan. CYBER_CYAN is its honest match.
     com.browserhub.app.data.model.StudioTheme.AMOLED_BLACK -> 0 to null
     com.browserhub.app.data.model.StudioTheme.CYBER_CYAN -> 0 to null
     com.browserhub.app.data.model.StudioTheme.MULLVAD_EMERALD -> GC.CUSTOM to RomKit.Good
     com.browserhub.app.data.model.StudioTheme.ARC_VIOLET -> GC.CUSTOM to Color(0xFFA855F7)
     com.browserhub.app.data.model.StudioTheme.NORDIC_FROST -> GC.CUSTOM to Color(0xFF93C5FD)
-    com.browserhub.app.data.model.StudioTheme.VIVALDI_CRIMSON -> 2 to null
-    com.browserhub.app.data.model.StudioTheme.WARM_DUSK -> 5 to null
+    // The reds moved down one slot when cyan took index 0; these keep the
+    // crimson/dusk choices pointing at the same hues as before.
+    com.browserhub.app.data.model.StudioTheme.VIVALDI_CRIMSON -> 3 to null
+    com.browserhub.app.data.model.StudioTheme.WARM_DUSK -> 6 to null
 }
 
 /**
