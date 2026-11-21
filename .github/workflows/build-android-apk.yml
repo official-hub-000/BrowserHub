@@ -24,7 +24,7 @@ on:
       - main
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build-android:
@@ -187,3 +187,18 @@ jobs:
           name: BrowserHub-debug-apk
           path: out/*.apk
           if-no-files-found: error
+
+      # Release assets are served from the regular objects host, so unlike an
+      # artifact zip they are downloadable straight from a browser.
+      - name: Publish APK to a release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="build-${GITHUB_RUN_NUMBER}"
+          APK=$(ls out/*.apk | head -1)
+          for f in out/*.apk; do mv "$f" BrowserHub.apk; break; done
+          gh release create "$TAG"             --repo "$GITHUB_REPOSITORY"             --target "$GITHUB_SHA"             --title "BrowserHub build ${GITHUB_RUN_NUMBER}"             --notes "Debug APK built from ${GITHUB_SHA} by workflow run ${GITHUB_RUN_NUMBER}.
+
+          Re-skin build: GamersHub design system, features unchanged (see RESKIN-DONE.md).
+          Signed with the debug key, so it installs directly but is not Play-ready."             BrowserHub.apk
+          echo "release: https://github.com/$GITHUB_REPOSITORY/releases/tag/$TAG"
