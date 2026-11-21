@@ -161,68 +161,6 @@ fun ModalSheetScrim(
     }
 }
 
-@Composable ColumnScope.() -> Unit
-) {
-    BackHandler(onBack = onDismiss)
-    val browserColors = LocalBrowserColors.current
-    var appeared by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) { appeared = true }
-
-    val scrimAlpha by animateFloatAsState(
-        targetValue = if (appeared) 0.72f else 0f,
-        animationSpec = tween(200),
-        label = "modal_scrim_alpha"
-    )
-    val sheetScale by animateFloatAsState(
-        targetValue = if (appeared) 1f else 0.94f,
-        animationSpec = spring(dampingRatio = 0.78f, stiffness = Spring.StiffnessMedium),
-        label = "modal_sheet_scale"
-    )
-    val sheetOffsetY by animateFloatAsState(
-        targetValue = if (appeared) 0f else 72f,
-        animationSpec = spring(dampingRatio = 0.82f, stiffness = Spring.StiffnessMediumLow),
-        label = "modal_sheet_offset"
-    )
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black.copy(alpha = scrimAlpha))
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                onClick = onDismiss
-            ),
-        contentAlignment = Alignment.BottomCenter
-    ) {
-        Surface(
-            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
-            color = MaterialTheme.colorScheme.surface,
-            border = BorderStroke(1.dp, browserColors.cardBorder),
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(max = 760.dp)
-                .graphicsLayer {
-                    scaleX = sheetScale
-                    scaleY = sheetScale
-                    translationY = sheetOffsetY
-                }
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                    onClick = {}
-                )
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .navigationBarsPadding()
-            ) {
-                content()
-            }
-        }
-    }
-}
 
 @Composable
 fun SearchEnginePickerSheet(
