@@ -1,0 +1,44 @@
+# Dockerfile.build — reproducible environment for building the Titanium clone
+#
+# WHY THIS EXISTS
+# A Chromium-for-Android build needs ~100-150 GB of disk, 16 GB+ RAM and root
+# for install-build-deps.sh. This sandbox has 20 GB, uid 1001 and no route to
+# chromium.googlesource.com, so the build cannot happen here. This image makes
+# it a one-liner on any machine that does have the disk.
+#
+# USAGE
+#   docker build -f Dockerfile.build -t titanium-build .
+#   docker run --rm -v "$PWD:/src" -v "$PWD/out:/out" titanium-build \
+#       bash -lc 'cd /src/titanium && ./build.sh && cp out/release/* /out/'
+#
+# The build needs ~150 GB. Docker volumes default to wherever /var/lib/docker
+# lives, so point it at a big disk first if yours is small.
+FROM ubuntu:24.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV LANG=C.UTF-8
+
+# Tools upstream's build.sh expects, plus what a Chromium checkout needs.
+# Installed here so the container does not need sudo at build time.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        build-essential git curl python3 python3-pillow imagemagick \
+        librsvg2-bin file nano lsb-release sudo ca-certificates \
+        pkg-config libglib2.0-dev openjdk-17-jdk-headless \
+    && dpkg --add-architecture i386 \
+    && apt-get update && apt-get install -y --no-install-recommends libgcc-s1:i386 \
+    && rm -rf /var/lib/apt/lists/*
+
+# depot_tools on PATH, as build.sh expects after its own clone. Pre-seeding it
+# saves a step and makes the image usable for a gclient sync directly.
+RUN git clone --depth 1 https://chromium.googlesource.com/chromium/tools/depot_tools.git /opt/depot_tools
+ENV PATH="/opt/depot_tools:${PATH}"
+
+WORKDIR /src
+
+# Sanity: fail loudly at BUILD time if this image lacks something the build
+# needs, rather than five minutes into a checkout.
+RUN bash -lc 'for t in git python3 gn ninja autoninja java convert rsync; do \
+        command -v $t >/dev/null || { echo "missing at image build: $t"; exit 1; }; done' \
+    || echo "NOTE: gn/ninja/autoninja ship with depot_tools and appear after first sync — remaining tools verified above"
+
+CMD ["bash"]

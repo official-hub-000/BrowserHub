@@ -1,0 +1,16 @@
+# Template for the signing config that common.sh::set_keys decodes from
+# $LOCAL_TEST_JKS. Upstream does not ship one; this is the shape sign_apk and
+# sign_aab expect (they `source` the decoded file and read these three names).
+#
+# 1. Create a keystore:   keytool -genkeypair -v -keystore release.jks \
+#        -alias titanium -keyalg RSA -keysize 2048 -validity 10000
+# 2. Copy this file to local.properties and fill in the same values.
+# 3. Encode both:
+#        export LOCAL_TEST_JKS=$(base64 -w0 local.properties)
+#        export STORE_TEST_JKS=$(base64 -w0 release.jks)
+#
+# Both variables are REQUIRED: set_keys writes them out unconditionally and
+# sign_apk exits 1 if apksigner cannot sign.
+storePassword=CHANGE_ME
+keyPassword=CHANGE_ME
+keyAlias=titanium
