@@ -85,12 +85,83 @@ import com.browserhub.app.ui.theme.FlagshipEmeraldDarkBg
 import com.browserhub.app.ui.theme.FlagshipVioletDarkBg
 import com.browserhub.app.ui.theme.LocalBrowserColors
 import com.browserhub.app.ui.theme.OledTextSecondary
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.border
+import com.browserhub.app.theme.RomKit
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 
+/**
+ * The one pop-up shell for every surface in the app.
+ *
+ * BrowserHub had a bespoke scrim here (scale + spring + 72 dp slide). It is now
+ * GamersHub's SheetFrame: scrim #99000000 with click-to-dismiss, a bottom-
+ * anchored card, fillMaxWidth, max 760 dp, R18 clip, Panel fill, 1 dp hairline,
+ * 18 dp horizontal padding, navigationBarsPadding + 18 dp bottom, and the
+ * top-centre 44x5 grabber.
+ *
+ * The slide-in motion is the GC one (slideInVertically { it } / out), which
+ * replaces the old spring/scale entirely. BackHandler is kept because Android
+ * users expect the back gesture to close a sheet - that is behaviour, not skin.
+ *
+ * Every one of the app's 21 surfaces renders through this, so re-skinning it
+ * here is what makes the pop-up language consistent app-wide.
+ */
 @Composable
 fun ModalSheetScrim(
     onDismiss: () -> Unit,
     maxHeightFraction: Float = 0.88f,
     content: @Composable ColumnScope.() -> Unit
+) {
+    BackHandler(onBack = onDismiss)
+    var appeared by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { appeared = true }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0x99000000))
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onDismiss
+            ),
+        contentAlignment = Alignment.BottomCenter
+    ) {
+        androidx.compose.animation.AnimatedVisibility(
+            visible = appeared,
+            enter = androidx.compose.animation.slideInVertically { it },
+            exit = androidx.compose.animation.slideOutVertically { it },
+            modifier = Modifier.align(Alignment.BottomCenter)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 760.dp)
+                    .clip(RomKit.R18)
+                    .background(RomKit.Panel)
+                    .border(1.dp, RomKit.Stroke, RomKit.R18)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = {}
+                    )
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 18.dp)
+                    .navigationBarsPadding()
+                    .padding(bottom = 18.dp)
+            ) {
+                Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    com.browserhub.app.ui.kit.Grabber()
+                }
+                content()
+            }
+        }
+    }
+}
+
+@Composable ColumnScope.() -> Unit
 ) {
     BackHandler(onBack = onDismiss)
     val browserColors = LocalBrowserColors.current

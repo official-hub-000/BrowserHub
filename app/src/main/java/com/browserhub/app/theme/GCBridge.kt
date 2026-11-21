@@ -127,6 +127,14 @@ fun BrowserHubGameCornerTheme(
         LocalAccent provides accent,
         LocalAccentIdx provides (if (custom != null) GC.CUSTOM else idx)
     ) {
-        MaterialTheme(colorScheme = scheme, typography = type, content = content)
+        MaterialTheme(
+            colorScheme = scheme,
+            typography = type,
+            // Shape language from Step 4: panels 18 / buttons 16 / ghost 12 /
+            // wells 10 / pills full. BrowserHubShapes already maps those onto
+            // the Material3 slots, so one reference keeps it authoritative.
+            shapes = com.browserhub.app.ui.theme.BrowserHubShapes,
+            content = content
+        )
     }
 }

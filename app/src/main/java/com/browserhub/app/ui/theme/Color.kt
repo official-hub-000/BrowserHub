@@ -1,51 +1,77 @@
 package com.browserhub.app.ui.theme
 
 import androidx.compose.ui.graphics.Color
+import com.browserhub.app.theme.GC
+import com.browserhub.app.theme.RomKit
 
-// BrowserHub Flagship OLED Color Tokens (Exact match to screenshots)
-val OledBlack = Color(0xFF000000)
-val OledElevatedBg = Color(0xFF03060A)
-val OledCardSurface = Color(0xFF070B11)
-val OledCardVariant = Color(0xFF0D141E)
-val OledCardHigh = Color(0xFF141D2B)
-val OledBorderSubtle = Color(0xFF1C2736)
-val OledTextPrimary = Color(0xFFF8FAFC)
-val OledTextSecondary = Color(0xFF94A3B8)
-val OledTextMuted = Color(0xFF64748B)
+/*
+ * Colour token layer.
+ *
+ * These names are referenced by ~26 UI files, so the names are kept exactly as
+ * they were and only the VALUES are repointed at the GamersHub design system
+ * (theme/GameCorner.kt + theme/RomKit.kt). That is how the re-skin reaches
+ * every screen without editing every call site, and without any surface
+ * silently keeping a BrowserHub hue.
+ *
+ * Mapping rule, applied throughout: BrowserHub's decorative palette
+ * (OLED near-blacks, Flagship cyan/violet/emerald) is replaced by GC's warm
+ * near-black surfaces and single accent. Colors that carry MEANING rather than
+ * style - secure / warning / danger - keep their meaning but take GC's semantic
+ * values, per the brief: semantic signals are status only, never decoration.
+ */
 
-// Primary Brand Accents
-val FlagshipCyan = Color(0xFF00D4FF)
-val FlagshipCyanDarkBg = Color(0xFF042633)
-val FlagshipEmerald = Color(0xFF10B981)
-val FlagshipEmeraldBright = Color(0xFF22C55E)
-val FlagshipEmeraldDarkBg = Color(0xFF06261B)
-val FlagshipViolet = Color(0xFFA855F7)
-val FlagshipVioletDarkBg = Color(0xFF221238)
-val FlagshipCrimson = Color(0xFFFB7185)
-val FlagshipCrimsonDarkBg = Color(0xFF3E101C)
-val FlagshipAmber = Color(0xFFF59E0B)
-val FlagshipAmberDarkBg = Color(0xFF2E1E08)
-val FlagshipFrost = Color(0xFF7DD3FC)
-val FlagshipFireOrange = Color(0xFFF97316)
-val FlagshipFireRed = Color(0xFFEF4444)
+// ---- Surfaces: GC warm near-black, no pure black, no hue drift --------------
+val OledBlack = GC.Bg            // was #000000 pure black; GC forbids it
+val OledElevatedBg = GC.Bg       // #05060A
+val OledCardSurface = GC.Surface // #0D1017
+val OledCardVariant = GC.SurfaceHi // #141926
+val OledCardHigh = GC.TagBg      // #1A2030
+val OledBorderSubtle = GC.Stroke // #232B3D
 
-// Incognito Overrides
-val IncognitoBgDark = Color(0xFF06030D)
-val IncognitoSurfaceDark = Color(0xFF0D0818)
-val IncognitoSurfaceVariantDark = Color(0xFF171029)
-val IncognitoPrimaryDark = Color(0xFFC084FC)
-val IncognitoContainerDark = Color(0xFF2B184E)
+// ---- Text -------------------------------------------------------------------
+val OledTextPrimary = GC.Text    // #F2F5FA
+val OledTextSecondary = GC.TextDim // #8A94A8
+val OledTextMuted = GC.TextSoft  // #B6BFD0
 
-// Compatibility aliases used across screens
-val SecureMintDark = FlagshipEmerald
-val WarningAmberDark = FlagshipAmber
-val DangerRoseDark = FlagshipCrimson
+// ---- Accents ----------------------------------------------------------------
+// GC has one accent family (the red/ember tones) plus semantic signals. The old
+// multi-hue brand accents therefore collapse onto those, which is the point of
+// the re-skin: one accent, not five competing ones.
+val FlagshipCyan = RomKit.Cyan            // #35E1F2 - GC's sanctioned secondary
+val FlagshipCyanDarkBg = GC.SurfaceHi
+val FlagshipEmerald = RomKit.Good         // #38E08B - "secure" signal
+val FlagshipEmeraldBright = RomKit.Good
+val FlagshipEmeraldDarkBg = GC.SurfaceHi
+val FlagshipViolet = GC.LightRedDeep      // decorative violet -> accent pair
+val FlagshipVioletDarkBg = GC.TONES[0].bed
+val FlagshipCrimson = RomKit.Bad          // #FF5C6C - "danger" signal
+val FlagshipCrimsonDarkBg = GC.TONES[1].bed
+val FlagshipAmber = RomKit.Warn           // #FFC857 - "warning" signal
+val FlagshipAmberDarkBg = GC.TONES[5].bed
+val FlagshipFrost = GC.TextSoft
+val FlagshipFireOrange = RomKit.Ember     // #FF6900 - the accent itself
+val FlagshipFireRed = RomKit.EmberDeep    // #D95300
 
+// ---- Incognito ---------------------------------------------------------------
+// Incognito stays a distinct mode (it is a feature, not a skin), but its values
+// move into GC's warm-black family so it does not read as a foreign palette.
+val IncognitoBgDark = GC.Bg
+val IncognitoSurfaceDark = GC.Surface
+val IncognitoSurfaceVariantDark = GC.SurfaceHi
+val IncognitoPrimaryDark = RomKit.Ember
+val IncognitoContainerDark = GC.TONES[0].bed
+
+// ---- Compatibility aliases (used across screens) -----------------------------
+val SecureMintDark = RomKit.Good
+val WarningAmberDark = RomKit.Warn
+val DangerRoseDark = RomKit.Bad
+
+/** Accent list for the studio theme picker - kept as a list, now GC tones. */
 val HubAccentList = listOf(
-    FlagshipCyan,
-    FlagshipEmerald,
-    FlagshipFireOrange,
-    FlagshipViolet,
-    FlagshipCrimson,
-    FlagshipAmber
+    RomKit.Ember,
+    RomKit.Good,
+    RomKit.EmberHi,
+    GC.LightRedDeep,
+    RomKit.Bad,
+    RomKit.Warn
 )

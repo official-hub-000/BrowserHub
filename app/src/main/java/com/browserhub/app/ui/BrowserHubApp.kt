@@ -77,6 +77,8 @@ import com.browserhub.app.ui.theme.BrowserHubTheme
 import com.browserhub.app.ui.theme.LocalBrowserColors
 import com.browserhub.app.ui.viewmodel.BrowserOverlay
 import com.browserhub.app.ui.viewmodel.BrowserViewModel
+import com.browserhub.app.theme.RomKit
+import com.browserhub.app.theme.RomKitEase
 
 @Composable
 fun BrowserHubApp(viewModel: BrowserViewModel) {
@@ -268,25 +270,18 @@ fun BrowserHubApp(viewModel: BrowserViewModel) {
                                 AnimatedContent(
                                     targetState = Triple(activeTab.id, activeTab.isOnHub, secondaryTab?.id),
                                     transitionSpec = {
-                                        val switchingTabs = initialState.first != targetState.first
-                                        if (switchingTabs) {
-                                            val oldIdx = uiState.tabs.indexOfFirst { it.id == initialState.first }
-                                            val newIdx = uiState.tabs.indexOfFirst { it.id == targetState.first }
-                                            val forward = newIdx >= oldIdx
-                                            val slideSpec = spring<androidx.compose.ui.unit.IntOffset>(
-                                                dampingRatio = 0.86f,
-                                                stiffness = Spring.StiffnessMediumLow
+                                        // GamersHub tab motion, exactly as RootShell.kt:
+                                        // in from 1/8 width over Emphasized (420 ms) while
+                                        // fading; out to -1/10 over Standard (300 ms) while
+                                        // fading; one easing curve (RomKitEase) for both.
+                                        (slideInHorizontally(
+                                            tween(RomKit.Emphasized, easing = RomKitEase)
+                                        ) { it / 8 } + fadeIn(tween(RomKit.Emphasized, easing = RomKitEase)))
+                                            .togetherWith(
+                                                slideOutHorizontally(
+                                                    tween(RomKit.Standard, easing = RomKitEase)
+                                                ) { -it / 10 } + fadeOut(tween(RomKit.Standard, easing = RomKitEase))
                                             )
-                                            (slideInHorizontally(slideSpec) { if (forward) it / 4 else -it / 4 } +
-                                                fadeIn(tween(200)))
-                                                .togetherWith(
-                                                    slideOutHorizontally(tween(180)) { if (forward) -it / 5 else it / 5 } +
-                                                        fadeOut(tween(150))
-                                                )
-                                        } else {
-                                            fadeIn(tween(180))
-                                                .togetherWith(fadeOut(tween(140)))
-                                        }
                                     },
                                     label = "main_tab_transition"
                                 ) { (_, isOnHub, _) ->
@@ -474,23 +469,29 @@ fun BrowserHubApp(viewModel: BrowserViewModel) {
                         initialState == BrowserOverlay.History
 
                     when {
+                        // GamersHub overlay motion: same slide/fade pair as tabs,
+                        // one easing curve, no springs anywhere in the app.
                         targetState == BrowserOverlay.None -> {
-                            fadeIn(tween(150)).togetherWith(
-                                slideOutVertically(tween(200)) { it / 6 } + fadeOut(tween(180))
-                            )
+                            fadeOut(tween(RomKit.Standard, easing = RomKitEase))
+                                .togetherWith(
+                                    slideOutVertically(tween(RomKit.Standard, easing = RomKitEase)) { it / 10 }
+                                )
                         }
                         isFullScreenTarget -> {
-                            (slideInHorizontally(spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMedium)) { it / 4 } + fadeIn(tween(200)))
-                                .togetherWith(fadeOut(tween(150)))
+                            (slideInHorizontally(tween(RomKit.Emphasized, easing = RomKitEase)) { it / 8 } +
+                                fadeIn(tween(RomKit.Emphasized, easing = RomKitEase)))
+                                .togetherWith(fadeOut(tween(RomKit.Standard, easing = RomKitEase)))
                         }
                         isFullScreenInitial -> {
-                            fadeIn(tween(180)).togetherWith(
-                                slideOutHorizontally(tween(180)) { it / 4 } + fadeOut(tween(160))
+                            fadeIn(tween(RomKit.Standard, easing = RomKitEase)).togetherWith(
+                                slideOutHorizontally(tween(RomKit.Standard, easing = RomKitEase)) { -it / 10 }
                             )
                         }
                         else -> {
-                            (slideInVertically(spring(dampingRatio = 0.82f, stiffness = Spring.StiffnessMediumLow)) { it / 5 } + fadeIn(tween(220)))
-                                .togetherWith(slideOutVertically(tween(170)) { it / 8 } + fadeOut(tween(150)))
+                            (slideInVertically(tween(RomKit.Emphasized, easing = RomKitEase)) { it / 8 } +
+                                fadeIn(tween(RomKit.Emphasized, easing = RomKitEase)))
+                                .togetherWith(slideOutVertically(tween(RomKit.Standard, easing = RomKitEase)) { -it / 10 } +
+                                    fadeOut(tween(RomKit.Standard, easing = RomKitEase)))
                         }
                     }
                 },

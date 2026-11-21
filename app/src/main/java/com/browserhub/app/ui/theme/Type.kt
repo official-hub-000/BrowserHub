@@ -8,24 +8,46 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import com.browserhub.app.R
 
+/*
+ * Font families.
+ *
+ * The names are kept (SpaceGroteskFontFamily, PlusJakartaSansFontFamily,
+ * JetBrainsMonoFontFamily) because screens reference them, but all three now
+ * resolve to the GamersHub type system: Oxanium for display/body, monospace for
+ * labels and numbers. Oxanium is a variable font (wght 200-800, verified from
+ * the fvar table), so the weight slots below are real instances rather than
+ * synthetic bolding.
+ *
+ * This mirrors GameCorner.kt's GC.Display / GC.Body split: chunky Black/Bold/
+ * SemiBold for headings, Normal/Medium for running text.
+ */
+@OptIn(androidx.compose.ui.text.ExperimentalTextApi::class)
+private fun oxanium(weight: Int, w: FontWeight) = Font(
+    R.font.oxanium,
+    weight = w,
+    variationSettings = androidx.compose.ui.text.font.FontVariation.Settings(
+        androidx.compose.ui.text.font.FontVariation.weight(weight)
+    )
+)
+
+/** Display family - GC.Display equivalent (Black/Bold/SemiBold/Medium). */
 val SpaceGroteskFontFamily = FontFamily(
-    Font(R.font.space_grotesk, FontWeight.Normal),
-    Font(R.font.space_grotesk, FontWeight.Medium),
-    Font(R.font.space_grotesk, FontWeight.SemiBold),
-    Font(R.font.space_grotesk, FontWeight.Bold)
+    oxanium(500, FontWeight.Medium),
+    oxanium(600, FontWeight.SemiBold),
+    oxanium(700, FontWeight.Bold),
+    oxanium(800, FontWeight.Black)
 )
 
+/** Body family - GC.Body equivalent (Normal/Medium/SemiBold/Bold). */
 val PlusJakartaSansFontFamily = FontFamily(
-    Font(R.font.plus_jakarta_sans, FontWeight.Normal),
-    Font(R.font.plus_jakarta_sans, FontWeight.Medium),
-    Font(R.font.plus_jakarta_sans, FontWeight.SemiBold),
-    Font(R.font.plus_jakarta_sans, FontWeight.Bold)
+    oxanium(400, FontWeight.Normal),
+    oxanium(500, FontWeight.Medium),
+    oxanium(600, FontWeight.SemiBold),
+    oxanium(700, FontWeight.Bold)
 )
 
-val JetBrainsMonoFontFamily = FontFamily(
-    Font(R.font.jetbrains_mono, FontWeight.Normal),
-    Font(R.font.jetbrains_mono, FontWeight.Medium)
-)
+/** Mono family - used for every number, unit, status word and label. */
+val JetBrainsMonoFontFamily = FontFamily.Monospace
 
 val BrowserHubTypography = Typography(
     displaySmall = TextStyle(

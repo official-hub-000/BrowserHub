@@ -1,19 +1,221 @@
 package com.browserhub.app.ui.components
 
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.defaultMinSize
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.browserhub.app.R
+import com.browserhub.app.data.model.BrowserTab
+import com.browserhub.app.theme.RomKit
+import com.browserhub.app.theme.accentNow
+import com.browserhub.app.ui.icons.GhIcons
+import com.browserhub.app.ui.kit.AIcon
+
+/**
+ * The floating five-slot bar — GamersHub's signature shell, carrying this app's
+ * five destinations.
+ *
+ * Structure and values are taken from GamersHub's RootShell.kt: R18 panel with a
+ * 1 dp hairline, 3 dp inner padding, 5 dp item gap, R10 item clip, 23 dp glyphs,
+ * 16 dp bottom inset above the navigation bar. A selected slot animates its
+ * horizontal padding 15 dp -> 18 dp and reveals its uppercase mono label in the
+ * accent colour, both over Micro (180 ms).
+ *
+ * The public signature is unchanged, so BrowserHubApp.kt and the navigation rail
+ * keep compiling and every ViewModel action is still wired exactly as before.
+ * The five slots, their test tags, the tab-count badge and the Shields on/off
+ * state all survive the re-skin.
+ */
+@Composable
+fun BottomControlBar(
+    activeTab: BrowserTab,
+    tabCount: Int,
+    shieldsEnabled: Boolean,
+    onHome: () -> Unit,
+    onOpenShields: () -> Unit,
+    onOpenAskAi: () -> Unit,
+    onOpenTabVault: () -> Unit,
+    onOpenMenu: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val accent = accentNow()
+
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .navigationBarsPadding()
+            .padding(bottom = 16.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(5.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .clip(RomKit.R18)
+                .background(RomKit.Panel)
+                .border(1.dp, RomKit.Stroke, RomKit.R18)
+                .padding(3.dp)
+        ) {
+            // 1. Lobby (home)
+            FloatingSlot(
+                icon = GhIcons.Home,
+                label = "Lobby",
+                selected = activeTab.isOnHub,
+                onClick = onHome,
+                testTag = "nav_home_button"
+            )
+
+            // 2. Shields — selected state mirrors shieldsEnabled, as before
+            FloatingSlot(
+                icon = GhIcons.Shield,
+                label = "Shields",
+                selected = shieldsEnabled,
+                onClick = onOpenShields,
+                testTag = "nav_shields_button"
+            )
+
+            // 3. AI — the centred action, now a slot like the rest so the bar
+            // reads as one instrument panel rather than a bar plus a bubble.
+            FloatingSlot(
+                icon = GhIcons.AutoAwesome,
+                label = "AI",
+                selected = false,
+                onClick = onOpenAskAi,
+                testTag = "nav_ask_ai_button"
+            )
+
+            // 4. Tabs — keeps the count badge
+            FloatingSlot(
+                icon = GhIcons.Widgets,
+                label = "Tabs",
+                selected = false,
+                onClick = onOpenTabVault,
+                testTag = "nav_tabs_button",
+                badge = if (tabCount > 0) (if (tabCount > 99) "99+" else tabCount.toString()) else null
+            )
+
+            // 5. Tools (menu)
+            FloatingSlot(
+                icon = GhIcons.Tune,
+                label = "Tools",
+                selected = false,
+                onClick = onOpenMenu,
+                testTag = "nav_menu_button"
+            )
+        }
+    }
+}
+
+/**
+ * One slot of the floating bar. Collapsed it is an icon; selected it widens and
+ * shows its label. Colours, padding and press alpha all animate over Micro.
+ */
+@Composable
+private fun FloatingSlot(
+    icon: ImageVector,
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    testTag: String,
+    badge: String? = null
+) {
+    val accent = accentNow()
+    val navBg by animateColorAsState(
+        if (selected) RomKit.Panel2 else Color.Transparent,
+        tween(RomKit.Micro), label = "navBg"
+    )
+    val navTint by animateColorAsState(
+        if (selected) accent else RomKit.TextLo,
+        tween(RomKit.Micro), label = "navTint"
+    )
+    val inter = remember { MutableInteractionSource() }
+    val pressed by inter.collectIsPressedAsState()
+    val alpha by animateFloatAsState(
+        if (pressed) 0.80f else 1f, tween(RomKit.Micro), label = "navAlpha"
+    )
+    val hPad by animateDpAsState(
+        if (selected) 18.dp else 15.dp, tween(RomKit.Micro), label = "navPad"
+    )
+
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .graphicsLayer { this.alpha = alpha }
+            .clip(RomKit.R10)
+            .background(navBg)
+            .clickable(inter, indication = null, onClick = onClick)
+            .padding(horizontal = hPad, vertical = 12.dp)
+            .testTag(testTag)
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            AIcon(
+                icon,
+                contentDescription = label,
+                tint = navTint,
+                modifier = Modifier.size(23.dp)
+            )
+            if (badge != null) {
+                // Count badge stays mono, per the "numbers are monospace" rule.
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .clip(RomKit.RPill)
+                        .background(RomKit.Panel2)
+                        .border(1.dp, RomKit.Stroke, RomKit.RPill)
+                        .padding(horizontal = 4.dp, vertical = 1.dp)
+                ) {
+                    Text(
+                        text = badge,
+                        style = RomKit.LabelSm,
+                        color = RomKit.TextMid
+                    )
+                }
+            }
+        }
+        if (selected) {
+            Spacer(Modifier.width(9.dp))
+            Text(
+                text = label.uppercase(),
+                style = RomKit.Label.copy(fontSize = 11.sp, letterSpacing = 0.8.sp),
+                color = accent
+            )
+        }
+    }
+}
+
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -29,189 +231,9 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationRail
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.material3.minimumInteractiveComponentSize
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import com.browserhub.app.R
-import com.browserhub.app.data.model.BrowserTab
 import com.browserhub.app.ui.theme.LocalBrowserColors
-
-@Composable
-fun BottomControlBar(
-    activeTab: BrowserTab,
-    tabCount: Int,
-    shieldsEnabled: Boolean,
-    onHome: () -> Unit,
-    onOpenShields: () -> Unit,
-    onOpenAskAi: () -> Unit,
-    onOpenTabVault: () -> Unit,
-    onOpenMenu: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val browserColors = LocalBrowserColors.current
-
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.background
-    ) {
-        Column(modifier = Modifier.navigationBarsPadding()) {
-            HorizontalDivider(color = browserColors.cardBorder.copy(alpha = 0.7f))
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 8.dp, vertical = 6.dp),
-                horizontalArrangement = Arrangement.SpaceAround,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // 1. Home
-                BottomBarItem(
-                    label = "Home",
-                    selected = activeTab.isOnHub,
-                    onClick = onHome,
-                    testTag = "nav_home_button"
-                ) { tint ->
-                    Icon(
-                        imageVector = Icons.Outlined.Home,
-                        contentDescription = stringResource(R.string.cd_home),
-                        tint = tint,
-                        modifier = Modifier.size(21.dp)
-                    )
-                }
-
-                // 2. Shields
-                BottomBarItem(
-                    label = "Shields",
-                    selected = shieldsEnabled,
-                    activeTint = browserColors.emerald,
-                    onClick = onOpenShields,
-                    testTag = "nav_shields_button"
-                ) { tint ->
-                    Icon(
-                        imageVector = Icons.Outlined.Shield,
-                        contentDescription = "Shields",
-                        tint = tint,
-                        modifier = Modifier.size(21.dp)
-                    )
-                }
-
-                // 3. Highlighted Centered Ask AI Pill
-                Surface(
-                    onClick = onOpenAskAi,
-                    shape = RoundedCornerShape(16.dp),
-                    color = MaterialTheme.colorScheme.primaryContainer,
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)),
-                    modifier = Modifier
-                        .defaultMinSize(minWidth = 74.dp, minHeight = 48.dp)
-                        .testTag("nav_ask_ai_button")
-                ) {
-                    Column(
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.AutoAwesome,
-                            contentDescription = "Ask AI",
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = "Ask AI",
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                fontWeight = FontWeight.SemiBold,
-                                fontSize = 11.sp
-                            ),
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                }
-
-                // 4. Tabs
-                BottomBarItem(
-                    label = "Tabs",
-                    selected = false,
-                    onClick = onOpenTabVault,
-                    testTag = "nav_tabs_button"
-                ) { tint ->
-                    Surface(
-                        shape = RoundedCornerShape(6.dp),
-                        color = MaterialTheme.colorScheme.surfaceVariant,
-                        border = BorderStroke(1.5.dp, tint),
-                        modifier = Modifier.size(21.dp)
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Text(
-                                text = if (tabCount > 99) "99+" else tabCount.toString(),
-                                style = MaterialTheme.typography.labelSmall.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 10.sp
-                                ),
-                                color = tint
-                            )
-                        }
-                    }
-                }
-
-                // 5. Menu
-                BottomBarItem(
-                    label = "Menu",
-                    selected = false,
-                    onClick = onOpenMenu,
-                    testTag = "nav_menu_button"
-                ) { tint ->
-                    Icon(
-                        imageVector = Icons.Outlined.Menu,
-                        contentDescription = stringResource(R.string.cd_more_options),
-                        tint = tint,
-                        modifier = Modifier.size(21.dp)
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun BottomBarItem(
-    label: String,
-    selected: Boolean,
-    activeTint: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.primary,
-    onClick: () -> Unit,
-    testTag: String,
-    iconContent: @Composable (androidx.compose.ui.graphics.Color) -> Unit
-) {
-    val tint = if (selected) activeTint else MaterialTheme.colorScheme.onSurfaceVariant
-    Column(
-        modifier = Modifier
-            .defaultMinSize(minWidth = 54.dp, minHeight = 48.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 8.dp, vertical = 4.dp)
-            .testTag(testTag),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        iconContent(tint)
-        Spacer(modifier = Modifier.height(3.dp))
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall.copy(
-                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
-                fontSize = 11.sp
-            ),
-            color = tint
-        )
-    }
-}
 
 @Composable
 fun BrowserNavigationRail(
