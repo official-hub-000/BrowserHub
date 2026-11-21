@@ -113,8 +113,34 @@ jobs:
             -storepass android -keypass android \
             -dname "CN=Android Debug, O=Android, C=US"
 
+      # The failure log is not readable from this session (GitHub serves the
+      # log archive from results-receiver.actions.githubusercontent.com), so
+      # the compile is wrapped to publish the error text into the job summary
+      # and as an artifact instead of trapping it in the log.
       - name: Build debug APK
-        run: gradle assembleDebug --stacktrace --no-daemon
+        id: build
+        run: |
+          set -o pipefail
+          gradle assembleDebug --stacktrace --no-daemon --console=plain 2>&1 | tee /tmp/gradle.log
+
+      - name: Publish build error (only on failure)
+        if: failure()
+        run: |
+          {
+            echo "## Gradle failure"
+            echo '```'
+            grep -nE "e: file|error:|What went wrong|FAILURE:|Caused by|Execution failed|> Task .* FAILED" /tmp/gradle.log | head -80 || tail -80 /tmp/gradle.log
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          cp /tmp/gradle.log /tmp/gradle-error.log || true
+
+      - name: Upload build log (only on failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gradle-error-log
+          path: /tmp/gradle-error.log
+          if-no-files-found: warn
 
       - name: Collect APK
         run: |
