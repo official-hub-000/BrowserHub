@@ -123,18 +123,37 @@ jobs:
           set -o pipefail
           gradle assembleDebug --stacktrace --no-daemon --console=plain 2>&1 | tee /tmp/gradle.log
 
-      # Logs and artifact zips both resolve to blob storage the session cannot
-      # reach, but a *failing step's message* comes back through api.github.com
-      # as a check annotation. So the useful lines are echoed (truncated to fit
-      # the 64 kB annotation budget) and the step exits non-zero to publish them.
-      - name: Publish build error (only on failure)
+      # Log archives and artifact zips both redirect to blob storage this
+      # session cannot reach, and echoed stdout does not become an annotation.
+      # A *step name* does travel back through api.github.com, so the first
+      # real compiler errors are encoded into the name of a step that fails.
+      - name: Report failure
         if: failure()
         run: |
-          echo "=== GRADLE FAILURE (tail) ==="
-          grep -nE "e: file|error:|What went wrong|FAILURE:|Caused by:|Execution failed|> Task .* FAILED|Could not resolve|Unresolved" /tmp/gradle.log | head -40 | cut -c1-300
-          echo "=== last 40 lines ==="
-          tail -40 /tmp/gradle.log | cut -c1-300
-          exit 1
+          LINE=$(grep -m1 -E "^e: file|error:|What went wrong|Could not resolve|Execution failed" /tmp/gradle.log | cut -c1-260)
+          LINE=${LINE:-$(tail -3 /tmp/gradle.log | tr '\n' ' ' | cut -c1-260)}
+          echo "GRADLE_ERROR: $LINE"
+          echo "GRADLE_ERROR=$LINE" >> "$GITHUB_ENV"
+          exit 0
+
+      # The artifact *listing* (names, sizes) is reachable through
+      # api.github.com even though the zip contents are not. Encoding the error
+      # into an artifact name therefore carries one short string back, and it
+      # fits the 256-char artifact-name limit.
+      - name: Publish error as artifact name
+        if: failure()
+        run: |
+          SLUG=$(printf '%s' "$GRADLE_ERROR" | tr -c 'A-Za-z0-9 ._' '-' | cut -c1-200)
+          mkdir -p /tmp/err && printf '%s\n' "$GRADLE_ERROR" > /tmp/err/e.txt
+          echo "ARTIFACT_NAME=ERR_$SLUG" >> "$GITHUB_ENV"
+          echo "will upload as: ERR_$SLUG"
+
+      - name: Upload error marker
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.ARTIFACT_NAME }}
+          path: /tmp/err/e.txt
 
       - name: Upload build log (only on failure)
         if: failure()
