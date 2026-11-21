@@ -474,9 +474,13 @@ fun BrowserHubApp(viewModel: BrowserViewModel) {
                         // GamersHub overlay motion: same slide/fade pair as tabs,
                         // one easing curve, no springs anywhere in the app.
                         targetState == BrowserOverlay.None -> {
-                            fadeOut(tween(RomKit.Standard, easing = RomKitEase))
+                            // Enter side must be an EnterTransition and the exit
+                            // side an ExitTransition; a closing overlay simply
+                            // fades in nothing and slides out.
+                            fadeIn(tween(RomKit.Standard, easing = RomKitEase))
                                 .togetherWith(
-                                    slideOutVertically(tween(RomKit.Standard, easing = RomKitEase)) { it / 10 }
+                                    slideOutVertically(tween(RomKit.Standard, easing = RomKitEase)) { it / 10 } +
+                                        fadeOut(tween(RomKit.Standard, easing = RomKitEase))
                                 )
                         }
                         isFullScreenTarget -> {
